@@ -1,41 +1,103 @@
-#pragma once
-
-/**
- * CheckpointSystem - Brain state serialization and checkpointing
- * 
- * Provides robust checkpointing for large-scale neural simulations.
- * Supports incremental saves, version compatibility, and validation.
- * 
- * Features:
- * - Complete brain state serialization
- * - Incremental checkpointing
- * - Version compatibility checks
- * - Integrity validation
- * - Streaming for large checkpoints
- * 
- * Stored state:
- * - Neuron states (membrane potential, firing state, etc.)
- * - Synapse states (weights, plasticity, etc.)
- * - Spike history (recent)
- * - Plasticity state (eligibility traces, etc.)
- * - Developmental state
- * - Random generator state
- * - Simulation clock
- * - Environment state (optional)
- */
-
-#include "../core/Types/Types.hpp"
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <memory>
-#include <optional>
-#include <fstream>
-#include <functional>
-#include <variant>
-
 namespace nlm {
+
+// Phase 5 checkpoint payload helpers for the extra sections. Format is
+// deliberately simple and self-describing per value: a uint64 count
+// followed by raw elements, in a fixed order per section. All readers
+// bounds-check and fail the section (not the whole load) on truncation,
+// so a corrupt extra section degrades to the Phase 4 behaviour instead
+// of aborting a load that would otherwise succeed.
+namespace {
+void p5AppendU64(std::vector<uint8_t>& out, uint64_t v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+void p5AppendFloat(std::vector<uint8_t>& out, float v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+void p5AppendDouble(std::vector<uint8_t>& out, double v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+template <typename T>
+void p5AppendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
+    p5AppendU64(out, static_cast<uint64_t>(v.size()));
+    if (!v.empty()) {
+        const uint8_t* b = reinterpret_cast<const uint8_t*>(v.data());
+        out.insert(out.end(), b, b + v.size() * sizeof(T));
+    }
+}
+
+struct P5Reader {
+    const uint8_t* p;
+    const uint8_t* end;
+    bool ok = true;
+    bool u64(uint64_t& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    bool f32(float& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    bool f64(double& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    template <typename T>
+    bool vec(std::vector<T>& v) {
+        uint64_t n = 0;
+        if (!u64(n)) return false;
+        if (n > 10000000) { ok = false; return false; }
+        if (end - p < static_cast<std::ptrdiff_t>(n * sizeof(T))) { ok = false; return false; }
+        v.resize(static_cast<size_t>(n));
+        if (n > 0) {
+            std::memcpy(v.data(), p, static_cast<size_t>(n) * sizeof(T));
+            p += static_cast<std::ptrdiff_t>(n * sizeof(T));
+        }
+        return true;
+    }
+};
+
+} // namespace
+
+// Checkpoint state structures for integrated systems
+struct PredictionSystemState {
+    std::vector<std::vector<float>> errorHistory;
+    std::vector<std::vector<float>> predictionStates;
+    std::vector<float> predictionErrors;
+};
+
+struct NeuralPlannerState {
+    std::vector<uint64_t> actionHistory;
+    std::vector<float> actionQualities;
+};
+
+struct ConceptFormationState {
+    std::vector<uint64_t> conceptIds;
+    std::vector<std::vector<float>> conceptPrototypes;
+};
+
+struct AttentionSystemState {
+    std::vector<float> attentionWeights;
+    std::vector<std::vector<float>> attentionHistory;
+};
+
+struct NeuromodulationSystemState {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionError;
+};
+
+struct DevelopmentSystemState {
+    float plasticityModifier;
+    uint64_t stage;
+    float criticalPeriodProgress;
+    float age;
+};
+
+} // namespace nlm
 
 // Checkpoint version for compatibility
 constexpr uint32_t CHECKPOINT_VERSION_MAJOR = 1;
@@ -69,7 +131,12 @@ enum class CheckpointSection : uint32_t {
     SimulationState = 11,
     Environment = 12,
     Checksum = 13,
-    End = 14
+    End = 14,
+    // Phase 6 integrated system sections
+    Prediction = 15,
+    Planner = 16,
+    ConceptFormation = 17,
+    Attention = 18
 };
 
 /**

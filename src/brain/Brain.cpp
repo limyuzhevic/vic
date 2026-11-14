@@ -1083,6 +1083,131 @@ bool Brain::save(const std::string& filepath) const {
             writer.bufferSection(CheckpointSection::Memory, payload);
         }
         
+        // Phase 5 extra sections for integrated systems
+        {
+            std::vector<uint8_t> payload;
+            
+            // Prediction system state
+            if (pImpl->predictionSystem) {
+                // Save prediction system state
+                auto predHistory = pImpl->predictionSystem->getErrorHistory();
+                auto predStates = pImpl->predictionSystem->getPredictionStates();
+                auto predErrors = pImpl->predictionSystem->getPredictionErrors();
+                
+                p5AppendU64(payload, static_cast<uint64_t>(predHistory.size()));
+                for (const auto& hist : predHistory) p5AppendVec<float>(payload, hist);
+                
+                p5AppendU64(payload, static_cast<uint64_t>(predStates.size()));
+                for (const auto& state : predStates) p5AppendVec<float>(payload, state);
+                
+                p5AppendU64(payload, static_cast<uint64_t>(predErrors.size()));
+                for (const auto& err : predErrors) p5AppendFloat(payload, err);
+            } else {
+                p5AppendU64(payload, 0);
+                p5AppendU64(payload, 0);
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::Prediction, payload);
+        }
+        {
+            std::vector<uint8_t> payload;
+            
+            // Neural planner state
+            if (pImpl->planner) {
+                auto plannerActions = pImpl->planner->getActionHistory();
+                auto plannerQualities = pImpl->planner->getActionQualities();
+                p5AppendU64(payload, static_cast<uint64_t>(plannerActions.size()));
+                for (const auto& action : plannerActions) p5AppendU64(payload, action);
+                p5AppendU64(payload, static_cast<uint64_t>(plannerQualities.size()));
+                for (const auto& quality : plannerQualities) p5AppendFloat(payload, quality);
+            } else {
+                p5AppendU64(payload, 0);
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::Planner, payload);
+        }
+        {
+            std::vector<uint8_t> payload;
+            
+            // Concept formation state
+            if (pImpl->conceptFormation) {
+                auto concepts = pImpl->conceptFormation->getConcepts();
+                auto conceptPrototypes = pImpl->conceptFormation->getConceptPrototypes();
+                p5AppendU64(payload, static_cast<uint64_t>(concepts.size()));
+                for (const auto& concept : concepts) p5AppendU64(payload, concept);
+                p5AppendU64(payload, static_cast<uint64_t>(conceptPrototypes.size()));
+                for (const auto& proto : conceptPrototypes) p5AppendVec<float>(payload, proto);
+            } else {
+                p5AppendU64(payload, 0);
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::ConceptFormation, payload);
+        }
+        {
+            std::vector<uint8_t> payload;
+            
+            // Attention system state
+            if (pImpl->attention) {
+                auto attentionWeights = pImpl->attention->getAttentionWeights();
+                auto attentionHistory = pImpl->attention->getAttentionHistory();
+                p5AppendU64(payload, static_cast<uint64_t>(attentionWeights.size()));
+                for (const auto& weight : attentionWeights) p5AppendFloat(payload, weight);
+                p5AppendU64(payload, static_cast<uint64_t>(attentionHistory.size()));
+                for (const auto& hist : attentionHistory) p5AppendVec<float>(payload, hist);
+            } else {
+                p5AppendU64(payload, 0);
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::Attention, payload);
+        }
+        {
+            std::vector<uint8_t> payload;
+            
+            // Neuromodulation system states
+            if (pImpl->dopamine) {
+                p5AppendFloat(payload, pImpl->dopamine->getLevel());
+                p5AppendFloat(payload, pImpl->dopamine->getPlasticityFactor());
+            } else {
+                p5AppendFloat(payload, 0.0f);
+                p5AppendFloat(payload, 0.0f);
+            }
+            if (pImpl->curiosity) {
+                p5AppendFloat(payload, pImpl->curiosity->getLevel());
+                p5AppendFloat(payload, pImpl->curiosity->getExplorationDrive());
+            } else {
+                p5AppendFloat(payload, 0.0f);
+                p5AppendFloat(payload, 0.0f);
+            }
+            if (pImpl->novelty) {
+                p5AppendFloat(payload, pImpl->novelty->getLevel());
+            } else {
+                p5AppendFloat(payload, 0.0f);
+            }
+            if (pImpl->predictionError) {
+                p5AppendFloat(payload, pImpl->predictionError->getError());
+                p5AppendFloat(payload, pImpl->predictionError->getMagnitude());
+            } else {
+                p5AppendFloat(payload, 0.0f);
+                p5AppendFloat(payload, 0.0f);
+            }
+            writer.bufferSection(CheckpointSection::Neuromodulation, payload);
+        }
+        {
+            std::vector<uint8_t> payload;
+            
+            // Development system state
+            if (pImpl->developmentSystem) {
+                p5AppendFloat(payload, static_cast<float>(pImpl->developmentSystem->getPlasticityModifier()));
+                p5AppendU64(payload, static_cast<uint64_t>(pImpl->developmentSystem->getStage()));
+                p5AppendFloat(payload, pImpl->developmentSystem->getCriticalPeriodProgress());
+            } else {
+                p5AppendFloat(payload, 1.0f);
+                p5AppendU64(payload, static_cast<uint64_t>(0));
+                p5AppendFloat(payload, 0.0f);
+            }
+            writer.bufferSection(CheckpointSection::Development, payload);
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -1364,9 +1489,57 @@ bool Brain::load(const std::string& filepath) {
                 }
             }
         }
-
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+        {
+            // Phase 6: Restore integrated system states
+            PredictionSystemState predState;
+            if (reader.readPredictionSystem(predState)) {
+                if (pImpl->predictionSystem) {
+                    pImpl->predictionSystem->restoreState(predState);
+                }
+            }
+        }
+        {
+            NeuralPlannerState plannerState;
+            if (reader.readNeuralPlanner(plannerState)) {
+                if (pImpl->planner) {
+                    pImpl->planner->restoreState(plannerState);
+                }
+            }
+        }
+        {
+            ConceptFormationState conceptState;
+            if (reader.readConceptFormation(conceptState)) {
+                if (pImpl->conceptFormation) {
+                    pImpl->conceptFormation->restoreState(conceptState);
+                }
+            }
+        }
+        {
+            AttentionSystemState attentionState;
+            if (reader.readAttentionSystem(attentionState)) {
+                if (pImpl->attention) {
+                    pImpl->attention->restoreState(attentionState);
+                }
+            }
+        }
+        {
+            NeuromodulationSystemState neuromodState;
+            if (reader.readNeuromodulationSystem(neuromState)) {
+                if (pImpl->dopamine) pImpl->dopamine->setLevel(neuromState.dopamineLevel);
+                if (pImpl->curiosity) pImpl->curiosity->setLevel(neuromState.curiosityLevel);
+                if (pImpl->novelty) pImpl->novelty->setLevel(neuromState.noveltyLevel);
+                if (pImpl->predictionError) pImpl->predictionError->setError(neuromState.predictionError);
+            }
+        }
+        {
+            DevelopmentSystemState devState;
+            if (reader.readDevelopmentSystem(devState)) {
+                if (pImpl->developmentSystem) {
+                    pImpl->developmentSystem->setStage(devState.stage);
+                    pImpl->developmentSystem->setAge(devState.age);
+                }
+            }
+        }
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());

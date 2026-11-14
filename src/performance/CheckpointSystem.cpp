@@ -71,23 +71,41 @@ std::vector<uint8_t> serializeNeurons(const NeuronCheckpointData& d) {
     return out;
 }
 
-bool parseNeurons(const std::vector<uint8_t>& payload, NeuronCheckpointData& d) {
-    const uint8_t* p = payload.data();
-    const uint8_t* end = p + payload.size();
-    return readVec(p, end, d.membranePotential) &&
-           readVec(p, end, d.restingPotential) &&
-           readVec(p, end, d.threshold) &&
-           readVec(p, end, d.resetPotential) &&
-           readVec(p, end, d.leakConductance) &&
-           readVec(p, end, d.firingState) &&
-           readVec(p, end, d.refractoryRemaining) &&
-           readVec(p, end, d.refractoryPeriod) &&
-           readVec(p, end, d.lastSpikeTime) &&
-           readVec(p, end, d.firingRate) &&
-           readVec(p, end, d.neuronType) &&
-           readVec(p, end, d.regionId) &&
-           readVec(p, end, d.populationId) &&
-           p == end;
+bool parsePredictionSystem(const std::vector<uint8_t>& payload, PredictionSystemState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.vec(state.errorHistory) && r.vec(state.predictionStates) && r.vec(state.predictionErrors);
+}
+
+bool parseNeuralPlanner(const std::vector<uint8_t>& payload, NeuralPlannerState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.vec(state.actionHistory) && r.vec(state.actionQualities);
+}
+
+bool parseConceptFormation(const std::vector<uint8_t>& payload, ConceptFormationState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.vec(state.conceptIds) && r.vec(state.conceptPrototypes);
+}
+
+bool parseAttentionSystem(const std::vector<uint8_t>& payload, AttentionSystemState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.vec(state.attentionWeights) && r.vec(state.attentionHistory);
+}
+
+bool parseNeuromodulationSystem(const std::vector<uint8_t>& payload, NeuromodulationSystemState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.f32(state.dopamineLevel) && r.f32(state.curiosityLevel) &&
+           r.f32(state.noveltyLevel) && r.f32(state.predictionError);
+}
+
+bool parseDevelopmentSystem(const std::vector<uint8_t>& payload, DevelopmentSystemState& state) {
+    if (payload.empty()) return true;
+    P5Reader r{payload.data(), payload.data() + payload.size()};
+    return r.ok && r.f32(state.plasticityModifier) && r.u64(state.stage) && r.f32(state.criticalPeriodProgress);
 }
 
 std::vector<uint8_t> serializeSynapses(const SynapseCheckpointData& d) {
@@ -369,7 +387,11 @@ bool CheckpointWriter::finalize() {
     for (CheckpointSection type : {CheckpointSection::SimulationState,
                                    CheckpointSection::RandomState,
                                    CheckpointSection::Plasticity,
-                                   CheckpointSection::Memory}) {
+                                   CheckpointSection::Memory,
+                                   CheckpointSection::Prediction,
+                                   CheckpointSection::Planner,
+                                   CheckpointSection::ConceptFormation,
+                                   CheckpointSection::Attention}) {
         for (const auto& entry : extraPayloads_) {
             if (entry.first == type && !entry.second.empty()) {
                 if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
@@ -489,18 +511,131 @@ std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoint
     return infos;
 }
 
-void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
-    auto infos = listCheckpoints();
-    if (infos.size() <= keepCount) return;
-    size_t toRemove = infos.size() - keepCount;
-    for (size_t i = 0; i < toRemove; ++i) {
-        std::error_code ec;
-        std::filesystem::remove(std::filesystem::path(checkpointDir_) / infos[i].name, ec);
-    }
-}
-
 std::string CheckpointManager::getLastCheckpointPath() const {
     return lastCheckpointPath_;
 }
 
-} // namespace nlm
+// ---------------- CheckpointReader ----------------
+
+CheckpointReader::CheckpointReader() : stream_(), header_(), error_(), streamPos_(0), sections_() {}
+
+bool CheckpointReader::open(const std::string& filepath) {
+    close();
+    filepath_ = filepath;
+    sections_.clear();
+    stream_.open(filepath, std::ios::binary | std::ios::in);
+    if (!stream_) return false;
+    
+    streamPos_ = 0;
+    stream_.seekg(0, std::ios::end);
+    if (!stream_) return false;
+    size_t fileSize = static_cast<size_t>(stream_.tellg());
+    stream_.seekg(0, std::ios::beg);
+    
+    if (fileSize < sizeof(SectionHeader)) return false;
+    
+    if (!readHeader()) return false;
+    
+    while (streamPos_ < header_.totalSize) {
+        SectionHeader section;
+        stream_.read(reinterpret_cast<char*>(&section), sizeof(section));
+        if (!stream_) break;
+        
+        sections_.push_back(section);
+        streamPos_ += sizeof(section);
+        
+        if (section.type == static_cast<uint32_t>(CheckpointSection::End)) break;
+    }
+    
+    return true;
+}
+
+void CheckpointReader::close() {
+    if (stream_.is_open()) {
+        stream_.close();
+    }
+    streamPos_ = 0;
+    sections_.clear();
+}
+
+bool CheckpointReader::validate() const {
+    if (!stream_.is_open()) return false;
+    if (header_.magic != CHECKPOINT_MAGIC) return false;
+    if (header_.majorVersion > CHECKPOINT_VERSION_MAJOR) return false;
+    return true;
+}
+
+bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
+    auto payload = readSection(CheckpointSection::Neurons);
+    if (payload.empty() && header_.neuronCount > 0) return false;
+    if (!parseNeurons(payload, data)) {
+        error_ = "failed to parse neuron section";
+        return false;
+    }
+    if (data.membranePotential.size() != header_.neuronCount) {
+        error_ = "neuron count in payload does not match header";
+        return false;
+    }
+    return true;
+}
+
+bool CheckpointReader::readDelayedSpikes(std::vector<DelayedSpikeEvent>& events) {
+    events.clear();
+    auto payload = readSection(CheckpointSection::SpikeHistory);
+    if (payload.empty()) return true;  // Absent section: legacy checkpoint, no pending spikes.
+    if (!parseDelayedSpikes(payload, events)) {
+        error_ = "failed to parse delayed spike section";
+        return false;
+    }
+    return true;
+}
+
+bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {
+    auto payload = readSection(CheckpointSection::Synapses);
+    if (payload.empty() && header_.synapseCount > 0) return false;
+    if (!parseSynapses(payload, data)) {
+        error_ = "failed to parse synapse section";
+        return false;
+    }
+    if (data.weight.size() != header_.synapseCount) {
+        error_ = "synapse count in payload does not match header";
+        return false;
+    }
+    return true;
+}
+
+bool CheckpointReader::readPredictionSystem(PredictionSystemState& state) {
+    auto payload = readSection(CheckpointSection::Prediction);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parsePredictionSystem(payload, state);
+}
+
+bool CheckpointReader::readNeuralPlanner(NeuralPlannerState& state) {
+    auto payload = readSection(CheckpointSection::Planner);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parseNeuralPlanner(payload, state);
+}
+
+bool CheckpointReader::readConceptFormation(ConceptFormationState& state) {
+    auto payload = readSection(CheckpointSection::ConceptFormation);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parseConceptFormation(payload, state);
+}
+
+bool CheckpointReader::readAttentionSystem(AttentionSystemState& state) {
+    auto payload = readSection(CheckpointSection::Attention);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parseAttentionSystem(payload, state);
+}
+
+bool CheckpointReader::readNeuromodulationSystem(NeuromodulationSystemState& state) {
+    auto payload = readSection(CheckpointSection::Neuromodulation);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parseNeuromodulationSystem(payload, state);
+}
+
+bool CheckpointReader::readDevelopmentSystem(DevelopmentSystemState& state) {
+    auto payload = readSection(CheckpointSection::Development);
+    if (payload.empty()) return true;  // Absent section is OK for backward compatibility
+    return parseDevelopmentSystem(payload, state);
+}
