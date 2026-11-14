@@ -34,7 +34,15 @@ void Reward::reset() {
 
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // PLACEHOLDER: Implement reward computation based on sensory input and current state
+    
+    // For now, return 0.0f as the environment doesn't provide observation data
+    // In Phase 2, this should analyze:
+    // - Vision input to detect resources vs hazards
+    // - Internal signals for energy, health, etc.
+    // - Action consequences to compute immediate rewards
+    // - Long-term planning rewards (exploration, discovery, survival)
+    
     return 0.0f;
 }
 

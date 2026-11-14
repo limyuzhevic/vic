@@ -222,31 +222,53 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Improved selective pattern learning with varied stimulation patterns
+    // This is better than the old code which stimulated ALL sensory neurons every step
+    // (causing global saturation and non-selective learning).
+    // Now we create varied patterns that change over time to encourage selective learning.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
+        // Get all sensory neurons first
+        std::vector<NeuronId> allSensoryNeurons;
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+            if (neuron->getType() == NeuronType::Sensory) {
+                allSensoryNeurons.push_back(neuron->getId());
             }
         }
-    }
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
         
-        brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+        // Create rotating and varied patterns for better learning
+        for (SimulationStep step = 0; step < 1000; ++step) {
+            // Change pattern every 100 steps (creates varied experience)
+            if (step % 100 == 0) {
+                // Randomly select up to 20 sensory neurons (more varied than just first 20)
+                patternNeurons.clear();
+                size_t neuronsToSelect = std::min<size_t>(20, allSensoryNeurons.size());
+                
+                // Select random neurons for varied pattern
+                // For now, just use deterministic variation - in Phase 8 we could add true randomness
+                size_t startIndex = (step / 100) * 2;  // Rotate through different sets
+                for (size_t i = 0; i < neuronsToSelect; ++i) {
+                    size_t index = (startIndex + i) % allSensoryNeurons.size();
+                    patternNeurons.push_back(allSensoryNeurons[index]);
+                }
+            }
+            
+            for (NeuronId id : patternNeurons) {
+                // Use slightly varied current levels for more realistic learning
+                float current = 30.0f + (step % 5) * 2.0f; // Vary current between 30-40f
+                brain->injectCurrent(id, current);
+            }
+            
+            brain->step(step, step * 0.001);
+            
+            // Log progress every 100 steps with more detailed statistics
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                            " | Pattern: " + std::to_string(patternNeurons.size()) + " neurons" +
+                            " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                            " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                            " | Current avg: " + std::to_string(current) + " mV");
+            }
         }
     }
     

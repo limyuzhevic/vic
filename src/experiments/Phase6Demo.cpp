@@ -81,5 +81,42 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
+    // Log comprehensive test results summary
+    std::cout << std::endl;
+    std::cout << "=== COMPREHENSIVE TEST RESULTS ===" << std::endl;
+    std::cout << "Total reward accumulated: " << result.totalReward << std::endl;
+    std::cout << "Average firing rate: " << result.avgFiringRate << " Hz" << std::endl;
+    std::cout << "Memory episodes stored: " << result.memoryEpisodesStored << std::endl;
+    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
+    std::cout << std::endl;
+    std::cout << "INTEGRATION STATUS CHECKLIST:" << std::endl;
+    std::cout << "  Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED") << std::endl;
+    std::cout << "  Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED") << std::endl;
+    std::cout << "  Neuromodulation: " << (result.neuromodulationIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED") << std::endl;
+    std::cout << "  Prediction System: " << (result.predictionIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED") << std::endl;
+    std::cout << "  Development System: " << (result.developmentIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED") << std::endl;
+    std::cout << "  Checkpointing: " << (result.checkpointingWorks ? "✓ WORKING" : "✗ NOT WORKING") << std::endl;
+    
+    // Determine overall integration health
+    int integratedSystems = 0;
+    if (result.memoryWorkingMemoryIntegrated) integratedSystems++;
+    if (result.memoryEpisodicMemoryIntegrated) integratedSystems++;
+    if (result.neuromodulationIntegrated) integratedSystems++;
+    if (result.predictionIntegrated) integratedSystems++;
+    if (result.developmentIntegrated) integratedSystems++;
+    
+    std::cout << "  Overall Integration Score: " << integratedSystems << "/5 systems connected" << std::endl;
+    
+    if (integratedSystems >= 4) {
+        std::cout << "✓ Phase 6 Integration: SUCCESS" << std::endl;
+    } else {
+        std::cout << "⚠ Phase 6 Integration: NEEDS WORK" << std::endl;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
     return 0;
 }
