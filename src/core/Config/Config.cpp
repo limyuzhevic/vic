@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "ErrorHandling.h"
 
 namespace nlm {
 
@@ -24,6 +25,12 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        GlobalErrorHandler::instance().reportError(
+            ErrorHelpers::makeError(ErrorCode::CONFIG_FILE_NOT_FOUND,
+                                   ErrorCategory::CONFIG,
+                                   ErrorSeverity::ERROR,
+                                   "Failed to open configuration file: " + filepath,
+                                   "loadFromFile"));
         return false;
     }
     
@@ -48,7 +55,26 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key format
+            if (key.empty()) {
+                GlobalErrorHandler::instance().reportError(
+                    ErrorHelpers::makeError(ErrorCode::CONFIG_SYNTAX_ERROR,
+                                           ErrorCategory::CONFIG,
+                                           ErrorSeverity::WARNING,
+                                           "Empty key found in configuration file at line: " + std::to_string(fileTellg(file)),
+                                           "loadFromFile"));
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            // Warn about malformed line but continue processing
+            GlobalErrorHandler::instance().reportError(
+                ErrorHelpers::makeError(ErrorCode::CONFIG_SYNTAX_ERROR,
+                                       ErrorCategory::CONFIG,
+                                       ErrorSeverity::WARNING,
+                                       "Invalid line format in configuration file: " + line,
+                                       "loadFromFile"));
         }
     }
     
@@ -56,40 +82,91 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    GlobalErrorHandler::instance().reportError(
+                        ErrorHelpers::makeError(ErrorCode::CONFIG_SYNTAX_ERROR,
+                                               ErrorCategory::CONFIG,
+                                               ErrorSeverity::WARNING,
+                                               "Invalid command line argument format: " + arg,
+                                               "loadFromArgs"));
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                GlobalErrorHandler::instance().reportError(
+                    ErrorHelpers::makeError(ErrorCode::CONFIG_SYNTAX_ERROR,
+                                           ErrorCategory::CONFIG,
+                                           ErrorSeverity::WARNING,
+                                           "Invalid command line argument: " + arg,
+                                           "loadFromArgs"));
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        GlobalErrorHandler::instance().reportError(
+            ErrorHelpers::makeError(ErrorCode::CONFIG_SYNTAX_ERROR,
+                                   ErrorCategory::CONFIG,
+                                   ErrorSeverity::ERROR,
+                                   std::string("Exception in loadFromArgs: ").append(e.what()),
+                                   "loadFromArgs"));
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        GlobalErrorHandler::instance().reportError(
+            ErrorHelpers::makeError(ErrorCode::IO_FILE_OPEN_FAILED,
+                                   ErrorCategory::IO,
+                                   ErrorSeverity::ERROR,
+                                   "Failed to open configuration file for writing: " + filepath,
+                                   "saveToFile"));
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        }
+        
+        // Check if write succeeded
+        if (file.fail()) {
+            GlobalErrorHandler::instance().reportError(
+                ErrorHelpers::makeError(ErrorCode::IO_FILE_WRITE_FAILED,
+                                       ErrorCategory::IO,
+                                       ErrorSeverity::ERROR,
+                                       "Failed to write configuration to file: " + filepath,
+                                       "saveToFile"));
+            return false;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        GlobalErrorHandler::instance().reportError(
+            ErrorHelpers::makeError(ErrorCode::IO_FILE_WRITE_FAILED,
+                                   ErrorCategory::IO,
+                                   ErrorSeverity::ERROR,
+                                   std::string("Exception in saveToFile: ").append(e.what()),
+                                   "saveToFile"));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

@@ -1,5 +1,14 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Important:** This guide covers both C++ usage and Python usage. For Python bindings (`pynlm`):
+
+- Use `pip install .` from this directory to build the Python module
+- Or build with CMake using `-DNLM_BUILD_PYTHON_BINDINGS=ON`
+
+Without building the Python bindings first, Python examples will not work.
+
+---
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -40,6 +49,22 @@ for i in range(100):
     brain.step(i)  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+```
+
+**Note**: The Python bindings (`pynlm`) require building with Python bindings enabled. For the easiest setup:
+
+**Option 1 - Using pip:**
+```bash
+cd /path/to/nlm
+pip install .
+```
+
+**Option 2 - Building with CMake:**
+```bash
+cd /path/to/nlm
+mkdir build && cd build
+cmake -DNLM_BUILD_PYTHON_BINDINGS=ON ..
+make
 ```
 
 ### Example 2: Brain in a Simple World
@@ -276,6 +301,7 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Make sure Python bindings are built (see Quick Start section above)
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
@@ -284,6 +310,12 @@ print("Agent simulation complete!")
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Make sure Python bindings are properly installed
+
+**"import pynlm failed"**
+- This error typically means Python bindings are not built
+- Build with: `cmake -DNLM_BUILD_PYTHON_BINDINGS=ON ..` followed by `make`
+- Or easier: `pip install .` from this directory
 
 ---
 
@@ -293,5 +325,27 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. For advanced users: The Python bindings (`pynlm`) are built separately
+
+**Python Bindings Setup:**
+
+The NLM Python bindings are built using scikit-build and can be installed via pip:
+
+```bash
+# The easiest way (requires Python development tools and scikit-build)
+cd /path/to/nlm
+pip install .
+```
+
+Or build with CMake directly:
+```bash
+# If you have pybind11 installed
+cd /path/to/nlm
+mkdir build && cd build
+cmake -DNLM_BUILD_PYTHON_BINDINGS=ON ..
+make
+```
+
+**Important:** By default, the CMake build does NOT include Python bindings for simpler C++ builds. Python bindings require setting `-DNLM_BUILD_PYTHON_BINDINGS=ON` during CMake configuration.
 
 That's it! You're now ready to use NLM.
