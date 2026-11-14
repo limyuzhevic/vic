@@ -179,6 +179,12 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
+# Demo executable
+add_executable(nlm_demo
+    demo/nlm_demo.cpp
+)
+target_link_libraries(nlm_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
 # but the root CMakeLists never built the module — pip install
@@ -201,12 +207,24 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Prediction integration test executable
+add_executable(test_prediction_integration
+    test_prediction_integration.cpp
+)
+target_link_libraries(test_prediction_integration PUBLIC nlm_core)
+
+# Checkpoint integration test executable
+add_executable(test_checkpoint_integration
+    test_checkpoint_integration.cpp
+)
+target_link_libraries(test_checkpoint_integration PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_demo test_prediction_integration test_checkpoint_integration
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

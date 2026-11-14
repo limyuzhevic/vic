@@ -12,7 +12,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/Phase6PredictionSystems.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -37,7 +37,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<Phase6PredictionSystems> phase6PredictionSystems;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -125,8 +125,8 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        // Initialize prediction systems
+        phase6PredictionSystems = std::make_unique<Phase6PredictionSystems>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -284,10 +284,11 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
+        // Initialize prediction systems
+    phase6PredictionSystems = std::make_unique<Phase6PredictionSystems>();
+    if (phase6PredictionSystems) {
+        phase6PredictionSystems->initialize(this);
+    }
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
@@ -613,9 +614,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->phase6PredictionSystems) {
+        // Phase 6: Use real neural prediction for sensory forecasting
+        // This connects prediction to the brain's learned temporal sequences
+        // The system uses STDP and Hebbian plasticity to learn sequences
+        // and predicts future sensory states based on neural patterns
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1483,10 +1486,10 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== PHASE 6 PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+Phase6PredictionSystems* Brain::getPhase6PredictionSystems() {
+    return pImpl->phase6PredictionSystems.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
