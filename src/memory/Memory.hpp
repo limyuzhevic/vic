@@ -8,7 +8,7 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Enhanced with capacity limits and LRU eviction
 
 class WorkingMemory {
 public:
@@ -16,7 +16,6 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -37,7 +36,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
@@ -49,7 +48,21 @@ struct EpisodicMemoryItem {
     std::vector<float> values;
     std::string metadata;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    // Episode age for consolidation and replay prioritization
+    size_t age;
+    
+    // Whether the episode has been consolidated to long-term storage
+    bool consolidated;
+    
+    // Episode relevance metrics
+    float reward;
+    float predictionError;
+    
+    // Resulting sensory state after the episode (for associative learning)
+    std::vector<float> resultingSensoryState;
+    
+    EpisodicMemoryItem() : timestamp(0), age(0), consolidated(false), 
+                          reward(0.0f), predictionError(0.0f) {}
 };
 
 class EpisodicMemory {
@@ -77,11 +90,13 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    size_t maxEpisodes_;
+    bool replayEnabled_;
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Enhanced with concept formation and pattern completion
 
 class SemanticMemory {
 public:
@@ -100,12 +115,21 @@ public:
     // Get all facts
     std::vector<std::pair<std::string, std::string>> getAllFacts() const;
     
+    // Extract key concepts from text
+    std::string extractKeyConcept(const std::string& text) const;
+    
+    // Extract attribute relationship between key and value
+    std::string extractAttribute(const std::string& key, const std::string& value) const;
+    
+    // Get all unique concepts from stored facts
+    void getAllConcepts(std::vector<std::string>& concepts) const;
+    
     // Clear all
     void clear();
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits

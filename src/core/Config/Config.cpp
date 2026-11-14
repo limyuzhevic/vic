@@ -3,8 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <unordered_map>
 
 namespace nlm {
+
+// Forward declaration for JSON parsing helper
+static bool parseJsonFile(const std::string& filepath, Config& config);
+static bool parseYamlFile(const std::string& filepath, Config& config);
+static bool parseSimpleFile(const std::string& filepath, Config& config);
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -18,10 +26,173 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// JSON parsing helper
+static bool parseJsonFile(const std::string& filepath, Config& config) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Simple JSON parsing for common cases
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Remove whitespace
+    std::string trimmed;
+    for (char c : content) {
+        if (!std::isspace(c)) {
+            trimmed += c;
+        }
+    }
+    
+    // Simple key=value pair extraction from JSON-like format
+    // This handles basic JSON objects like {"key1": "value1", "key2": 123}
+    size_t pos = 0;
+    while (pos < trimmed.length()) {
+        if (trimmed[pos] == '{' || trimmed[pos] == '}') {
+            pos++;
+            continue;
+        }
+        
+        // Find key (string in quotes)
+        size_t keyStart = trimmed.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break;
+        }
+        
+        size_t keyEnd = trimmed.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = trimmed.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find separator and value
+        size_t sepPos = trimmed.find(':', keyEnd);
+        if (sepPos == std::string::npos) {
+            break;
+        }
+        
+        size_t valueStart = trimmed.find_first_not_of(' ', sepPos + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Determine value type and parse
+        char firstChar = trimmed[valueStart];
+        
+        if (firstChar == '"') {
+            // String value
+            size_t valueEnd = trimmed.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string value = trimmed.substr(valueStart + 1, valueEnd - valueStart - 1);
+            config.set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (firstChar == 't' || firstChar == 'f') {
+            // Boolean value
+            size_t valueEnd = trimmed.find_first_of(",}", valueStart);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string valueStr = trimmed.substr(valueStart, valueEnd - valueStart);
+            bool value = (valueStr == "true");
+            config.set(key, value, ConfigSource::File);
+            pos = valueEnd;
+        } else if (firstChar == '-' || std::isdigit(firstChar)) {
+            // Number value
+            size_t valueEnd = trimmed.find_first_of(",}", valueStart);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string valueStr = trimmed.substr(valueStart, valueEnd - valueStart);
+            
+            // Try to parse as integer or double
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double value = std::stod(valueStr);
+                    config.set(key, value, ConfigSource::File);
+                } else {
+                    int64_t value = std::stoll(valueStr);
+                    config.set(key, value, ConfigSource::File);
+                }
+            } catch (...) {
+                // Skip invalid numbers
+                pos = valueEnd;
+                continue;
+            }
+            pos = valueEnd;
+        }
+        
+        // Skip to next comma or closing brace
+        while (pos < trimmed.length() && trimmed[pos] != ',' && trimmed[pos] != '}') {
+            pos++;
+        }
+        
+        if (pos < trimmed.length() && trimmed[pos] == ',') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+// YAML parsing helper (simplified)
+static bool parseYamlFile(const std::string& filepath, Config& config) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip comments and empty lines
+        line = trim(line);
+        if (line.empty() || line.find("#") != std::string::npos) {
+            continue;
+        }
+        
+        // Handle simple key-value pairs: key: value
+        size_t pos = line.find(':');
+        if (pos != std::string::npos && pos > 0) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Parse value based on content
+            if (value.empty()) {
+                continue;
+            }
+            
+            // Check for quotes
+            if ((value.front() == '"' && value.back() == '"') ||
+                (value.front() == '\'' && value.back() == '\'')) {
+                value = value.substr(1, value.size() - 2);
+                config.set(key, value, ConfigSource::File);
+            } else if (value == "true" || value == "false") {
+                config.set(key, value == "true", ConfigSource::File);
+            } else {
+                // Try numeric parsing
+                try {
+                    if (value.find('.') != std::string::npos) {
+                        double num = std::stod(value);
+                        config.set(key, num, ConfigSource::File);
+                    } else {
+                        int64_t num = std::stoll(value);
+                        config.set(key, num, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // If not a number, treat as string
+                    config.set(key, value, ConfigSource::File);
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+// Original simple key=value parser
+static bool parseSimpleFile(const std::string& filepath, Config& config) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,12 +219,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            config.set(key, value, ConfigSource::File);
         }
     }
     
     return true;
 }
+
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
