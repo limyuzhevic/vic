@@ -3,12 +3,111 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Enhanced JSON support
+    nlohmann::json jsonConfig;
+    bool jsonParsed;
+    std::string jsonSource;
 };
+
+// JSON namespace helper
+namespace {
+    // Parse dot-separated keys (e.g., "simulation.timestep" -> {"simulation", "timestep"})
+    std::vector<std::string> parseKeyPath(const std::string& key) {
+        std::vector<std::string> path;
+        size_t pos = 0;
+        std::string token;
+        while ((pos = key.find('.')) != std::string::npos) {
+            token = key.substr(0, pos);
+            path.push_back(token);
+            key.erase(0, pos + 1);
+        }
+        path.push_back(key);
+        return path;
+    }
+    
+    // Convert value to JSON-compatible format
+    nlohmann::json configValueToJson(const ConfigValue& value) {
+        return std::visit([](auto&& arg) -> nlohmann::json {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                return nlohmann::json(arg);
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                return nlohmann::json(arg);
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                return nlohmann::json(arg);
+            } else {
+                return nlohmann::json();
+            }
+        }, value);
+    }
+    
+    // Convert JSON to ConfigValue
+    ConfigValue jsonToConfigValue(const nlohmann::json& json) {
+        if (json.is_string()) {
+            return json.get<std::string>();
+        } else if (json.is_number_integer()) {
+            return json.get<int64_t>();
+        } else if (json.is_number_float()) {
+            return json.get<double>();
+        } else if (json.is_boolean()) {
+            return json.get<bool>();
+        } else if (json.is_array()) {
+            // Determine array type
+            if (!json.empty()) {
+                if (json[0].is_number_integer()) {
+                    return json.get<std::vector<int64_t>>();
+                } else if (json[0].is_number_float()) {
+                    return json.get<std::vector<double>>();
+                } else if (json[0].is_string()) {
+                    return json.get<std::vector<std::string>>();
+                }
+            }
+            return std::vector<int>{};
+        }
+        return std::string("");
+    }
+    
+    // Set nested JSON value
+    void setNestedJson(nlohmann::json& json, const std::vector<std::string>& path, const nlohmann::json& value) {
+        nlohmann::json* current = &json;
+        for (size_t i = 0; i < path.size() - 1; ++i) {
+            if (!current->contains(path[i])) {
+                (*current)[path[i]] = nlohmann::json::object();
+            }
+            current = &((*current)[path[i]]);
+        }
+        (*current)[path.back()] = value;
+    }
+    
+    // Get nested JSON value
+    bool getNestedJson(const nlohmann::json& json, const std::vector<std::string>& path, nlohmann::json& result) {
+        const nlohmann::json* current = &json;
+        for (const auto& part : path) {
+            if (!current->contains(part)) {
+                return false;
+            }
+            current = &((*current)[part]);
+        }
+        result = *current;
+        return true;
+    }
+}};
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
