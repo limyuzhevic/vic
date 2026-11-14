@@ -65,14 +65,17 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
+// Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
-    // Set values
+    // Validate configuration value
+    bool validateConfigValue(const std::string& key, const ConfigValue& value) const;
+
+    // Get configuration value with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);

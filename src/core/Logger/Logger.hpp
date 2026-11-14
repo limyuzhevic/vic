@@ -64,6 +64,28 @@ private:
     std::string levelToColor(LogLevel level) const;
 };
 
+// File logger implementation
+class FileLogger : public ILogger {
+public:
+    FileLogger();
+    explicit FileLogger(const std::string& filepath);
+    ~FileLogger() override;
+    
+    void log(const LogEntry& entry) override;
+    void setLevel(LogLevel level) override;
+    LogLevel getLevel() const override;
+    
+    // Set file path
+    void setOutputFile(const std::string& filepath);
+    void closeOutputFile();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    std::string levelToString(LogLevel level) const;
+};
+
 // Main Logger class
 class Logger {
 public:
@@ -103,7 +125,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

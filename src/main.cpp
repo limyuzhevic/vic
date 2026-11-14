@@ -359,14 +359,24 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Synapse parameters
+    config->set("synapse_min_weight", -1.0f, ConfigSource::Default);
+    config->set("synapse_max_weight", 1.0f, ConfigSource::Default);
+    config->set("synapse_delay_max", 5, ConfigSource::Default);
+    config->set("synapse_short_term_facilitation_tau", 100.0f, ConfigSource::Default);
+    config->set("synapse_short_term_depression_tau", 200.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Neuron LIF parameters
+    config->set("neuron_lif_tau", 20.0f, ConfigSource::Default);
+    config->set("neuron_lif_threshold", -55.0f, ConfigSource::Default);
+    config->set("neuron_lif_resting", -70.0f, ConfigSource::Default);
+    config->set("neuron_lif_reset", -70.0f, ConfigSource::Default);
+    config->set("neuron_refractory_period", 9, ConfigSource::Default);
+    config->set("neuron_max_firing_rate", 1000.0f, ConfigSource::Default);
+    
+    // Reward clipping
+    config->set("reward_clip_min", -1.0f, ConfigSource::Default);
+    config->set("reward_clip_max", 1.0f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -376,7 +386,14 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synapse_min_weight: " + std::to_string(config->getOr<float>("synapse_min_weight", -1.0f)));
+    NLM_LOG_INFO("  synapse_max_weight: " + std::to_string(config->getOr<float>("synapse_max_weight", 1.0f)));
+    NLM_LOG_INFO("  neuron_lif_threshold: " + std::to_string(config->getOr<float>("neuron_lif_threshold", -55.0f)));
+    NLM_LOG_INFO("  reward_clip_min: " + std::to_string(config->getOr<float>("reward_clip_min", -1.0f)));
+    NLM_LOG_INFO("  reward_clip_max: " + std::to_string(config->getOr<float>("reward_clip_max", 1.0f)));
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

@@ -191,12 +191,77 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     }
 }
 
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+// File logger implementation
+struct FileLogger::Impl {
+    LogLevel level = LogLevel::Info;
+    std::ofstream fileOut;
+    std::mutex mutex;
+    std::string filepath;
+};
 
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+FileLogger::FileLogger() : pImpl(std::make_unique<Impl>()) {}
+
+FileLogger::FileLogger(const std::string& filepath) : pImpl(std::make_unique<Impl>()) {
+    pImpl->filepath = filepath;
+    pImpl->fileOut.open(filepath, std::ios::app);
+}
+
+FileLogger::~FileLogger() = default;
+
+void FileLogger::log(const LogEntry& entry) {
+    if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    std::ostringstream oss;
+    oss << "[" << levelToString(entry.level) << "] ";
+    
+    // Add timestamp
+    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    oss << " " << entry.message;
+    
+    std::string output = oss.str();
+    
+    // Write to file
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut << output << "\n";
+        pImpl->fileOut.flush();
+    }
+}
+
+void FileLogger::setLevel(LogLevel level) {
+    pImpl->level = level;
+}
+
+LogLevel FileLogger::getLevel() const {
+    return pImpl->level;
+}
+
+void FileLogger::setOutputFile(const std::string& filepath) {
+    closeOutputFile();  // Close existing file if open
+    pImpl->fileOut.open(filepath, std::ios::app);
+    pImpl->filepath = filepath;
+}
+
+void FileLogger::closeOutputFile() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+std::string FileLogger::levelToString(LogLevel level) const {
+    switch (level) {
+        case LogLevel 아버: return "DEBUG";
+        case LogLevel::Info: return "INFO";
+        case LogLevel::Warning: return "WARN";
+        case LogLevel::Error: return "ERROR";
+        case LogLevel::Critical: return "CRIT";
+        default: return "UNKNOWN";
+    }
 }
 
 } // namespace nlm

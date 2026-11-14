@@ -50,6 +50,10 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
+// Phase 6 improvement: Separate implementation to reduce header size
+// Forward declarations for all systems
+struct BrainImpl;
+
 class Brain {
 public:
     // Create brain with configuration
@@ -191,7 +195,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
@@ -206,6 +210,24 @@ public:
     void logStatus() const;
     
 private:
+    // Forward declarations for implementation details
+    // These will be defined in Brain.cpp
+    struct NeuralRegionImpl;
+    struct NeuralPopulationImpl;
+    struct SynapseImpl;
+    struct NeuronImpl;
+    struct SpikeSystemImpl;
+    struct STDPImpl;
+    struct HebbianImpl;
+    struct StructuralPlasticityImpl;
+    struct DevelopmentSystemImpl;
+    struct NeuromodulatorImpl;
+    struct MemorySystemImpl;
+    struct PredictionSystemImpl;
+    struct CognitionSystemImpl;
+    struct EnvironmentImpl;
+    
+    // Implementation details will be in Brain.cpp
     struct Impl;
     Impl* pImpl;
 };
