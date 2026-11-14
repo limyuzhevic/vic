@@ -1,0 +1,116 @@
+Start testing: Nov 14 03:43 UTC
+----------------------------------------------------------
+1/1 Testing: nlm_test
+1/1 Test: nlm_test
+Command: "/workspace/app/build/tests/nlm_test"
+Directory: /workspace/app/build/tests
+"nlm_test" start time: Nov 14 03:43 UTC
+Output:
+----------------------------------------------------------
+=== NLM Phase 2 Tests ===
+Testing Real Neural Computation:
+  - LIF Neuron Dynamics
+  - Synaptic Transmission
+  - STDP Plasticity
+
+Running Types tests...
+    testNeuronId passed
+    testSynapseId passed
+    testRegionId passed
+    testPopulationId passed
+    testNeuronType passed
+    testSynapseType passed
+    testPlasticityFlags passed
+    testSpikeEvent passed
+  PASSED
+Running Config tests...
+    testConfigCreation passed
+    testConfigSetAndGet passed
+    testConfigGetOr passed
+    testConfigRemove passed
+    testConfigKeys passed
+  PASSED
+Running Random tests...
+    testRandomGeneratorCreation passed
+    testUniformInt passed
+    testUniformReal passed
+    testNormal passed
+    testBernoulli passed
+    testRandomBool passed
+    testPickRandomIndex passed
+    testShuffle passed
+    testSeed passed
+  PASSED
+Running Clock tests...
+    testClockCreation passed
+    testClockAdvance passed
+    testClockReset passed
+    testClockSetStep passed
+    testClockSetTime passed
+    testClockAdvanceBy passed
+    testClockConversions passed
+    testClockFirstLastStep passed
+    testClockTimeAtFutureStep passed
+  PASSED
+Running Neuron tests...
+    testNeuronCreation passed
+    testNeuronType passed
+    testMembranePotential passed
+    testFiringState passed
+    testRefractoryDecrement passed
+    testCurrentInjection passed
+    testSynapticInput passed
+    testSpikeHistory passed
+    testRandomInitialization passed
+    testReset passed
+  PASSED
+Running Synapse tests...
+Running Synapse tests...
+    testSynapseCreation passed
+    testSynapseWeight passed
+    testSynapseWeightBounds passed
+    testSynapseType passed
+    testSynapseDelay passed
+    testSynapseSpikeHistory passed
+    testSynapseEligibilityTrace passed
+    testSynapseEfficacy passed
+    testSynapseRandomInitialization passed
+    testSynapseReset passed
+    testSynapsePlasticityFlags passed
+  PASSED
+Running STDP tests...
+Running STDP tests...
+    testSTDPCreation passed
+    testSTDPConfiguration passed
+    testSTDPConfigure passed
+    testSTDPName passed
+    testSTDPPotentiation passed (Δ=0)
+    testSTDPDepression passed (Δ=0)
+    testSTDPEmptySpikes passed
+    testSTDPWeightBounds passed
+    testSTDPSoftBounds passed (final weight=0.896135)
+  PASSED
+Running Brain tests...
+    testBrainCreation passed
+    testBrainInitialization passed
+    testBrainStep passed
+    testBrainReset passed
+    testBrainRegions passed
+    testBrainActionProduction passed
+    testBrainStatus passed
+    testBrainCheckpointRoundTrip passed (meanWeight=0.434972, pending=678, rates 84.1867 vs 84.1867)
+    testPhase6TextEncoding passed
+    testPhase6ConceptSimilarity passed (same=1, diff=0.642812)
+    testPhase6WorkingMemoryTraces passed
+  PASSED
+
+=== All Tests PASSED ===
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"nlm_test" end time: Nov 14 03:43 UTC
+"nlm_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 14 03:43 UTC
