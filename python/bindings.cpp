@@ -166,9 +166,126 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON/YAML/simple file")
+        // Load from specific file formats
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+             "Load configuration from JSON file")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("filepath"),
+             "Load configuration from YAML file")
+        .def("loadFromSimple", [](Config& self, const std::string& filepath) {
+            return self.loadFromSimpleFormat(filepath);
+        }, py::arg("filepath"),
+             "Load configuration from simple key=value file")
+        // Save to specific file formats
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration (JSON by default, simple format for compatibility)")
+        .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"),
+             "Save configuration to JSON file")
+        .def("saveToSimple", [](Config& self, const std::string& filepath) {
+            return self.saveToSimpleFormat(filepath);
+        }, py::arg("filepath"),
+             "Save configuration to simple key=value format")
+        // Configuration validation
+        .def("validate", &Config::validate,
+             "Validate configuration and return true if valid")
+        .def("validateKey", &Config::validateKey, py::arg("key"),
+             "Validate specific configuration key")
+        .def("getValidationErrors", &Config::getValidationErrors,
+             "Get list of configuration validation errors")
+        // Configuration management
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            std::string value;
+            if (self.has(key)) {
+                auto valOpt = self.getOr<std::string>(key);
+                if (valOpt) value = *valOpt;
+            }
+            return value;
+        }, py::arg("key"),
+             "Get configuration value as string (returns empty string if not found)")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+             "Get configuration value as int with default")
+        .def("getDouble", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+             "Get configuration value as double with default")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = false,
+             "Get configuration value as bool with default")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value")
+        .def("setMultiple", [](Config& self, const std::vector<std::pair<std::string, std::string>>& values) {
+            for (const auto& kv : values) {
+                self.set(kv.first, kv.second);
+            }
+        }, py::arg("values"),
+             "Set multiple configuration values from key-value pairs")
+        // Configuration utility methods
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("getAll", [](Config& self) {
+            py::dict result;
+            for (const auto& key : self.getKeys()) {
+                // Try different types
+                auto valStrOpt = self.getOr<std::string>(key);
+                if (valStrOpt) {
+                    result[key] = *valStrOpt;
+                    continue;
+                }
+                auto valIntOpt = self.getOr<int64_t>(key);
+                if (valIntOpt) {
+                    result[key] = *valIntOpt;
+                    continue;
+                }
+                auto valDoubleOpt = self.getOr<double>(key);
+                if (valDoubleOpt) {
+                    result[key] = *valDoubleOpt;
+                    continue;
+                }
+                auto valBoolOpt = self.getOr<bool>(key);
+                if (valBoolOpt) {
+                    result[key] = *valBoolOpt;
+                    continue;
+                }
+            }
+            return result;
+        }, "Get all configuration values as a dictionary")
+        .def("update", [](Config& self, const py::dict& updates) {
+            for (auto it = updates.begin(); it != updates.end(); ++it) {
+                std::string key = it->first.cast<std::string>();
+                if (py::isinstance<py::str>(it->second)) {
+                    self.set(key, it->second.cast<std::string>());
+                } else if (py::isinstance<py::int_>(it->second)) {
+                    self.set(key, it->second.cast<int64_t>());
+                } else if (py::isinstance<py::float_>(it->second)) {
+                    self.set(key, it->second.cast<double>());
+                } else if (py::isinstance<py::bool_>(it->second)) {
+                    self.set(key, it->second.cast<bool>());
+                }
+            }
+        }, py::arg("updates"),
+             "Update configuration from dictionary of key-value pairs")
+        // Python utility methods
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("__len__", [](const Config& cfg) {
+            return static_cast<int>(cfg.getKeys().size());
+        })
+        .def("__contains__", [](const Config& cfg, const std::string& key) {
+            return cfg.has(key);
+        }, py::arg("key"));
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -358,8 +475,45 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+            py::arg("value"),
+              "Add brain region with specified name");
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getFiringNeurons", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Python convenience methods
+        .def("__repr__", [](const Brain& brain) {
+            return "<Brain: neurons=" + std::to_string(brain.getTotalNeuronCount()) +
+                   ", synapses=" + std::to_string(brain.getTotalSynapseCount()) + "'>";
+        })
+        .def("getStatistics", [](Brain& brain) {
+            py::dict stats;
+            stats["neuron_count"] = brain.getTotalNeuronCount();
+            stats["synapse_count"] = brain.getTotalSynapseCount();
+            stats["firing_neurons"] = brain.getFiringNeuronCount();
+            stats["firing_rate"] = brain.getAverageFiringRate();
+            stats["e_i_ratio"] = brain.getExcitationInhibitionRatio();
+            stats["total_spikes"] = brain.getTotalSpikeCount();
+            return stats;
+        });
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,7 +560,53 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        // AgentBrain convenience methods
+        .def("__repr__", [](const AgentBrain& agent) {
+            auto brain = agent.getBrain();
+            return "<AgentBrain: neurons=" + std::to_string(brain->getTotalNeuronCount()) +
+                   ", curiosity=" + std::to_string(agent.getCuriosityLevel()) + "'>";
+        })
+        .def("getAgentStatistics", [](AgentBrain& agent) {
+            py::dict stats;
+            auto brain = agent.getBrain();
+            stats["curiosity"] = agent.getCuriosityLevel();
+            stats["novelty"] = agent.getNoveltyLevel();
+            stats["prediction_error"] = agent.getPredictionError();
+            stats["neuromodulation"] = agent.getNeuromodulationLevel();
+            stats["development_stage"] = static_cast<int>(agent.getDevelopmentalStage());
+            stats["neurons"] = brain->getTotalNeuronCount();
+            stats["synapses"] = brain->getTotalSynapseCount();
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            return stats;
+        })
+        .def("setConfiguration", [](AgentBrain& agent, const std::string& key, const std::string& value) {
+            auto config = agent.getBrain()->getConfig();
+            config->set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set brain configuration using string key and value")
+        .def("getConfiguration", [](AgentBrain& agent, const std::string& key) {
+            auto config = agent.getBrain()->getConfig();
+            if (config->has(key)) {
+                return py::make_tuple(key, config->getOr<std::string>(key, ""));
+            }
+            return py::make_tuple(key, py::none());
+        }, py::arg("key"),
+             "Get brain configuration value by key (returns tuple of key and value)")
+        .def("enableAllLearning", [](AgentBrain& agent) {
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+        }, "Enable all learning subsystems (reward, structural plasticity, development, curiosity)")
+        .def("disableAllLearning", [](AgentBrain& agent) {
+            agent.enableRewardModulation(false);
+            agent.enableStructuralPlasticity(false);
+            agent.enableDevelopment(false);
+            agent.enableCuriosity(false);
+        }, "Disable all learning subsystems");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -59,11 +59,26 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
     
-    // Save to file
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON file
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Validate specific key
+    bool validateKey(const std::string& key) const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>

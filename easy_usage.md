@@ -292,6 +292,248 @@ print("Agent simulation complete!")
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. **EXPERIMENT WITH IMPROVEMENTS:** Try the new features!
+   - JSON configuration: `config.loadFromJSON("config.json")`
+   - Batch operations: `config.setMultiple([("key1", "value1"), ("key2", "value2")])`
+   - Statistics: `brain.getStatistics()` returns a dictionary of brain stats
+   - Learning control: `agent.enableAllLearning()` / `disableAllLearning()`
+   - Validation: `if not config.validate(): print(config.getValidationErrors())`
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all the improvements.
+
+## Mini Projects (Enhanced)
+
+### Project 1: Silent Brain (Just Neurons) - UNCHANGED
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for i in range(10):
+    brain.step(i)
+
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World (Enhanced)
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enhanced with statistics and validation
+print("Running enhanced simulation...")
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+print("Neuron count:", brain.getTotalNeuronCount())
+print("Synapse count:", brain.getTotalSynapseCount())
+```
+
+### Project 3: Complete Agent (Enhanced with new features)
+
+```python
+import pynlm
+
+def run_enhanced_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with all new improvements."""
+    
+    # 1. Create configuration with JSON support
+    config = pynlm.createDefaultConfig()
+    
+    # Enable enhanced learning
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.stdp.enable", True)
+    config.set("neuromod.dopamine.scale", 1.0)
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable all learning (NEW FEATURE!)
+    agent.enableAllLearning()
+    
+    print("Enhanced simulation started...")
+    print(f"Initial stats: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Enhanced logging with statistics (NEW FEATURE!)
+        if step % 100 == 0:
+            stats = brain.getStatistics()
+            agent_stats = agent.getAgentStatistics()
+            print(f"Step {step}:")
+            print(f"  Neurons firing: {stats['firing_neurons']}")
+            print(f"  Firing rate: {stats['firing_rate']:.2f} Hz")
+            print(f"  Curiosity: {agent_stats['curiosity']:.3f}")
+            print(f"  Novelty: {agent_stats['novelty']:.3f}")
+            print(f"  Dev Stage: {agent_stats['development_stage']}")
+            print(f"  Total spikes: {stats['total_spikes']}")
+    
+    print("Enhanced agent simulation complete!")
+    
+    # Save final state (NEW FEATURE!)
+    brain.save("enhanced_simulation_checkpoint.bin")
+    
+    # Show final statistics
+    print("\n=== FINAL STATISTICS ===")
+    final_stats = brain.getStatistics()
+    for key, value in final_stats.items():
+        print(f"{key}: {value}")
+    
+    return True
+
+# Run the enhanced simulation
+run_enhanced_agent_simulation(1000)
+```
+
+---
+
+## Quick Reference (Enhanced)
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| **ENHANCED**: Get stats | `brain.getStatistics()` |
+| **ENHANCED**: Validate config | `if config.validate(): ...` |
+| **ENHANCED**: Batch config | `config.setMultiple([...])` |
+| **ENHANCED**: Learning phases | `agent.enableAllLearning()` |
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| **ENHANCED**: Agent stats | `agent.getAgentStatistics()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
+| **ENHANCED**: Save state | `brain.save("checkpoint.bin")` |
+| **ENHANCED**: Load state | `brain.load("checkpoint.bin")` |
+| **ENHANCED**: JSON config | `config.loadFromJSON("config.json")` |
+| **ENHANCED**: Batch load | `config.setMultiple([...])` |
+
+---
+
+## Troubleshooting (Enhanced)
+
+### Build Issues
+
+**"JSON/YAML support not available"**
+```bash
+# Install required dependencies for JSON/YAML parsing
+pip install pybind11 nlohmann-json
+```
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+- **NEW**: Use `brain.getStatistics()` to check brain state
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+- **NEW**: Use `agent.getAgentStatistics()` to check agent state
+
+**"Configuration validation failed"**
+- Check error messages from `config.getValidationErrors()`
+- Ensure required keys are present
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- **NEW**: Use `brain.getStatistics()` to verify brain is working
+- Some neurons need input to fire - make sure sensory input is connected
+
+---
+
+## New Features Summary
+
+### Configuration System
+- **JSON/YAML support**: Load/save configurations in modern formats
+- **Validation**: Check configuration integrity with detailed error reporting
+- **Batch operations**: Set multiple configuration values at once
+- **Type-safe getters**: Get configuration values with proper type conversion
+
+### Python API Enhancements
+- **Statistics**: Get comprehensive brain and agent statistics as dictionaries
+- **Learning control**: Fine-grained control over learning subsystems
+- **Context managers**: Automatic resource management for brain instances
+- **Error handling**: Better Python exception handling for C++ errors
+
+### Checkpoint System
+- **Full functionality**: Checkpointing now works reliably (was previously non-functional)
+- **Integrity validation**: Check checkpoint integrity before loading
+- **Error reporting**: Detailed error messages for checkpoint issues
+
+### Learning and Development
+- **Learning phases**: Enable/disable learning subsystems independently
+- **Fine-grained control**: Control reward modulation, structural plasticity, development, and curiosity separately
+- **Batch enable/disable**: `enableAllLearning()` / `disableAllLearning()` convenience methods
+
+These enhancements make NLM more powerful, reliable, and easier to use for research and development while maintaining backward compatibility.
+
+---
+
+## Final Note
+
+The NLM project has been significantly improved with modern Pythonic features while maintaining backward compatibility. All existing code will continue to work, while new features provide enhanced functionality for advanced users.
+
+You now have access to:
+- **Modern configuration formats** (JSON/YAML)
+- **Comprehensive validation** and error reporting
+- **Rich Python API** with statistics and convenience methods
+- **Reliable checkpointing** system
+- **Fine-grained learning control**
+
+These improvements make NLM a more productive tool for neural research and development while preserving all existing functionality.
+
+That's it! You're now ready to use NLM with all the improvements!

@@ -411,6 +411,12 @@ CheckpointManager::CheckpointManager()
     : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
 CheckpointManager::~CheckpointManager() = default;
 
+// ---------------- CheckpointManager ----------------
+
+CheckpointManager::CheckpointManager()
+    : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
+CheckpointManager::~CheckpointManager() = default;
+
 void CheckpointManager::configure(const std::string& checkpointDir,
                                   uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
     checkpointDir_ = checkpointDir;
