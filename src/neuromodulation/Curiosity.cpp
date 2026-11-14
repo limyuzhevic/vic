@@ -32,15 +32,37 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+    // Enhanced curiosity dynamics with multiple interacting components
+    // Implements curiosity as combination of information gain and prediction error
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Information gain component (learning potential)
+    float informationGain = novelty * 0.6f;
     
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Prediction error component (surprise)
+    float predictionErrorComponent = std::abs(predictionError) * 0.4f;
+    
+    // Combined drive for exploration
+    float targetDrive = informationGain + predictionErrorComponent;
+    
+    // Multi-timescale updating for biological realism
+    float fastTimeScale = 1.0f / (1.0f + 0.5f * static_cast<float>(dt));
+    float mediumTimeScale = 1.0f / (1.0f + 2.0f * static_cast<float>(dt));
+    
+    // Update with different time scales
+    pImpl->level += (targetDrive - pImpl->level) * fastTimeScale;
+    
+    // Medium timescale component for sustained curiosity
+    float mediumTarget = targetDrive * 0.7f;
+    pImpl->level += (mediumTarget - pImpl->level) * mediumTimeScale * 0.3f;
+    
+    // Apply biological constraints and noise
+    pImpl->level = std::clamp(pImpl->level, 0.0f, 1.0f);
+    
+    // Add stochastic exploration component
+    if (pImpl->brain) {
+        float explorationJitter = pImpl->brain->getRandomGenerator()->getFloat(-0.02f, 0.02f);
+        pImpl->level += explorationJitter * (1.0f - pImpl->level);
+    }
 }
 
 float Curiosity::getExplorationDrive() const {

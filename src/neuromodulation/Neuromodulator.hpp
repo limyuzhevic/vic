@@ -31,8 +31,31 @@ protected:
     Neuromodulator() = default;
 };
 
-// Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// ===== DA: REALISTIC REWARD AND REINFORCEMENT LEARNING =====
+// Implements biologically realistic reward processing and dopamine signaling
+
+class Dopamine : public Neuromodulator {
+public:
+    Dopamine();
+    ~Dopamine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Reward signaling
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
+    
+    // Get reward prediction error
+    float getError() const { return pImpl->error; }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();

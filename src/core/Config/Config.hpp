@@ -16,20 +16,35 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    uint64_t,
+    float,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
+    std::vector<uint64_t>,
+    std::vector<float>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<bool>,
+    std::vector<std::string>,
+    std::vector<std::vector<float>>  // For matrix parameters
 >;
 
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+// Configuration entry with description and validation
+struct ConfigEntry {
+    std::string key;
+    ConfigValue value;
+    ConfigSource source;
+    std::string description;
+    std::string validationPattern;
+    std::string units;
+    
+    ConfigEntry() 
+        : key(), value(), source(ConfigSource::Default), description(), validationPattern(), units() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& pattern = "", const std::string& units = "")
+        : key(k), value(v), source(s), description(desc), validationPattern(pattern), units(units) {}
 };
 
 // Configuration entry
