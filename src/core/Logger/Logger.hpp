@@ -48,7 +48,7 @@ public:
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
-    // Enable/disable colors
+    // Enable/disable colors in console output
     void setUseColors(bool useColors);
     bool getUseColors() const;
     

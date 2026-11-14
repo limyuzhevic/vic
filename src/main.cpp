@@ -49,17 +49,21 @@ void printBanner() {
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
+// This structure captures the synaptic state before and after an experience
+// to verify that learning is actually occurring in the neural network
 struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+    std::shared_ptr<Brain> brain;           // The neural brain to test
+    uint64_t seed;                         // Random seed for reproducibility
+    size_t initialSynapseCount;            // Number of synapses before learning
+    std::vector<float> initialWeights;    // Weight values before learning
+    std::vector<float> finalWeights;       // Weight values after learning
+    std::vector<NeuronId> mostActiveNeurons; // Top 10 most active neurons after learning
     
+    // Constructor initializes with brain reference and seed
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    // Record the initial synaptic state (weights and count)
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
@@ -80,6 +84,7 @@ struct LearningExperiment {
         }
     }
     
+    // Record the final synaptic state after learning
     void recordFinalState() {
         finalWeights.clear();
         
@@ -90,6 +95,7 @@ struct LearningExperiment {
             }
         }
         
+        // Track the 10 most active neurons to understand learning patterns
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
@@ -101,6 +107,7 @@ struct LearningExperiment {
         }
     }
     
+    // Compute and display detailed statistics about learning
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");

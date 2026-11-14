@@ -142,28 +142,35 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
+    // Used for maintaining recent sensory input and motor plans
     NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
+    // Stores complete experiences with contexts for replay
     NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
+    // Forms connections between related patterns for learning
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
+    // Implements predictive coding and error-based learning
     PredictionSystem* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
+    // Evaluates possible actions and selects optimal plans based on learned values
     NeuralPlanner* getPlanner();
     
     // Concept formation for pattern discovery
+    // Discovers and forms abstract concepts from sensory experiences
     ConceptFormation* getConceptFormation();
     
     // Attentional selection for focus
+    // Selects which sensory inputs and actions to prioritize
     AttentionalSelection* getAttention();
     
     // ========== DEVELOPMENT SYSTEM ==========

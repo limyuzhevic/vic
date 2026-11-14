@@ -86,14 +86,17 @@ public:
     void fillBytes(void* data, size_t size);
     
     // Get underlying engine for advanced use
+    // This provides access to the mt19937_64 engine for direct use if needed
     std::mt19937_64& engine();
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
+    // These match the static member functions of mt19937_64 for compatibility
     static constexpr result_type min() { return std::mt19937_64::min(); }
     static constexpr result_type max() { return std::mt19937_64::max(); }
     
     // Operator for compatibility with std functions
+    // Allows use as a random number generator in STL algorithms
     result_type operator()() { return static_cast<result_type>(engine()()); }
     
 private:

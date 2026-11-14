@@ -13,33 +13,37 @@ namespace nlm {
 class Config;
 
 // Configuration value types
+// Supports basic types and containers for flexible configuration
 using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    int,                 // Integer value
+    int64_t,             // 64-bit integer value
+    double,              // Floating point value
+    bool,                // Boolean value
+    std::string,         // String value
+    std::vector<int>,    // Integer vector
+    std::vector<double>, // Double vector
+    std::vector<std::string> // String vector
 >;
 
-// Configuration source
+// Configuration source indicating where the value originated from
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,     // Default value from code
+    File,        // Loaded from configuration file
+    CommandLine, // Set via command line arguments
+    Runtime      // Set at runtime via API
 };
 
-// Configuration entry
+// Configuration entry containing key-value pair with metadata
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;              // Configuration key
+    ConfigValue value;            // Configuration value
+    ConfigSource source;          // Source of the configuration value
+    std::string description;      // Human-readable description of what this config does
     
+    // Default constructor creates empty entry
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    // Constructor with parameters
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
