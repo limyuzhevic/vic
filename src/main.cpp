@@ -58,17 +58,30 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        if (!brain) {
+            NLM_LOG_ERROR("LearningExperiment: brain pointer is null!");
+        }
+    }
     
     void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
+        initialSynapseCount = brain ? brain->getTotalSynapseCount() : 0;
         initialWeights.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        // Record initial weights from first region (if it exists)
+        if (brain) {
+            auto* region = brain->getRegion(RegionId(1));
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn) {
+                        initialWeights.push_back(syn->getWeight());
+                    }
+                }
+            } else {
+                NLM_LOG_WARNING("LearningExperiment: RegionId(1) not found - cannot record initial weights");
             }
+        } else {
+            NLM_LOG_ERROR("LearningExperiment: Cannot record initial state - brain is null");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -83,17 +96,31 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Record final weights from first region (if it exists)
+        if (brain) {
+            auto* region = brain->getRegion(RegionId(1));
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn) {
+                        finalWeights.push_back(syn->getWeight());
+                    }
+                }
+            } else {
+                NLM_LOG_WARNING("LearningExperiment: RegionId(1) not found - cannot record final weights");
             }
+        } else {
+            NLM_LOG_ERROR("LearningExperiment: Cannot record final state - brain is null");
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons.clear();
+        if (brain && brain->getSpikeSystem()) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        } else if (brain) {
+            NLM_LOG_WARNING("LearningExperiment: Spike system not available - cannot get most active neurons");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain ? brain->getTotalSpikeCount() : 0));
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
@@ -107,7 +134,9 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_INFO("ERROR: No weights recorded - cannot compute statistics");
+            NLM_LOG_INFO("  Initial weights: " + std::to_string(initialWeights.size()));
+            NLM_LOG_INFO("  Final weights: " + std::to_string(finalWeights.size()));
             return;
         }
         
@@ -128,6 +157,11 @@ struct LearningExperiment {
         size_t unchanged = 0;
         
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        if (minSize == 0) {
+            NLM_LOG_INFO("  ERROR: No synaptic data to compare");
+            return;
+        }
+        
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
             if (delta > 0.01f) ++strengthened;
@@ -143,7 +177,8 @@ struct LearningExperiment {
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        size_t totalSpikes = brain ? brain->getTotalSpikeCount() : 0;
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
@@ -228,12 +263,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // and every weight saturated to 1.0 - learning was measurable but not
     // selective at all.
     std::vector<NeuronId> patternNeurons;
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+    if (brain && brain->getRegion(RegionId(1))) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron && neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                    patternNeurons.push_back(neuron->getId());
+                }
             }
         }
+    } else {
+        NLM_LOG_WARNING("runPlasticityExperiment: Cannot create pattern - no brain or region found");
     }
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
@@ -261,8 +301,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("runStdpVerification: Brain pointer is null!");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_WARNING("runStdpVerification: RegionId(1) not found - cannot test STDP");
+        return;
+    }
     
     // Use one real synapse and its own pre/post neurons. The old test
     // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
@@ -272,6 +320,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  No synapses for STDP test");
         return;
     }
+    
     Synapse* syn = synapses[0].get();
     syn->enablePlasticity(false, true, false);  // STDP only
     float beforeWeight = syn->getWeight();
@@ -279,22 +328,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -309,7 +358,6 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
 int main(int argc, char** argv) {
     printBanner();
-    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger

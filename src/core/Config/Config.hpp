@@ -44,7 +44,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration schema definition
+struct ConfigSchema {
+    std::string name;
+    std::string description;
+    ConfigSource defaultSource;
+    bool required;
+    std::string defaultValue;
+    std::string validationRegex;
+    std::string type;
+    
+    ConfigSchema() : name(), description(), defaultSource(ConfigSource::Default), 
+                    required(false), defaultValue(), validationRegex(), type("string") {}
+    
+    ConfigSchema(const std::string& n, const std::string& d, const std::string& t = "string",
+                 bool req = false, const std::string& def = "")
+        : name(n), description(d), defaultSource(ConfigSource::Default),
+          required(req), defaultValue(def), validationRegex(), type(t) {}
+};
+
+// Main configuration class with validation and schema support
 class Config {
 public:
     Config();
@@ -66,19 +85,42 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    
+    // Enhanced set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validation and type conversion
+    bool validate(const std::string& key, std::string& errorMsg) const;
+    bool validateAll(std::vector<std::string>& errors) const;
+    
+    // Get type information
+    std::string getType(const std::string& key) const;
+    bool isType(const std::string& key, const std::string& typeName) const;
+    
+    // Schema management
+    void addSchema(const ConfigSchema& schema);
+    const ConfigSchema* getSchema(const std::string& key) const;
+    bool hasSchema(const std::string& key) const;
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+    // Print help/usage information
+    void printHelp() const;
+    
+    // Get/set configuration flags
+    void setFlag(const std::string& flag, bool value);
+    bool getFlag(const std::string& flag) const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -89,11 +131,11 @@ template<typename T>
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    // Get all entries
+    std::vector<ConfigEntry> getAllEntries() const;
+    
     // Clear all
     void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
     
 private:
     struct Impl;
@@ -102,6 +144,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool matchesRegex(const std::string& value, const std::string& regex);
+    static ConfigValue convertToConfigValue(const std::string& strValue);
+    static std::string toString(const ConfigValue& value);
 };
 
 } // namespace nlm

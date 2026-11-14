@@ -371,18 +371,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    try {
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain::step: Error processing delayed spikes: " + std::string(e.what()));
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    int neuronStepSuccess = 0;
+    int neuronStepErrors = 0;
+    
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_WARNING("Brain::step: Null region encountered, skipping neuron updates");
+            continue;
+        }
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARNING("Brain::step: Null population encountered, skipping neuron updates");
+                continue;
+            }
+            
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                if (!neuron) {
+                    NLM_LOG_WARNING("Brain::step: Null neuron encountered, skipping LIF update");
+                    neuronStepErrors++;
+                    continue;
+                }
+                
+                try {
+                    neuron->stepLIF(currentTime, pImpl->timestep);
+                    neuronStepSuccess++;
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Brain::step: Error in neuron " + std::to_string(neuron->getId().index()) + ": " + std::string(e.what()));
+                    neuronStepErrors++;
+                }
             }
         }
     }
     
+    if (neuronStepErrors > 0) {
+        NLM_LOG_WARNING("Brain::step: " + std::to_string(neuronStepErrors) + " neuron errors during LIF update");
+    }
+    
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    int spikeDetectionSuccess = 0;
+    int spikeDetectionErrors = 0;
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -395,38 +431,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+                    try {
+                        pImpl->spikeSystem->queueSpike(event);
+                        spikeDetectionSuccess++;
+                    } catch (const std::exception& e) {
+                        NLM_LOG_ERROR("Brain::step: Error queuing spike for neuron " + std::to_string(neuron->getId().index()) + ": " + std::string(e.what()));
+                        spikeDetectionErrors++;
+                    }
 
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) {
+                            try {
+                                syn->recordPostSpike(currentTime);
+                            } catch (const std::exception& e) {
+                                NLM_LOG_ERROR("Brain::step: Error recording post-synaptic spike for synapse " + std::to_string(syn->getId().index()) + ": " + std::string(e.what()));
+                            }
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                        if (!syn) {
+                            continue; // Safety check
+                        }
+                        
+                        try {
+                            // Create delayed spike event
+                            Delay delay = syn->getDelay();
+                            SimulationStep deliveryStep = currentTime + delay;
+                            Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
+                            DelayedSpikeEvent delayedEvent(
+                                neuron->getId(),
+                                syn->getDestinationNeuron(),
+                                syn->getId(),
+                                syn->getWeight(),
+                                syn->getType(),
+                                currentTime,
+                                deliveryTime,
+                                currentStep,
+                                deliveryStep
+                            );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
+                            // Record pre-synaptic spike for plasticity
+                            syn->recordPreSpike(currentTime);
+                            
+                            spikeDetectionSuccess++;
+                        } catch (const std::exception& e) {
+                            NLM_LOG_ERROR("Brain::step: Error processing synapse " + std::to_string(syn->getId().index()) + ": " + std::string(e.what()));
+                            spikeDetectionErrors++;
+                        }
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
@@ -445,8 +504,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // existing decay then keeps it alive only while the
                     // neuron keeps firing, which is the intended
                     // working-memory behaviour.
+                    // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
+                        try {
+                            pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
+                        } catch (const std::exception& e) {
+                            NLM_LOG_ERROR("Brain::step: Error storing neuron to working memory " + std::to_string(neuron->getId().index()) + ": " + std::string(e.what()));
+                        }
                     }
                 }
             }
@@ -593,8 +657,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+        if (!pop) {
+            NLM_LOG_WARNING("Brain::step: Null population encountered, skipping spike detection");
+            continue;
+        }
+            for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) {
+                    NLM_LOG_WARNING("Brain::step: Null neuron encountered, skipping spike detection");
+                    spikeDetectionErrors++;
+                    continue;
+                }
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -742,11 +814,14 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
                     neuron->injectCurrent(current);
+                    }
                 }
             }
         }
     }
-}
+    
+    NLM_LOG_INFO("Brain::step: Spike detection completed: " + std::to_string(spikeDetectionSuccess) + " successful, " +
+                 std::to_string(spikeDetectionErrors) + " errors");
 
 SpikeSystem* Brain::getSpikeSystem() {
     return pImpl->spikeSystem.get();
@@ -1297,7 +1372,11 @@ bool Brain::load(const std::string& filepath) {
                 P5Reader r{payload.data(), payload.data() + payload.size()};
                 std::unordered_map<uint64_t, std::vector<Synapse*>> byPair;
                 auto pairKey = [](uint64_t src, uint64_t dst) { return (src << 32) ^ dst; };
-                for (auto& region : pImpl->regions) {
+    for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_WARNING("Brain::step: Null region encountered, skipping spike detection");
+            continue;
+        }
                     for (auto& syn : region->getSynapses()) {
                         byPair[pairKey(syn->getSourceNeuron().index(),
                                        syn->getDestinationNeuron().index())].push_back(syn.get());
