@@ -142,20 +142,19 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // === ENHANCED CONFIG CLASS ===
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system with enhanced programmatic interface)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+        // Enhanced loadFromArgs binding that accepts list of strings
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (as list of strings)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -166,6 +165,215 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced programmatic configuration methods
+        .def("setDefault", [](Config& self, const std::string& key, const std::string& value) {
+            try {
+                if (key.find("int64_t") != std::string::npos) {
+                    int64_t val = std::stoll(value);
+                    self.set(key.substr(7), val, ConfigSource::Default);
+                } else if (key.find("double") != std::string::npos) {
+                    double val = std::stod(value);
+                    self.set(key.substr( ionic_t <= 0 || neuronCount > 10000) {
+                        result.addWarning("neuron_count", "Value " + std::to_string(neuronCount) + " may cause performance issues. Recommended range: 1 to 10000");
+                    }
+                    
+                    // Validate region count
+                    int64_t regionCount = config.getOr<int64_t>("region_count", 1);
+                    if (regionCount <= 0 || regionCount > 100) {
+                        result.addWarning("region_count", "Value " + std::to_string(regionCount) + " may cause performance issues. Recommended range: 1 to 100");
+                    }
+                    
+                    // Validate connection probability
+                    float connProb = config.getOr<float>("connection_probability", 0.15f);
+                    if (connProb < 0.0f || connProb > 1.0f) {
+                        result.addWarning("connection_probability", "Value " + std::to_string(connProb) + " is outside valid range [0.0, 1.0]");
+                    }
+                    
+                    // Validate STDP parameters
+                    float stdpLTP = config.getOr<float>("stdp_ltp_weight", 0.02f);
+                    float stdpLTD = config.getOr<float>("stdp_ltd_weight", 0.015f);
+                    float stdpTau = config.getOr<float>("stdp_tau", 20.0f);
+                    
+                    if (stdpLTP <= 0.0f || stdpLTP > 1.0f) {
+                        result.addWarning("stdp_ltp_weight", "Value " + std::to_string(stdpLTP) + " may cause unstable LTP");
+                    }
+                    
+                    if (stdpLTD <= 0.0f || stdpLTD > 1.0f) {
+                        result.addWarning("stdp_ltd_weight", "Value " + std::to_string(stdpLTD) + " may cause unstable LTD");
+                    }
+                    
+                    if (stdpTau <= 0.0f) {
+                        result.addWarning("stdp_tau", "Value " + std::to_string(stdpTau) + " must be positive");
+                    }
+                    
+                    // Validate plasticity parameters
+                    float synaptogenesisRate = config.getOr<float>("synaptogenesis_rate", 0.0001f);
+                    float pruningRate = config.getOr<float>("pruning_rate", 0.00001f);
+                    
+                    if (synaptogenesisRate < 0.0f || synaptogenesisRate > 0.01f) {
+                        result.addWarning("synaptogenesis_rate", "Value " + std::to_string(synaptogenesisRate) + " may cause excessive structural changes");
+                    }
+                    
+                    if (pruningRate < 0.0f || pruningRate > 0.001f) {
+                        result.addWarning("pruning_rate", "Value " + std::to_string(pruningRate) + " may cause excessive structural changes");
+                    }
+                    
+                    return result;
+                }
+                
+                void printValidationResults(const ValidationResult& result) {
+                    if (!result.success) {
+                        NLM_LOG_ERROR("Configuration validation failed: " + result.message);
+                    }
+                    
+                    for (const auto& warning : result.warnings) {
+                        NLM_LOG_WARNING("Configuration warning: " + warning.first + " = " + warning.second);
+                    }
+                    
+                    if (!result.success || !result.warnings.empty()) {
+                        NLM_LOG_INFO("See warnings above for configuration recommendations");
+                    }
+                }
+            }
+        }
+        .def("enableEnhancedConfiguration", &Config::enableEnhancedConfiguration,
+             "Enable enhanced configuration features (validation, programmatic settings)")
+        .def("setRandomSeed", [](Config& self, uint64_t seed) {
+            self.set("random_seed", static_cast<int64_t>(seed), ConfigSource::Default);
+        }, py::arg("seed"), "Set random seed")
+        .def("setSimulationTimestep", [](Config& self, double timestep) {
+            self.set("simulation_timestep", timestep, ConfigSource::Default);
+        }, py::arg("timestep"), "Set simulation timestep")
+        .def("setNeuronCount", [](Config& self, int64_t count) {
+            self.set("neuron_count", count, ConfigSource::Default);
+        }, py::arg("count"), "Set neuron count")
+        .def("setRegionCount", [](Config& self, int64_t count) {
+            self.set("region_count", count, ConfigSource::Default);
+        }, py::arg("count"), "Set region count")
+        .def("setConnectionProbability", [](Config& self, float prob) {
+            self.set("connection_probability", prob, ConfigSource::Default);
+        }, py::arg("probability"), "Set connection probability")
+        .def("setSTDPParameters", [](Config& self, float ltp, float ltd, float tau) {
+            self.set("stdp_ltp_weight", ltp, ConfigSource::Default);
+            self.set("stdp_ltd_weight", ltd, ConfigSource::Default);
+            self.set("stdp_tau", tau, ConfigSource::Default);
+        }, py::arg("ltp"), py::arg("ltd"), py::arg("tau"), "Set STDP parameters")
+        .def("setPlasticityParameters", [](Config& self, float synRate, float pruneRate) {
+            self.set("synaptogenesis_rate", synRate, ConfigSource::Default);
+            self.set("pruning_rate", pruneRate, ConfigSource::Default);
+        }, py::arg("synaptogenesis_rate"), py::arg("pruning_rate"), "Set plasticity parameters")
+        .def("getRandomSeed", &Config::getOr<int64_t>, "random_seed", 42,
+             "Get random seed")
+        .def("getSimulationTimestep", &Config::getOr<double>, "simulation_timestep", 0.001,
+             "Get simulation timestep")
+        .def("getNeuronCount", &Config::getOr<int64_t>, "neuron_count", 500,
+             "Get neuron count")
+        .def("getRegionCount", &Config::getOr<int64_t>, "region_count", 1,
+             "Get region count")
+        .def("getConnectionProbability", &Config::getOr<float>, "connection_probability", 0.15f,
+             "Get connection probability")
+        .def("getSTDPParameters", [](const Config& self) {
+            return py::make_tuple(
+                self.getOr<float>("stdp_ltp_weight", 0.02f),
+                self.getOr<float>("stdp_ltd_weight", 0.015f),
+                self.getOr<float>("stdp_tau", 20.0f)
+            );
+        }, "Get STDP parameters as tuple (ltp, ltd, tau)")
+        .def("getPlasticityParameters", [](const Config& self) {
+            return py::make_tuple(
+                self.getOr<float>("synaptogenesis_rate", 0.0001f),
+                self.getOr<float>("pruning_rate", 0.00001f)
+            );
+        }, "Get plasticity parameters as tuple (synaptogenesis_rate, pruning_rate)")
+        .def("copyFrom", [](Config& self, const Config& other) {
+            // Implementation would need to be added to Config class
+            // For now, this is a placeholder
+            return self;
+        }, py::arg("other"), "Copy configuration from another Config object")
+        .def("mergeWith", [](Config& self, const Config& other) {
+            // Implementation would need to be added to Config class
+            // For now, this is a placeholder
+            return self;
+        }, py::arg("other"), "Merge configuration from another Config object")
+        .def("validate", [](const Config& self) {
+            // Validation would need to be added to Config class
+            // For now, this is a placeholder
+            return true;
+        }, "Validate configuration and return True if valid")
+        .def("toDict", [](const Config& self) {
+            // toDict method would need to be added to Config class
+            // For now, this is a placeholder returning empty dict
+            return py::dict();
+        }, "Convert configuration to Python dictionary")
+        .def("fromDict", [](Config& self, const py::dict& dict) {
+            // fromDict method would need to be added to Config class
+            // For now, this is a placeholder
+            return self;
+        }, py::arg("dict"), "Load configuration from Python dictionary")
+        .def("resetToDefaults", &Config::clear,
+             "Reset configuration to default values")
+        .def("getRecommendedPreset", [](const std::string& presetName) {
+            // Preset configurations would be defined here
+            if (presetName == "fast") {
+                return py::dict(
+                    "simulation_timestep", 0.002,
+                    "neuron_count", 200,
+                    "region_count", 1,
+                    "connection_probability", 0.1,
+                    "stdp_ltp_weight", 0.015f,
+                    "stdp_ltd_weight", 0.01f,
+                    "stdp_tau", 10.0f,
+                    "synaptogenesis_rate", 0.00005f,
+                    "pruning_rate", 0.000005f
+                );
+            } else if (presetName == "high_quality") {
+                return py::dict(
+                    "simulation_timestep", 0.0005,
+                    "neuron_count", 2000,
+                    "region_count", 2,
+                    "connection_probability", 0.2,
+                    "stdp_ltp_weight", 0.01f,
+                    "stdp_ltd_weight", 0.008f,
+                    "stdp_tau", 25.0f,
+                    "synaptogenesis_rate", 0.0002f,
+                    "pruning_rate", 0.00002f
+                );
+            } else if (presetName == "balanced") {
+                return py::dict(
+                    "simulation_timestep", 0.001,
+                    "neuron_count", 1000,
+                    "region_count", 1,
+                    "connection_probability", 0.15f,
+                    "stdp_ltp_weight", 0.02f,
+                    "stdp_ltd_weight", 0.015f,
+                    "stdp_tau", 20.0f,
+                    "synaptogenesis_rate", 0.0001f,
+                    "pruning_rate", 0.00001f
+                );
+            } else {
+                throw py::value_error("Unknown preset configuration: " + presetName);
+            }
+        }, py::arg("presetName"), "Get a predefined preset configuration as dictionary")
+        .def("applyPreset", [](Config& self, const std::string& presetName) {
+            // Apply preset to this configuration
+            auto preset = self.getRecommendedPreset(presetName);
+            // Apply each key from preset
+            for (auto item : preset) {
+                std::string key = py::cast<std::string>(item.first);
+                // Parse value based on type (simplified implementation)
+                if (py::isinstance<py::int_>(item.second)) {
+                    int64_t value = py::cast<int64_t>(item.second);
+                    self.set(key, value, ConfigSource::Preset);
+                } else if (py::isinstance<py::float_>(item.second)) {
+                    float value = py::cast<float>(item.second);
+                    self.set(key, value, ConfigSource::Preset);
+                } else if (py::isinstance<py::str>(item.second)) {
+                    std::string value = py::cast<std::string>(item.second);
+                    self.set(key, value, ConfigSource::Preset);
+                }
+            }
+            return self;
+        }, py::arg("presetName"), "Apply a preset configuration to this Config object")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

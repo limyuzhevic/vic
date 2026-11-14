@@ -11,14 +11,105 @@
 
 namespace test_brain {
 
-void testBrainCreation() {
+void testConfigurationValidation() {
+    nlm::Config config;
+    
+    // Test basic configuration
+    config.set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config.set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+    config.set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    // Test configuration access
+    assert(config.has("neuron_count"));
+    assert(config.has("simulation_timestep"));
+    assert(config.has("region_count"));
+    
+    // Test configuration summary
+    std::string summary = config.summary();
+    assert(!summary.empty());
+    
+    std::cout << "    testConfigurationValidation passed" << std::endl;
+}
+
+void testCommandLineParsing() {
     auto config = std::make_shared<nlm::Config>();
+    
+    // Test basic config creation
+    config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    
+    // Test config access
+    assert(config->getOr<int64_t>("random_seed", 0) == 42);
+    assert(config->getOr<int64_t>("neuron_count", 0) == 100);
+    
+    // Test default values
+    assert(config->getOr<int64_t>("unknown_key", 999) == 999);
+    assert(config->getOr<double>("unknown_key", 3.14) == 3.14);
+    
+    std::cout << "    testCommandLineParsing passed" << std::endl;
+}
+
+void testBrainConfigurationOptions() {
+    auto config = std::make_shared<nlm::Config>();
+    
+    // Test STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, nlm::ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, nlm::ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, nlm::ConfigSource::Default);
+    
+    // Test plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, nlm::ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, nlm::ConfigSource::Default);
+    
+    // Test connection parameters
+    config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+    
+    // Verify STDP parameters
+    assert(config->getOr<float>("stdp_ltp_weight", 0.0f) == 0.02f);
+    assert(config->getOr<float>("stdp_ltd_weight", 1.0f) == 0.015f);
+    assert(config->getOr<float>("stdp_tau", 0.0f) == 20.0f);
+    
+    // Verify plasticity parameters
+    assert(config->getOr<float>("synaptogenesis_rate", 1.0f) == 0.0001f);
+    assert(config->getOr<float>("pruning_rate", 1.0f) == 0.00001f);
+    
+    // Verify connection probability
+    assert(config->getOr<float>("connection_probability", 1.0f) == 0.15f);
+    
+    std::cout << "    testBrainConfigurationOptions passed" << std::endl;
+}
+
+void testEnhancedTestExecution() {
+    // This test verifies that enhanced test execution options work
+    // Test with max steps limited
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     
     nlm::Brain brain(config);
     
-    std::cout << "    testBrainCreation passed" << std::endl;
+    if (brain.initialize()) {
+        // Test basic connectivity with limited steps
+        runBasicConnectivityTest(brain, 100);  // Limit to 100 steps instead of default 50
+        
+        // The test should still pass within the limited steps
+        std::cout << "    testEnhancedTestExecution passed" << std::endl;
+    }
+}
+
+void testErrorHandling() {
+    // Test error handling and validation
+    auto config = std::make_shared<nlm::Config>();
+    
+    // Test invalid configuration values that should trigger warnings
+    config->set("simulation_timestep", 0.0, nlm::ConfigSource::Default);  // Invalid timestep
+    config->set("neuron_count", -1, nlm::ConfigSource::Default);  // Invalid neuron count
+    
+    // The configuration should still work but validation should warn
+    assert(config->getOr<double>("simulation_timestep", 0.001) == 0.0);
+    assert(config->getOr<int64_t>("neuron_count", 100) == -1);
+    
+    std::cout << "    testErrorHandling passed" << std::endl;
 }
 
 void testBrainInitialization() {

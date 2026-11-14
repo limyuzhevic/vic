@@ -88,6 +88,43 @@ void testCurrentInjection() {
     std::cout << "    testCurrentInjection passed" << std::endl;
 }
 
+void testLIFStep() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    nlm::RandomGenerator rng;
+    neuron.initializeRandom(rng);
+    
+    // Record initial state
+    float initialV = neuron.getMembranePotential();
+    float initialFiringRate = neuron.getFiringRate();
+    
+    // Simulate a few steps without spiking
+    for (int i = 0; i < 5; ++i) {
+        neuron.stepLIF(0.0, 0.001);
+    }
+    
+    // Neuron should not have spiked
+    assert(!neuron.isFiring());
+    assert(neuron.getFiringRate() == initialFiringRate);
+    
+    std::cout << "    testLIFStep passed" << std::endl;
+}
+
+void testNeuralConnectivity() {
+    // This test would verify synaptic connections between neurons
+    // For now, we'll create a simple connectivity test
+    nlm::NeuronId id1(1);
+    nlm::NeuronId id2(2);
+    
+    nlm::Neuron neuron1(id1);
+    nlm::Neuron neuron2(id2);
+    
+    // Initially neurons have no connections
+    assert(neuron1.getIncomingSynapses().empty());
+    assert(neuron2.getIncomingSynapses().empty());
+    
+    std::cout << "    testNeuralConnectivity passed" << std::endl;
+}
+
 void testSynapticInput() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
