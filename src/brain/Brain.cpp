@@ -191,15 +191,8 @@ bool Brain::initialize() {
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
-    pImpl->regions.clear();
-    pImpl->sensoryNeurons.clear();
-    pImpl->motorNeurons.clear();
-    pImpl->neuronById.clear();
-    pImpl->nextRegionId = RegionId(1);
-    pImpl->totalSpikesTotal = 0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
+    clearBrainState();
+    resetBrainState();
     
     // Get configuration values
     size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
@@ -846,12 +839,8 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
+    // Reset brain state
+    resetBrainState();
     
     for (auto& region : pImpl->regions) {
         region->reset();
@@ -1586,6 +1575,22 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+// Helper methods for brain state management
+void Brain::clearBrainState() {
+    pImpl->regions.clear();
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    pImpl->neuronById.clear();
+    pImpl->nextRegionId = RegionId(1);
+}
+
+void Brain::resetBrainState() {
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->totalSpikesTotal = 0;
+    pImpl->isResting = false;
+    pImpl->stepsSinceLastEpisode = 0;
 }
 
 } // namespace nlm

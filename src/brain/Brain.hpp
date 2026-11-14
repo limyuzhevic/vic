@@ -208,6 +208,10 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Helper methods for brain state management
+    void clearBrainState();
+    void resetBrainState();
 };
 
 } // namespace nlm

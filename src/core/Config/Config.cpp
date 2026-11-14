@@ -3,6 +3,12 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+
+// Helper function for error logging
+void logConfigError(const std::string& operation, const std::string& filepath, const std::string& error) {
+    std::cerr << "Config Error [" << operation << "]: " << error << "; File: " << filepath << std::endl;
+}
 
 namespace nlm {
 
@@ -19,9 +25,74 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        logConfigError("LOAD_FILE", filepath, "Failed to open file");
+        return false;
+    }
     
+    std::string line;
+    size_t lineNumber = 0;
+    while (std::getline(file, line)) {
+        lineNumber++;
+        
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        } else {
+            logConfigError("LOAD_FILE", filepath, "Invalid format at line " + std::to_string(lineNumber));
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json config = json::parse(file);
+        loadFromJsonObject(config);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to parse JSON config: ") + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    try {
+        YAML::LoadFile(filepath);
+        YAML::Node config = YAML::LoadFile(filepath);
+        loadFromYamlNode(config);
+        return true;
+    } catch (const YAML::Exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to parse YAML config: ") + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,7 +126,50 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
+void Config::loadFromJsonObject(const json& object) {
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        std::string key = it.key();
+        std::string value;
+        
+        if (it->is_string()) {
+            value = it->get<std::string>();
+        } else if (it->is_number_integer()) {
+            value = std::to_string(it->get<int64_t>());
+        } else if (it->is_number_float()) {
+            value = std::to_string(it->get<double>());
+        } else if (it->is_boolean()) {
+            value = it->get<bool>() ? "true" : "false";
+        } else if (it->is_null()) {
+            value = "";
+        } else {
+            // Handle arrays by converting to JSON string representation
+            value = it->dump();
+        }
+        
+        set(key, value, ConfigSource::File);
+    }
+}
+
+void Config::loadFromYamlNode(const YAML::Node& node) {
+    for (const auto& key : node) {
+        std::string keyStr = key.data().ToString();
+        YAML::Node value = node[key.data().ToString()];
+        
+        std::string valueStr;
+        
+        if (value.IsScalar()) {
+            valueStr = value.scalar();
+        } else if (value.IsSequence()) {
+            valueStr = YAML::Dump(value);
+        } else if (value.IsFlowSequence()) {
+            valueStr = YAML::Dump(value);
+        } else if (value.IsMap()) {
+            valueStr = YAML::Dump(value);
+        }.tokensin;
+        
+        set(keyStr, valueStr, ConfigSource::File);
+    }
+}
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
