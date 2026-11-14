@@ -353,45 +353,57 @@ bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* d
     return false;
 }
 
-bool CheckpointWriter::finalize() {
-    if (!stream_.is_open()) return false;
-    // Reserve space for the header, then write sections.
-    stream_.seekp(0, std::ios::beg);
-    CheckpointHeader placeholder;
-    stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
-    if (!stream_) return false;
-    bytesWritten_ = sizeof(placeholder);
-    if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
-    // Phase 5 extra sections, in fixed order so a reader can rely on
-    // layout (readSection also finds them by type, order-independent).
-    for (CheckpointSection type : {CheckpointSection::SimulationState,
-                                   CheckpointSection::RandomState,
-                                   CheckpointSection::Plasticity,
-                                   CheckpointSection::Memory}) {
-        for (const auto& entry : extraPayloads_) {
-            if (entry.first == type && !entry.second.empty()) {
-                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
+    bool CheckpointWriter::finalize() {
+        if (!stream_.is_open()) return false;
+        // Write the header
+        if (!writeHeader()) return false;
+        
+        // Write sections using helper methods
+        if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
+        if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
+        if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
+        
+        // Phase 5 extra sections, in fixed order so a reader can rely on
+        // layout (readSection also finds them by type, order-independent).
+        for (CheckpointSection type : {CheckpointSection::SimulationState,
+                                       CheckpointSection::RandomState,
+                                       CheckpointSection::Plasticity,
+                                       CheckpointSection::Memory}) {
+            for (const auto& entry : extraPayloads_) {
+                if (entry.first == type && !entry.second.empty()) {
+                    if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
+                }
             }
         }
+        
+        // Write end marker section
+        SectionHeader endHeader;
+        endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
+        endHeader.offset = bytesWritten_ + sizeof(SectionHeader);
+        endHeader.size = 0;
+        endHeader.compressedSize = 0;
+        endHeader.checksum = 0;
+        
+        if (!writeSectionHeader(endHeader)) return false;
+        
+        // Update header with total size
+        header_.totalSize = bytesWritten_;
+        // Recalculate checksum for complete checkpoint
+        std::vector<uint8_t> fullChecksumData;
+        appendVec(fullChecksumData, neuronPayload_);
+        appendVec(fullChecksumData, synapsePayload_);
+        appendVec(fullChecksumData, delayedSpikePayload_);
+        header_.checksum = ChecksumCalculator::crc32(fullChecksumData.data(), fullChecksumData.size());
+        
+        // Rewrite header with correct size
+        stream_.seekp(0, std::ios::beg);
+        stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+        stream_.flush();
+        if (!stream_) return false;
+        
+        close();
+        return true;
     }
-    SectionHeader endHeader;
-    endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
-    endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
-    stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
-    if (!stream_) return false;
-    bytesWritten_ += sizeof(endHeader);
-    // Patch the real header in place.
-    header_.totalSize = bytesWritten_;
-    header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
-    stream_.seekp(0, std::ios::beg);
-    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
-    stream_.flush();
-    if (!stream_) return false;
-    close();
-    return true;
-}
 
 void CheckpointWriter::abort() {
     close();
@@ -401,9 +413,35 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    stream_.seekp(0, std::ios::beg);
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) return false;
+    bytesWritten_ = sizeof(header_);
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open() || alignment == 0) return true;
+    size_t currentPos = static_cast<size_t>(stream_.tellp());
+    size_t padding = (alignment - (currentPos % alignment)) % alignment;
+    if (padding == 0) return true;
+    
+    std::vector<uint8_t> padBuffer(padding, 0);
+    stream_.write(reinterpret_cast<const char*>(padBuffer.data()), padding);
+    if (!stream_) return false;
+    bytesWritten_ += padding;
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

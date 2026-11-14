@@ -226,9 +226,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // IMPROVEMENT: Faster decay for better control of runaway excitation
+    // Original decay rate (0.95) was too slow for networks with 200+ spikes/step
+    // New decay rate (0.90) provides better stabilization while preserving learning
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * 0.015f;  // Slightly stronger adaptation
+        pImpl->state.adaptationVariable *= 0.90f;  // Faster decay (was 0.95)
     }
     
     // Clamp membrane potential to prevent instability

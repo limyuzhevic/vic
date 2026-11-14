@@ -544,42 +544,107 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
+    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) - IMPROVED ==========
+    // Every 50 steps (more frequent), cap each neuron's total incoming excitatory
     // weight. STDP/Hebbian with soft bounds stop individual weights
     // saturating, but they do not stop the *sum* of ~25 incoming
     // weights growing until every neuron is driven over threshold on
     // every refractory cycle — the periodic attractor of Phase 3.
+    // 
+    // IMPROVEMENTS:
+    // 1. More frequent scaling (every 50 vs 100 steps) for better stability
+    // 2. Lower cap (2.0 vs 3.0) to prevent excessive excitation
+    // 3. Scale all excitatory weights, not just a subset
+    // 4. Add a minimum inhibitory scaling to maintain E/I balance
+    //
     // Rescaling only when the sum exceeds the cap, and scaling all
     // incoming excitatory weights by the same factor, preserves the
     // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
+    // total drive. Scaling inhibitory weights toward balance moves
+    // the E/I balance toward inhibition rather than away.
+    // Cap 2.0: with ~5 co-active presynaptic neurons per step, total
+    // drive is then at most ~5 * (2.0/25) * 10 = 4 mV per step before
     // leak — below the ~15 mV spike gap, so a neuron must integrate
     // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
-        constexpr float kIncomingExcitatoryCap = 3.0f;
+    if (currentStep > 0 && currentStep % 50 == 0) {
+        constexpr float kIncomingExcitatoryCap = 2.0f;
+        constexpr float kMinimumInhibitoryScale = 0.95f;  // Maintain E/I balance
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
                 auto incoming = region->getSynapsesTo(neuron->getId());
-                float sum = 0.0f;
+                float excitatorySum = 0.0f;
+                float inhibitorySum = 0.0f;
                 for (Synapse* syn : incoming) {
-                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                    if (syn->getWeight() > 0.0f) {
+                        excitatorySum += syn->getWeight();
+                    } else {
+                        inhibitorySum += std::abs(syn->getWeight());
+                    }
                 }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
+                bool needsScaling = false;
+                float scaleFactor = 1.0f;
+                if (excitatorySum > kIncomingExcitatoryCap) {
+                    needsScaling = true;
+                    scaleFactor = kIncomingExcitatoryCap / excitatorySum;
+                }
+                // If inhibitory control is weak, increase inhibition
+                if (!needsScaling && inhibitorySum < kIncomingExcitatoryCap * 0.1f) {
+                    needsScaling = true;
+                    scaleFactor = kMinimumInhibitoryScale;
+                }
+                if (needsScaling) {
+                    // Scale excitatory weights
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+                            syn->setWeight(syn->getWeight() * scaleFactor);
+                        }
+                    }
+                    // Increase inhibitory weights to restore balance
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() < 0.0f) {
+                            syn->setWeight(syn->getWeight() * (1.0f + (1.0f - scaleFactor) * 2.0f));
+                        }
+                    }
+    // ========== STEP 6c: Global E/I balance controller ==========
+    // Add a global mechanism to adjust inhibitory strength based on E/I ratio
+    // This provides an additional layer of stability beyond local homeostatic scaling
+    // and helps prevent the system from drifting toward runaway excitation.
+    if (currentStep % 100 == 0) {  // Less frequent adjustment to avoid oscillation
+        float eiRatio = getExcitationInhibitionRatio();
+        float targetEiRatio = 3.0f;  // Healthy E/I balance (excitatory slightly stronger)
+        
+        // If E/I ratio is too high (too much excitation), strengthen inhibition
+        // If E/I ratio is too low (too much inhibition), weaken inhibition
+        if (eiRatio > targetEiRatio * 1.5f) {
+            // System is too excitable, increase global inhibition
+            float balanceFactor = std::min(0.2f, (eiRatio / targetEiRatio - 1.5f) * 0.1f);
+            for (auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    // Increase synaptic noise/uncertainty to reduce excitability
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() < 0.0f) {  // Only inhibitory synapses
+                            syn->setWeight(syn->getWeight() * (1.0f + balanceFactor));
+                        }
+                    }
+                }
+            }
+        } else if (eiRatio < targetEiRatio * 0.5f && eiRatio > 0.1f) {
+            // System is too inhibitory, reduce global inhibition slightly
+            float balanceFactor = std::min(0.1f, (1.5f - eiRatio / targetEiRatio) * 0.05f);
+            for (auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() < 0.0f) {
+                            syn->setWeight(syn->getWeight() * (1.0f - balanceFactor));
                         }
                     }
                 }
             }
         }
     }
-
+    
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
