@@ -160,12 +160,22 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get a configuration value as string (generic)")
+        .def("getInt", &Config::get<int64_t>, py::arg("key"),
+             "Get a configuration value as integer")
+        .def("getFloat", &Config::get<double>, py::arg("key"),
+             "Get a configuration value as float/double")
+        .def("getBool", &Config::get<bool>, py::arg("key"),
+             "Get a configuration value as boolean")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (key, value, optional source)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -412,17 +422,59 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    m.def("createDefaultConfigWithFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            py::warn("Failed to load configuration from file: " + filepath + ". Using defaults.");
+        }
+        return config;
+    }, py::arg("filepath"), "Create a configuration loaded from file");
+
+    m.def("createConfigWithArgs", [](const std::vector<std::string>& args) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Convert vector to argv-style for loadFromArgs
+        std::vector<char*> argv;
+        for (const auto& arg : args) {
+            argv.push_back(const_cast<char*>(arg.c_str()));
+        }
+        config->loadFromArgs(static_cast<int>(argv.size()), argv.data());
+        return config;
+    }, py::arg("args"), "Create a configuration from command line arguments");
+
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrainFromFile", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration from file: " + configFile);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile"), "Create a brain from a configuration file");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    m.def("createSimpleWorldWithSize", [](int width, int height, 
+                                          size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"), 
+        "Create a simple world with specified dimensions");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createAgentBrainWithWorld", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), 
+        "Create and initialize an agent brain interface with world");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
