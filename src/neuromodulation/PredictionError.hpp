@@ -31,6 +31,10 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Get neuromodulation signal strength (0-1)
+    // Higher error = stronger modulation for learning
+    float getModulationSignal() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

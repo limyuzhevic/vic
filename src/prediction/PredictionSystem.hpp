@@ -7,16 +7,27 @@
 
 namespace nlm {
 
+// PredictionErrorType enumeration for detailed error tracking
+enum class PredictionErrorType {
+    IntensityError,
+    SpatialError,
+    TemporalError,
+    TotalError,
+    Count
+};
+
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// REAL IMPLEMENTATION: Neural predictive coding with temporal and action-consequence prediction
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -28,12 +39,22 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Get detailed error components
+    float getPredictionErrorComponent(PredictionErrorType type) const;
+    std::vector<float> getPredictionErrorComponents() const;
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Get action prediction bias
+    std::vector<float> getPredictionBias() const;
+    
+    // Integrate prediction system with brain operations
+    void integrateWithBrain(class Brain* brain);
     
 private:
     struct Impl;

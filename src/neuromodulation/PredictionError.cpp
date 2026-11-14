@@ -50,4 +50,10 @@ float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
 }
 
+// Convert error to neuromodulation signal (0-1)
+// Higher error = stronger modulation for learning
+float PredictionError::getModulationSignal() const {
+    return std::min(1.0f, std::abs(pImpl->error) * 2.0f);
+}
+
 } // namespace nlm
