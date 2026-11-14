@@ -15,6 +15,8 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -43,6 +45,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -86,6 +90,9 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    
+    // Last sensory input for prediction
+    std::unique_ptr<SensoryInput> lastSensoryInput_;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -132,6 +139,8 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -614,8 +623,78 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Store current sensory state for prediction
+        std::vector<float> currentSensoryState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            currentSensoryState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                currentSensoryState.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Use prediction system to predict next state
+        std::unique_ptr<SensoryInput> predictedState;
+        if (!currentSensoryState.empty()) {
+            predictedState = pImpl->predictionSystem->predictNextState(currentSensoryState);
+        }
+        
+        // Update prediction with actual observations
+        if (predictedState) {
+            // Convert current neural activity to sensory-like input for prediction system
+            std::unique_ptr<SensoryInput> actualState = std::make_unique<InternalSignals>();
+            auto& actualData = actualState->getData();
+            actualData = currentSensoryState;
+            
+            pImpl->predictionSystem->updatePredictions(predictedState, actualState);
+            
+            // Connect prediction error to curiosity and novelty systems
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // Update curiosity based on prediction error
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(predictionError, predictionConfidence, pImpl->timestep);
+            }
+            
+            // Update novelty detection based on prediction error
+            if (pImpl->novelty) {
+                pImpl->novelty->update(predictionError, pImpl->timestep);
+            }
+            
+            // Update prediction error neuromodulation signal
+            if (pImpl->predictionError) {
+                pImpl->predictionError->update(predictionError, pImpl->timestep);
+            }
+        }
+        
+        // Connect prediction to neural planning
+        if (pImpl->planner && !currentSensoryState.empty()) {
+            // Update planner with prediction-based state estimates
+            pImpl->planner->updatePlanQuality(
+                pImpl->planner->getCurrentGoal(),
+                pImpl->planner->getCurrentGoal(), // Would use actual actions in full implementation
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f
+            );
+        }
+        
+        // Store prediction data for episodic memory
+        if (pImpl->predictionSystem) {
+            const auto& errorHistory = pImpl->predictionSystem->getErrorHistory();
+            if (!errorHistory.empty()) {
+                // Store average prediction error in working memory as a meta-memory trace
+                float avgPredictionError = 0.0f;
+                for (float error : errorHistory) avgPredictionError += error;
+                avgPredictionError /= errorHistory.size();
+                
+                if (pImpl->workingMemory) {
+                    // Store as a special meta-memory trace for meta-learning
+                    pImpl->workingMemory->storeToNeuron(
+                        NeuronId(std::numeric_limits<uint64_t>::max()),
+                        avgPredictionError
+                    );
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -692,6 +771,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    NLM_LOG_INFO("Brain receiving sensory input of type: " + std::string(input.getType()));
+    
+    // Store current sensory input for prediction system
+    lastSensoryInput_ = input.clone();
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -716,6 +800,34 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Update self-model with sensory input
+    if (pImpl->selfModel) {
+        std::vector<float> beforeState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            beforeState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                beforeState.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Update after sensory input by simulating the effect
+        std::vector<float> afterState = beforeState;
+        for (size_t i = 0; i < std::min(afterState.size(), values.size()); ++i) {
+            afterState[i] += normalizedValue;
+            afterState[i] = std::clamp(afterState[i], -70.0f, 50.0f); // Reasonable neural bounds
+        }
+        
+        // Record this action-effect pair (using a dummy action type)
+        pImpl->selfModel->recordSelfAction(ActionType::Interact, beforeState, afterState);
+    }
+    
+    // Update social learning with sensory observation
+    if (pImpl->socialLearning && !values.empty()) {
+        // Social learning can learn from observing sensory patterns
+        // In a real implementation, this would involve comparing with other agents
+        pImpl->socialLearning->observeAgentAction(ActionType::Interact, values, values);
     }
 }
 
@@ -1509,6 +1621,16 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// Self-model access
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+// Social learning access
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========

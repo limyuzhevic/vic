@@ -25,6 +25,8 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -165,6 +167,12 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Self-model: represents the agent's internal model of itself
+    SelfModel* getSelfModel();
+    
+    // Social learning: enables learning from observing other agents
+    SocialLearning* getSocialLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

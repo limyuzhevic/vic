@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#ifdef __has_include
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -18,10 +21,26 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from file with auto-detection
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension to determine format
+    if (filepath.size() >= 5) {
+        std::string extension = filepath.substr(filepath.size() - 4);
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+        
+        if (extension == ".json") {
+            return loadFromJSONFile(filepath);
+        } else if (extension == ".yaml" || extension == ".yml") {
+            return loadFromYAMLFile(filepath);
+        }
+    }
     
+    // Default to simple key=value format
+    return loadFromSimpleFormat(filepath);
+}
+
+// Load from simple key=value format (legacy)
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +72,152 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+// Load from JSON file
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::string content;
+    {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        content = buffer.str();
+    }
+    
+    return loadFromJSON(content);
+}
+
+// Load from YAML file (placeholder - would use a YAML parser if available)
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    std::string content;
+    {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        content = buffer.str();
+    }
+    
+    // TODO: Implement YAML parser if needed
+    // For now, treat as simple format
+    return loadFromSimpleFormat(filepath);
+}
+
+// Load from JSON format (existing method)
+bool Config::loadFromJSON(const std::string& json) {
+#ifdef __has_include
+    // Check if nlohmann/json is available
+    if constexpr (__has_include(<nlohmann/json.hpp>)) {
+        try {
+            auto j = nlohmann::json::parse(json);
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                
+                // Recursively process JSON value
+                processJSONValue(key, it.value());
+            }
+            return true;
+        } 
+        catch (const std::exception& e) {
+            return false;
+        }
+    }
+#endif
+    
+    return false;
+}
+
+// Process JSON value recursively
+void Config::processJSONValue(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } 
+    else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    }
+    
+    else if (value.is_number_unsigned()) {
+        set(key, value.get<uint64_t>(), ConfigSource::File);
+    }
+    
+    else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    }
+    
+    else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    }
+    
+    else if (value.is_array()) {
+        // Handle array values
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ", ";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    }
+    
+    else if (value.is_object()) {
+        // Convert nested object to JSON string
+        set(key, value.dump(), ConfigSource::File);
+    }
+}
+
+// Load from JSON format
+bool Config::loadFromJSON(const std::string& json) {
+#ifdef __has_include
+    // Check if nlohmann/json is available
+    if constexpr (__has_include(<nlohmann/json.hpp>)) {
+        try {
+            auto j = nlohmann::json::parse(json);
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                
+                // Recursively process JSON value
+                processJSONValue(key, it.value());
+            }
+            return true;
+        } catch (const std::exception& e) {
+            return false;
+        }
+    }
+#endif
+    
+    return false;
+}
+
+// Process JSON value recursively
+void Config::processJSONValue(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_unsigned()) {
+        set(key, value.get<uint64_t>(), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else if (value.is_array()) {
+        // Handle array values
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ", ";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    } else if (value.is_object()) {
+        // Convert nested object to JSON string
+        set(key, value.dump(), ConfigSource::File);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
