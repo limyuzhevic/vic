@@ -132,11 +132,18 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (unified demo framework)
 add_executable(nlm
-    src/main.cpp
+    src/core/DemoFramework/DemoFramework.cpp
+    src/main_unified.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Install unified framework headers
+install(FILES
+    src/core/DemoFramework/DemoFramework.hpp
+    DESTINATION include/nlm/core
+)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
