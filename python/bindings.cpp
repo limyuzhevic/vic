@@ -7,14 +7,16 @@
 #include <vector>
 
 #include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "src/core/Config/Config.hpp"
+#include "src/core/Random/Random.hpp"
+#include "src/core/Types/Types.hpp"
+#include "src/agent/AgentBrain.hpp"
+#include "src/world/SimpleWorld.hpp"
+#include "src/sensory/SensoryInput.hpp"
+#include "src/motor/Action.hpp"
+#include "src/agent/AgentBody.hpp"
+#include "src/agent/SensoryPercept.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -28,6 +30,11 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgument");
+    py::register_exception<std::out_of_range>(m, "OutOfRange");
+    py::register_exception<std::length_error>(m, "LengthError");
+    py::register_exception<std::logic_error>(m, "LogicError");
+    py::register_exception<std::domain_error>(m, "DomainError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -142,6 +149,41 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Core Neuron class
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Leaky Integrate-and-Fire neuron)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"))
+        .def("getId", &Neuron::getId)
+        .def("getType", &Neuron::getType)
+        .def("setType", &Neuron::setType, py::arg("type"))
+        .def("getState", &Neuron::getState)
+        .def("getMembranePotential", &Neuron::getMembranePotential)
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"))
+        .def("getThreshold", &Neuron::getThreshold)
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"))
+        .def("isFiring", &Neuron::isFiring)
+        .def("isRefractory", &Neuron::isRefractory)
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt"))
+        .def("checkThreshold", &Neuron::checkThreshold)
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"))
+        .def("reset", &Neuron::reset)
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"))
+        .def("getSpikeHistory", &Neuron::getSpikeHistory)
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory)
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"))
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"))
+        .def("getIncomingSynapses", &Neuron::getIncomingSynapses)
+        .def("getOutgoingSynapses", &Neuron::getOutgoingSynapses)
+        .def("getRegionId", &Neuron::getRegionId)
+        .def("setRegionId", &Neuron::setRegionId, py::arg("region"))
+        .def("getPopulationId", &Neuron::getPopulationId)
+        .def("setPopulationId", &Neuron::setPopulationId, py::arg("population"))
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags)
+        .def("enablePlasticity", &Neuron::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"))
+        .def("__repr__", [](const Neuron& n) {
+            return "<Neuron id=" + std::to_string(n.getId().value) + 
+                   " type=" + std::to_string(static_cast<int>(n.getType())) + ">";
+        });
+
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -150,9 +192,16 @@ PYBIND11_MODULE(pynlm, m) {
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            std::vector<std::string> argCopies;
+            argCopies.reserve(args.size());
             std::vector<char*> argv;
             argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            
+            // Create safe copies of strings to avoid const_cast of temporary pointers
+            for (const auto& a : args) {
+                argCopies.push_back(a);  // Make a permanent copy
+                argv.push_back(const_cast<char*>(argCopies.back().c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
@@ -168,6 +217,59 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        });
+
+    // Random generator class
+    py::class_<RandomGenerator>(m, "RandomGenerator", R"pbdoc(Random number generator)")
+        .def(py::init<>())
+        .def("seed", &RandomGenerator::seed, py::arg("seed"))
+        .def("uniform", py::overload_cast<double, double>(&RandomGenerator::uniform), 
+             py::arg("min"), py::arg("max"))
+        .def("uniform", py::overload_cast<int, int>(&RandomGenerator::uniform),
+             py::arg("min"), py::arg("max"))
+        .def("normal", &RandomGenerator::normal, py::arg("mean"), py::arg("stddev"))
+        .def("randInt", py::overload_cast<size_t>(&RandomGenerator::randInt), py::arg("n"))
+        .def("randInt", py::overload_cast<uint64_t, uint64_t>(&RandomGenerator::randInt),
+             py::arg("min"), py::arg("max"))
+        .def("getSeed", &RandomGenerator::getSeed)
+        .def("__repr__", [](const RandomGenerator& rng) {
+            return "<RandomGenerator seed=" + std::to_string(rng.getSeed()) + ">";
+        });
+
+    // Synapse class
+    py::class_<Synapse>(m, "Synapse", R"pbdoc(Neural synapse with synaptic dynamics)")
+        .def(py::init<SynapseId, NeuronId, NeuronId>(), py::arg("id"), py::arg("source"), py::arg("destination"))
+        .def("getId", &Synapse::getId)
+        .def("getSourceNeuron", &Synapse::getSourceNeuron)
+        .def("getDestinationNeuron", &Synapse::getDestinationNeuron)
+        .def("getWeight", &Synapse::getWeight)
+        .def("setWeight", &Synapse::setWeight, py::arg("weight"))
+        .def("addToWeight", &Synapse::addToWeight, py::arg("delta"))
+        .def("getDelay", &Synapse::getDelay)
+        .def("setDelay", &Synapse::setDelay, py::arg("delay"))
+        .def("getType", &Synapse::getType)
+        .def("setType", &Synapse::setType, py::arg("type"))
+        .def("isExcitatory", &Synapse::isExcitatory)
+        .def("isInhibitory", &Synapse::isInhibitory)
+        .def("recordPreSpike", &Synapse::recordPreSpike, py::arg("timestamp"))
+        .def("recordPostSpike", &Synapse::recordPostSpike, py::arg("timestamp"))
+        .def("getPreSpikeHistory", &Synapse::getPreSpikeHistory)
+        .def("getPostSpikeHistory", &Synapse::getPostSpikeHistory)
+        .def("clearHistory", &Synapse::clearHistory)
+        .def("getPlasticityFlags", &Synapse::getPlasticityFlags)
+        .def("enablePlasticity", &Synapse::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"))
+        .def("getEligibilityTrace", &Synapse::getEligibilityTrace)
+        .def("setEligibilityTrace", &Synapse::setEligibilityTrace, py::arg("trace"))
+        .def("decayEligibilityTrace", &Synapse::decayEligibilityTrace, py::arg("factor"))
+        .def("getEfficacy", &Synapse::getEfficacy)
+        .def("setEfficacy", &Synapse::setEfficacy, py::arg("efficacy"))
+        .def("step", &Synapse::step, py::arg("timestamp"))
+        .def("reset", &Synapse::reset)
+        .def("initializeRandom", &Synapse::initializeRandom, py::arg("rng"))
+        .def("__repr__", [](const Synapse& syn) {
+            return "<Synapse id=" + std::to_string(syn.getId().value) +
+                   " weight=" + std::to_string(syn.getWeight()) +
+                   " type=" + std::to_string(static_cast<int>(syn.getType())) + ">";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
