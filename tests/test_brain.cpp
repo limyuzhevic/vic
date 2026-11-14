@@ -207,19 +207,28 @@ void testBrainCheckpointRoundTrip() {
 }
 
 void testPhase6TextEncoding() {
-    // Phase 6: the text encoder must be deterministic, and
-    // different words must give different patterns — otherwise
-    // "teaching" a word could not be distinguished from any other
-    // word even in principle. Throwing checks, not assert: in a
-    // Release build assert is compiled out and this test would
-    // be vacuous (the Phase 4 lesson).
+    // OLD INTERFACE (backward compatibility):
+    // This continues to work using AgentBrain::encodeText, which now delegates to TextEncoder::encode()
     auto apple1 = nlm::AgentBrain::encodeText("apple");
     auto apple2 = nlm::AgentBrain::encodeText("Apple");
     auto zebra = nlm::AgentBrain::encodeText("zebra");
+    
+    // NEW INTERFACE (cleaner, more explicit):
+    // For new code, use TextEncoder directly - it's cleaner and more self-documenting
+    auto apple1_new = nlm::TextEncoder::encode("apple");
+    auto apple2_new = nlm::TextEncoder::encode("Apple");
+    auto zebra_new = nlm::TextEncoder::encode("zebra");
+    
+    // Both interfaces should produce the same results
+    if (apple1 != apple1_new) throw std::runtime_error("AgentBrain and TextEncoder interfaces must match");
+    if (apple2 != apple2_new) throw std::runtime_error("AgentBrain and TextEncoder interfaces must match");
+    if (zebra != zebra_new) throw std::runtime_error("AgentBrain and TextEncoder interfaces must match");
+    
     if (apple1.size() != 4) throw std::runtime_error("text code must have 4 neurons");
     if (apple1 != apple2) throw std::runtime_error("text encoding must be case-insensitive and deterministic");
     if (apple1 == zebra) throw std::runtime_error("different words must encode differently");
     std::cout << "    testPhase6TextEncoding passed" << std::endl;
+}
 }
 
 void testPhase6ConceptSimilarity() {

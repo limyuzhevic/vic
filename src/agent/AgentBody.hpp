@@ -57,15 +57,17 @@ struct AgentBody {
 
 // Low-level motor commands that the brain can produce
 // These are innate muscle-like signals, not semantic actions
+// Note: MotorCommand values are now aliased to ActionType for consistency
+// while maintaining their original meaning as low-level motor signals
 enum class MotorCommand {
-    MoveForward = 0,   // Propel forward
-    MoveBackward = 1,  // Propel backward  
-    TurnLeft = 2,      // Rotate left
-    TurnRight = 3,     // Rotate right
-    LookLeft = 4,      // Pan sensor left
-    LookRight = 5,     // Pan sensor right
-    Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    MoveForward = ActionType::MoveForward,
+    MoveBackward = ActionType::MoveBackward,
+    TurnLeft = ActionType::TurnLeft,
+    TurnRight = ActionType::TurnRight,
+    LookLeft = ActionType::LookLeft,
+    LookRight = ActionType::LookRight,
+    Interact = ActionType::Interact,
+    Wait = ActionType::Wait
 };
 
 // Action result from the world's perspective

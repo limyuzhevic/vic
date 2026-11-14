@@ -182,10 +182,36 @@ int main() {
     std::cout << " ; zebra ->";
     for (size_t idx : AgentBrain::encodeText("zebra")) std::cout << " " << idx;
     std::cout << " (same word always gives the same pattern; different words differ)\n";
-
+    
+    // NEW INTERFACE DEMONSTRATION:
+    // For new code, you can use TextEncoder directly - it's cleaner and more self-documenting
+    std::cout << "  NEW INTERFACE: TextEncoder::encode(\"apple\") ->";
+    for (size_t idx : nlm::TextEncoder::encode("apple")) std::cout << " " << idx;
+    std::cout << " ; TextEncoder::encode(\"zebra\") ->";
+    for (size_t idx : nlm::TextEncoder::encode("zebra")) std::cout << " " << idx;
+    std::cout << " (same word always gives the same pattern; different words differ)\n";
+    
+    // Demonstrate TextEncoder validation methods
+    auto pattern = nlm::TextEncoder::encode("test");
+    if (nlm::TextEncoder::validatePattern(pattern)) {
+        std::cout << "  TextEncoder validation: pattern is valid (" << pattern.size() << " neurons)\n";
+    }
+    
+    // Demonstrate text neuron ID conversion
+    auto neuronIds = nlm::TextEncoder::toNeuronIds(pattern);
+    std::cout << "  TextEncoder toNeuronIds: pattern -> neuron IDs [";
+    for (size_t id : neuronIds) {
+        if (&id != &neuronIds[0]) std::cout << ", ";
+        std::cout << id;
+    }
+    std::cout << "] (offset " << nlm::TextEncoder::TEXT_NEURON_OFFSET << ")\n";
+    
     // Paired teaching: the word and the scene, together, repeatedly.
     // No reward, no label, no string matching — only co-presentation.
     for (int a = 0; a < 300; ++a) {
+        agent.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
+        for (int i = 0; i < 10; ++i) brain->step(step++);
+    }
         agent.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
         for (int i = 0; i < 10; ++i) brain->step(step++);
     }

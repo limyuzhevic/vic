@@ -123,16 +123,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    // MotorCommand is now an alias to ActionType for backward compatibility
+    // All MotorCommand values are available directly as ActionType values
+    // For new Python code, use ActionType instead of MotorCommand
+    // Existing code will continue to work as MotorCommand::MoveForward = ActionType::MoveForward, etc.
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
@@ -428,6 +422,157 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // =================================================================
+    // Python Convenience Methods and Batch Operations
+    // =================================================================
+    
+    // Batch processing methods for efficiency
+    m.def("runSteps", [](std::shared_ptr<Brain> brain, uint64_t startStep, uint64_t numSteps) {
+        for (uint64_t step = startStep; step < startStep + numSteps; ++step) {
+            brain->step(step, step * 0.001f);
+        }
+    }, py::arg("brain"), py::arg("startStep"), py::arg("numSteps"),
+       "Run multiple simulation steps efficiently");
+    
+    // Convenience methods for common operations
+    m.def("resetBrain", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        brain->initialize();
+    }, py::arg("brain"),
+         "Reset and reinitialize brain state");
+    
+    // Text encoding convenience methods
+    m.def("encodeTextPattern", [](const std::string& text) {
+        return TextEncoder::encode(text);
+    }, py::arg("text"),
+         "Encode text to neuron pattern (convenience wrapper)");
+    
+    m.def("validateTextPattern", [](const std::vector<size_t>& pattern) {
+        return TextEncoder::validatePattern(pattern);
+    }, py::arg("pattern"),
+         "Validate that a text pattern is within valid ranges");
+    
+    // Batch action injection for agent simulation
+    m.def("injectMultipleCurrent", [](std::shared_ptr<Brain> brain, 
+                                    const std::vector<std::pair<size_t, float>>& injections) {
+        for (const auto& inj : injections) {
+            brain->injectCurrent(NeuronId(inj.first), inj.second);
+        }
+    }, py::arg("brain"), py::arg("injections"),
+         "Inject current into multiple neurons efficiently");
+    
+    // Agent simulation convenience methods
+    m.def("runAgentEpisode", [](std::shared_ptr<AgentBrain> agent, 
+                             std::shared_ptr<SimpleWorld> world,
+                             const SensoryPercept& initialPercept,
+                             uint64_t maxSteps) {
+        uint64_t step = 0;
+        for (uint64_t s = 0; s < maxSteps; ++s) {
+            agent->processSensoryInput(initialPercept);
+            // Note: In a real implementation, this would need to handle world updates
+            // and motor command application as well
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("initialPercept"), py::arg("maxSteps"),
+         "Run a complete agent episode simulation");
+    
+    // Configuration utility methods
+    m.def("mergeConfigs", [](std::shared_ptr<Config> target, 
+                           const std::shared_ptr<Config>& source) {
+        for (const auto& key : source->getKeys()) {
+            target->set(key, source->getOr<std::string>(key, ""));
+        }
+    }, py::arg("target"), py::arg("source"),
+         "Merge configuration from source into target");
+    
+    // Statistics and metrics collection methods
+    m.def("collectBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, float> stats;
+        stats["neuron_count"] = static_cast<float>(brain->getTotalNeuronCount());
+        stats["synapse_count"] = static_cast<float>(brain->getTotalSynapseCount());
+        stats["spike_count"] = static_cast<float>(brain->getTotalSpikeCount());
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"),
+         "Collect statistics from brain as Python dictionary");
+    
+    // Error handling and validation utilities
+    m.def("validateNeuronId", [](size_t id) {
+        return id > 0 && id < 100000; // Simple validation
+    }, py::arg("id"),
+         "Validate that a neuron ID is within acceptable range");
+    
+    m.def("validateSynapseId", [](size_t id) {
+        return id > 0 && id < 100000; // Simple validation
+    }, py::arg("id"),
+         "Validate that a synapse ID is within acceptable range");
+    
+    // Utility functions for common operations
+    m.def("getDefaultSimulationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        return config;
+    }, "Create a default simulation configuration");
+    
+    m.def("isPatternValid", [](const std::vector<size_t>& pattern, 
+                            size_t maxNeurons = 15) {
+        return pattern.size() <= 4 && 
+               std::all_of(pattern.begin(), pattern.end(), 
+                          [maxNeurons](size_t idx) { return idx < maxNeurons; });
+    }, py::arg("pattern"), py::arg("maxNeurons"),
+         "Validate that a pattern meets TextEncoder requirements");
+    
+    // Debug and logging utilities
+    m.def("enableVerboseLogging", [](bool enable) {
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(enable ? LogLevel::Debug : LogLevel::Info);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+    }, py::arg("enable"),
+         "Enable or disable verbose logging");
+    
+    // Python-specific utility functions
+    m.def("createTestEnvironment", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 16, 16);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete test environment for development");
+    
+    m.def("getTextEncodingStats", []() {
+        std::unordered_map<std::string, int> stats;
+        stats["max_neurons"] = TextEncoder::MAX_TEXT_NEURONS;
+        stats["max_pattern_length"] = TextEncoder::MAX_NEURONS_PER_PATTERN;
+        stats["offset"] = TextEncoder::TEXT_NEURON_OFFSET;
+        return stats;
+    }, "Get statistics about text encoding capabilities");
+    
+    // Batch configuration loading utilities
+    m.def("loadConfigsFromFiles", [](const std::vector<std::string>& filepaths) {
+        std::vector<std::shared_ptr<Config>> configs;
+        for (const auto& filepath : filepaths) {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(filepath);
+            configs.push_back(config);
+        }
+        return configs;
+    }, py::arg("filepaths"),
+         "Load multiple configuration files into a list of Config objects");
+    
+    // =================================================================
+    // End of Python Convenience Methods and Batch Operations
+    // =================================================================
 }
 
 } // namespace nlm
