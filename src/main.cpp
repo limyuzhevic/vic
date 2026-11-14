@@ -264,18 +264,46 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
     
-    // Use one real synapse and its own pre/post neurons. The old test
-    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
-    // usually unrelated to that pair, so its result said nothing about STDP.
-    auto& synapses = region->getSynapses();
-    if (synapses.empty()) {
-        NLM_LOG_INFO("  No synapses for STDP test");
+    // Find a synapse with pre and post neurons that we can easily control
+    // to create the correlated activity needed for STDP
+    Synapse* syn = nullptr;
+    Neuron* preNeuron = nullptr;
+    Neuron* postNeuron = nullptr;
+    
+    for (auto& synPtr : synapses) {
+        Neuron* source = nullptr;
+        Neuron* dest = nullptr;
+        
+        // Get source and destination neurons from the region's neurons
+        auto allNeurons = region->getAllNeurons();
+        for (Neuron* neuron : allNeurons) {
+            if (neuron->getId() == synPtr->getSourceNeuron()) {
+                source = neuron;
+            }
+            if (neuron->getId() == synPtr->getDestinationNeuron()) {
+                dest = neuron;
+            }
+        }
+        
+        if (source && dest) {
+            // Check that source and destination are different neurons
+            if (source != dest) {
+                syn = synPtr.get();
+                preNeuron = source;
+                postNeuron = dest;
+                break;
+            }
+        }
+    }
+    
+    if (!syn) {
+        NLM_LOG_INFO("  No suitable synapse found for STDP test");
         return;
     }
-    Synapse* syn = synapses[0].get();
+    
     syn->enablePlasticity(false, true, false);  // STDP only
     float beforeWeight = syn->getWeight();
-    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
+    NLM_LOG_INFO("  Testing STDP on synapse " + std::to_string(syn->getId().index()) + ":");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
@@ -284,9 +312,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
     for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        // Use the actual neurons we found for the STDP test
+        brain->injectCurrent(preNeuron->getId(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->injectCurrent(postNeuron->getId(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
 

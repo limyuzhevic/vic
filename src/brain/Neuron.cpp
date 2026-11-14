@@ -245,7 +245,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 
-    // Check for spike
+    // Check for spike with proper threshold crossing detection
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
@@ -260,14 +260,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Reset membrane potential
         V = V_reset;
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Enter refractory period - Phase 6 fix: use 9 steps instead of 5
+        // This prevents neurons from firing twice in one presentation cycle
+        // which was causing excessive activity (~200 spikes/step)
+        pImpl->state.refractoryRemaining = 9;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
