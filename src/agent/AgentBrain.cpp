@@ -699,6 +699,65 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
             }
         }
     }
+    
+    // Phase 6: Advanced planning using NeuralPlanner
+    if (brain_ && brain_->getPlanner() && !lastVision_.empty()) {
+        // Get planner's suggestion for next action
+        ActionType plannedAction = brain_->getPlanner()->planAction(lastVision_);
+        
+        // Convert planner's action to MotorCommand
+        MotorCommand plannerPlanned = MotorCommand::Wait;
+        switch (plannedAction) {
+            case ActionType::MoveForward: plannerPlanned = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: plannerPlanned = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: plannerPlanned = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: plannerPlanned = MotorCommand::TurnRight; break;
+            case ActionType::Interact: plannerPlanned = MotorCommand::Interact; break;
+            default: plannerPlanned = MotorCommand::Wait; break;
+        }
+        
+        // Apply planner suggestion as a bias to motor decode
+        // This is similar to thought planning but more proactive
+        bool plannerGuidanceApplied = false;
+        bool learned = false;
+        
+        for (ActionType a : {ActionType::MoveForward, ActionType::MoveBackward,
+                             ActionType::TurnLeft, ActionType::TurnRight,
+                             ActionType::Interact, ActionType::Wait}) {
+            if (std::abs(brain_->getPlanner()->getActionQuality(a)) > 0.02f) { 
+                learned = true; 
+                break; 
+            }
+        }
+        
+        if (learned) {
+            // Calculate action quality difference
+            float qPlanned = brain_->getPlanner()->getActionQuality(plannedAction);
+            
+            // Calculate current motor bias without planner
+            float currentBestRate = std::max({forwardRate, backwardRate, turnLeftRate, turnRightRate, interactRate});
+            bool plannerSuggestionBetter = false;
+            
+            // Simple check: planner planned something other than wait
+            if (plannerPlanned != MotorCommand::Wait) {
+                plannerSuggestionBetter = true;
+            }
+            
+            // Apply planner guidance if learned and suggests something different
+            if (plannerSuggestionBetter && plannerPlanned != decoded) {
+                plannerGuidanceApplied = true;
+                // Add planner bias to the planned action
+                switch (plannerPlanned) {
+                    case MotorCommand::MoveForward: forwardRate += 10.0f; break;
+                    case MotorCommand::MoveBackward: backwardRate += 10.0f; break;
+                    case MotorCommand::TurnLeft: turnLeftRate += 10.0f; break;
+                    case MotorCommand::TurnRight: turnRightRate += 10.0f; break;
+                    case MotorCommand::Interact: interactRate += 10.0f; break;
+                    default: break;
+                }
+            }
+        }
+    }
     // Phase 6 concept bias: if the current scene matches a concept
     // whose experienced rewards were strongly positive, interacting
     // is favoured; if strongly negative, interacting is penalised
@@ -905,6 +964,98 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         if (norm > 0.01f) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
+    }
+    
+    // Phase 6: Concept formation also uses episodic memory to learn
+    if (brain_->getConceptFormation() && brain_->getEpisodicMemory()) {
+        // Extract patterns from recent episodes to form concepts
+        auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(3);
+        if (!recentEpisodes.empty()) {
+            // Build concept patterns from episodic content
+            std::vector<std::vector<float>> conceptPatterns;
+            std::vector<float> conceptRewards;
+            
+            for (const auto* episode : recentEpisodes) {
+                // Combine vision and touch for complete sensory pattern
+                std::vector<float> fullPattern = episode->sensoryState;
+                fullPattern.insert(fullPattern.end(), 
+                                   episode->sensoryState.begin(), 
+                                   episode->sensoryState.end());
+                conceptPatterns.push_back(fullPattern);
+                conceptRewards.push_back(episode->reward);
+            }
+            
+            // Learn concepts from episodic patterns
+            brain_->getConceptFormation()->learnFromEpisodes(conceptPatterns, conceptRewards);
+        }
+    }
+    
+    // Phase 6 working memory integration: store current sensory pattern
+    if (brain_->getWorkingMemory() && !lastVision_.empty()) {
+        // Convert vision and touch to a working memory pattern
+        std::vector<float> memoryPattern;
+        memoryPattern.reserve(lastVision_.size() + lastTouch_.size());
+        memoryPattern.insert(memoryPattern.end(), lastVision_.begin(), lastVision_.end());
+        memoryPattern.insert(memoryPattern.end(), lastTouch_.begin(), lastTouch_.end());
+        
+        // Normalize to [0,1] range
+        float maxVal = 0.0f;
+        for (float v : memoryPattern) {
+            if (std::abs(v) > maxVal) maxVal = std::abs(v);
+        }
+        if (maxVal > 0.0f) {
+            for (float& v : memoryPattern) {
+                v = (v + 1.0f) * 0.5f; // Map from [-1,1] to [0,1]
+            }
+        }
+        
+        brain_->getWorkingMemory()->store(memoryPattern, 1.0f);
+    }
+    
+    // Phase 6 episodic memory integration: store experience
+    if (brain_->getEpisodicMemory() && !lastVision_.empty()) {
+        // Create an episodic memory item from this experience
+        EpisodicMemoryItem episode;
+        episode.timestamp = static_cast<SimulationStep>(brain_->getTotalSpikeCount() / 100); // Approximate step
+        
+        // Store vision and touch patterns
+        episode.sensoryState = lastVision_;
+        episode.sensoryState.insert(episode.sensoryState.end(), lastTouch_.begin(), lastTouch_.end());
+        
+        // Set position and orientation
+        episode.positionX = 0.0f; // Would come from world state
+        episode.positionY = 0.0f;
+        episode.orientation = 0.0f;
+        
+        // Set action
+        if (hasLastDecoded_) {
+            switch (lastDecoded_) {
+                case MotorCommand::MoveForward: episode.action = ActionType::MoveForward; break;
+                case MotorCommand::MoveBackward: episode.action = ActionType::MoveBackward; break;
+                case MotorCommand::TurnLeft: episode.action = ActionType::TurnLeft; break;
+                case MotorCommand::TurnRight: episode.action = ActionType::TurnRight; break;
+                case MotorCommand::Interact: episode.action = ActionType::Interact; break;
+                default: episode.action = ActionType::Wait; break;
+            }
+        } else {
+            episode.action = ActionType::Wait;
+        }
+        
+        // Set reward and energy
+        episode.reward = reward;
+        episode.energy = 10.0f; // Default energy
+        episode.novelty = noveltyLevel_;
+        
+        // Set resulting sensory state (would be from next observation)
+        // For now, use current state as placeholder
+        episode.resultingSensoryState = lastVision_;
+        episode.resultingSensoryState.insert(episode.resultingSensoryState.end(), lastTouch_.begin(), lastTouch_.end());
+        episode.resultingReward = reward;
+        
+        // Store neural activity patterns
+        episode.age = 0;
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
     }
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:

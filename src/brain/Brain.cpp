@@ -506,7 +506,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // ========== STEP 6: Apply neuromodulatory signals ==========
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulatory effects on memory systems
+    if (pImpl->dopamine && pImpl->workingMemory) {
+        // Dopamine modulates working memory encoding and maintenance
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Higher dopamine enhances working memory encoding
+        if (dopamineLevel > 0.0f) {
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel);
+        }
+        
+        // Positive dopamine favors certain memory traces through competition
+        pImpl->workingMemory->runCompetition();
+    }
+    
+    if (pImpl->dopamine && pImpl->episodicMemory) {
+        // Dopamine modulates episodic memory storage (reward prediction error signals learning)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Stronger positive reward (dopamine) leads to better memory encoding
+        if (dopamineLevel > 0.0f) {
+            pImpl->episodicMemory->consolidate(0.2f * dopamineLevel);
+        }
+    }
+    
+    if (pImpl->dopamine && pImpl->attention) {
+        // Dopamine modulates attention - positive dopamine enhances focus on relevant information
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        if (dopamineLevel > 0.0f) {
+            pImpl->attention->setExcitationStrength(1.5f + dopamineLevel);
+        }
+    }
+    
+    // ========== STEP 6b: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -612,27 +666,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate with attention if available
+        if (pImpl->attention) {
+            pImpl->attention->update(pImpl->timestep);
+            
+            // Apply attention to working memory winners
+            if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+                std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    // ========== STEP 9: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current state for temporal sequence learning
+        // This helps anticipate next sensory inputs
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Get current sensory state (simplified - in real implementation would come from agent)
+        std::vector<float> currentSensoryPattern;
+        currentSensoryPattern.reserve(pImpl->sensoryNeurons.size() + pImpl->motorNeurons.size());
+        
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            float activation = neuron->getState().membranePotential;
+            currentSensoryPattern.push_back(activation);
         }
+        
+        for (Neuron* neuron : pImpl->motorNeurons) {
+            float activation = neuron->getState().membranePotential;
+            currentSensoryPattern.push_back(activation);
+        }
+        
+        // Update prediction system with current sensory pattern
+        pImpl->predictionSystem->updatePrediction(currentSensoryPattern, currentTime);
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -679,10 +754,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // ========== STEP 14: Sleep/rest cycle with memory consolidation ==========
+    // Implement sleep/rest cycle: reduce neural activity, consolidate memories
+    if (currentStep % 1000 == 0) {  // Enter rest every 1000 steps
+        // Enter resting state
+        pImpl->isResting = true;
+        
+        if (pImpl->episodicMemory) {
+            // Memory consolidation during rest
+            // Replay important memories to strengthen them
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            
+            // Consolidate weak memories (remove or weaken less important ones)
+            pImpl->episodicMemory->consolidate(0.2f);
+        }
+        
+        if (pImpl->workingMemory) {
+            // Working memory decay during rest (forget irrelevant details)
+            pImpl->workingMemory->clear();
+        }
+        
+        // Restore energy and reduce synaptic noise
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Return to resting potential
+                neuron->injectCurrent(-neuron->getState().membranePotential * 0.5f);
+            }
+        }
+    } else {
+        // Not in rest, normal operation
+        pImpl->isResting = false;
     }
     
     // ========== STEP 15: Checkpoint management ==========
