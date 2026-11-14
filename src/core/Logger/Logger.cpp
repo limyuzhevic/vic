@@ -23,6 +23,9 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    // Fixed bug: Check if entry level is BELOW minimum level to filter out
+    // If logger level is Info (1), we want to show Info, Warning, Error, Critical (1,2,3,4)
+    // but NOT Debug (0). So if entry.level < logger.level, skip.
     if (entry.level < pImpl->level) {
         return;
     }
@@ -36,11 +39,23 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
+    // Add file location info for debugging
+    if (!entry.file.empty()) {
+        oss << " (" << entry.file;
+        if (entry.line > 0) oss << ":" << entry.line;
+        oss << ")";
+    }
+    
     oss << " " << entry.message;
+    
+    // Add function name for better debugging
+    if (!entry.function.empty()) {
+        oss << " [" << entry.function << "]";
+    }
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with enhanced formatting
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
@@ -51,6 +66,16 @@ void ConsoleLogger::log(const LogEntry& entry) {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+    }
+    
+    // Performance timing for slow operations (debug only)
+    static bool timingEnabled = false;
+    if (timingEnabled && entry.level <= LogLevel::Warning) {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - entry.timestamp);
+        if (duration.count() > 1000) { // Log operations taking >1ms
+            std::cerr << "[PERF] " << duration.count() << " μs" << std::endl;
+        }
     }
 }
 

@@ -43,7 +43,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -84,9 +84,38 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save configuration with proper formatting for key=value format
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper function to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& value) -> std::string {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, int64_t> ||
+                                    std::is_same_v<T, int> ||
+                                    std::is_same_v<T, double> ||
+                                    std::is_same_v<T, float> ||
+                                    std::is_same_v<T, bool>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                    std::is_same_v<T, std::vector<double>> ||
+                                    std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                }
+            }, value);
+            return oss.str();
+        };
+        
+        file << entry.key << " = " << valueToString(entry.value) << "\n";
     }
     
     return true;
@@ -152,7 +181,7 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << ") end:\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
@@ -160,8 +189,8 @@ std::string Config::summary() const {
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
             } else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                                 std::is_same_v<T, std::vector<double>> ||
-                                 std::is_same_v<T, std::vector<std::string>>) {
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
                 oss << "[";
                 for (size_t i = 0; i < arg.size(); ++i) {
                     if (i) oss << ", ";
@@ -179,7 +208,7 @@ std::string Config::summary() const {
 
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
+    if (start == std::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
     return str.substr(start, end - start + 1);
 }
