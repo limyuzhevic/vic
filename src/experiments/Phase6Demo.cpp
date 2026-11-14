@@ -1,9 +1,4 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
+// Enhanced Phase 6 integration demo with meaningful reward system
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
@@ -12,8 +7,8 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "=== Enhanced NLM Phase 6 Integration Demo ===" << std::endl;
+    std::cout << "Testing the integrated artificial brain with meaningful rewards..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
@@ -51,14 +46,19 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
+    // Run enhanced experiment with meaningful goals
+    std::cout << "--- Enhanced Integration Experiment with Goals ---" << std::endl;
     Phase6Config config;
     config.neuronCount = 500;
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    
+    // Add meaningful goal for the agent
+    config.goalPositionX = 15.0f;
+    config.goalPositionY = 15.0f;
+    config.hazardDensity = 0.1f; // Add some hazards
     
     auto result = experiment.run(config);
     
@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;

@@ -85,6 +85,11 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Enhanced configuration for meaningful integration
+    float goalPositionX;
+    float goalPositionY;
+    float hazardDensity;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +98,11 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , goalPositionX(10.0f)  // Default goal position
+        , goalPositionY(10.0f)
+        , hazardDensity(0.05f)  // Default hazard density
+    {}
 };
 
 /**

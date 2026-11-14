@@ -26,6 +26,11 @@ public:
     // TODO PHASE 2: Implement real reward computation
     float computeReward(const class Observation& observation) const;
     
+    // Enhanced reward computation using agent and world state
+    float computeReward(const class AgentState& agentState, 
+                       const class WorldState& worldState, 
+                       const Brain& brain) const;
+    
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();

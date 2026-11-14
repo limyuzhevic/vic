@@ -35,6 +35,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
+    // Add enhanced configuration for meaningful goals
+    cfg->set("goal_position_x", config.goalPositionX);
+    cfg->set("goal_position_y", config.goalPositionY);
+    cfg->set("hazard_density", config.hazardDensity);
+    
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
