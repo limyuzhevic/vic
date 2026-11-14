@@ -160,16 +160,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             float newX = agent_.x + dx * 0.1f;
             float newY = agent_.y + dy * 0.1f;
             
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
-                result.success = true;
-            } else {
-                result.reward = -0.05f;  // Cost for hitting wall
-                result.success = false;
-            }
+            // Small incremental reward for exploration and learning
+                float explorationBoost = 0.01f;
+                float energyEfficiency = agent_.energy / maxEnergy_;
+                if (energyEfficiency > 0.8f) {
+                    result.reward += explorationBoost * 2.0f;  // Bonus for efficiency
+                } else {
+                    result.reward += explorationBoost;  // Small exploration reward
+                }
             break;
         }
         
@@ -238,7 +236,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             agent_.angularVelocity *= 0.9f;
             agent_.isMoving = false;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            // Small exploration and consolidation reward for resting
+            float explorationBonus = 0.005f;
+            float learningReward = 0.003f;
+            if (simTime_ > 10.0f) {
+                result.reward = explorationBonus + learningReward;
+            } else {
+                result.reward = explorationBonus;
+            }
             result.success = true;
             break;
     }
@@ -264,18 +269,34 @@ ActionResult SimpleWorld::interact() {
         if (dist < interactRange + obj.radius) {
             obj.active = false;  // Consume the object
             
+            // Resource interaction
             if (obj.type == WorldObjectType::Resource) {
-                agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
-                result.reward = obj.value;  // Positive reward
+                agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_ * 0.5f);  // Half of max energy
+                result.reward = obj.value * 0.4f;  // 40% of original value
                 result.success = true;
                 result.message = "consumed_resource";
-            } else if (obj.type == WorldObjectType::Hazard) {
+            }
+            
+            // Hazard interaction
+            if (obj.type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
-                result.reward = obj.value;  // Negative reward
+                result.reward = obj.value * 0.4f;  // 40% of original value
                 result.success = true;
                 result.message = "hit_hazard";
             }
             
+            // Success bonus for achieving goals
+            if (obj.type == WorldObjectType::Resource && agent_.energy >= maxEnergy_ * 0.8f) {
+                result.reward += 0.05f;  // Efficiency bonus for not wasting energy
+            }
+            
+            // Exploration reward for discovering new areas
+            static bool hasExplored = false;
+            if (!hasExplored && simTime_ > 20.0f) {
+                result.reward += 0.1f;  // First discovery bonus
+                hasExplored = true;
+            }
+
             // Only interact with one object at a time
             break;
         }

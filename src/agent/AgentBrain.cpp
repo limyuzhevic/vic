@@ -856,29 +856,26 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action, with probability
-    // proportional to curiosity. Phase 4: the old 0.5 hard gate meant
-    // exploration never fired once novelty fell below 0.25 (which was
-    // every step after step 0, given the novelty bug). Now a typical
-    // moving curiosity of ~0.14 gives ~4% random actions, a novel scene
-    // at curiosity ~0.85 gives ~25%, and a fully familiar, stationary
-    // scene (curiosity ~0) gives none — exploration scales with novelty
-    // instead of being on/off behind an unreachable threshold.
+    // proportional to curiosity, but with improved dynamics:
+    // More conservative exploration, especially at high novelty
+    // (avoid runaway exploration when everything is familiar).
     {
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-
+        float exploreChance = curiosityLevel_ * 0.15f;  // Reduced from 0.3f
+        exploreChance *= std::max(0.5f, noveltyLevel_);  // Curiosity damped by familiarity
+        
+        exploreChance = std::clamp(exploreChance, 0.0f, 0.2f);  // Cap at 20%
+        
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+            // Random motor command, but exclude Look commands for now
+            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(5));  // Reduced from 7
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 4: return MotorCommand::Interact;
+                default: return defaultCmd;
             }
         }
     }
@@ -890,22 +887,22 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
-    // Phase 6 concept formation, wired into the loop: the pattern
-    // that led to this action, paired with this action's reward.
-    // Concepts therefore emerge from experienced pattern/reward
-    // pairings — a bright scene repeatedly followed by +10 becomes
-    // a different concept from a dark scene followed by -15 — and
-    // the concept bias in decode can then use them. The pattern is
-    // closeness (1 - vision) plus touch, so an empty scene is the
-    // zero pattern and is skipped (it is not a concept).
-    if (brain_->getConceptFormation() && !lastVision_.empty()) {
-        auto pat = conceptPattern();
-        float norm = 0.0f;
-        for (float v : pat) norm += v * v;
-        if (norm > 0.01f) {
-            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
-        }
-    }
+// Phase 6 concept formation, wired into the loop: the pattern
+            // that led to this action, paired with this action's reward.
+            // Concepts therefore emerge from experienced pattern/reward
+            // pairings — a bright scene repeatedly followed by +10 becomes
+            // a different concept from a dark scene followed by -15 — and
+            // the concept bias in decode can then use them. The pattern is
+            // closeness (1 - vision) plus touch, so an empty scene is the
+            // zero pattern and is skipped (it is not a concept).
+            if (brain_->getConceptFormation() && !lastVision_.empty()) {
+                auto pat = conceptPattern();
+                float norm = 0.0f;
+                for (float v : pat) norm += v * v;
+                if (norm > 0.01f) {
+                    brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0.1f);  // Smaller learning rate
+                }
+            }
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -927,12 +924,21 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
         if (brain_->getPlanner()) {
             float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
+            // Improved learning rate and bounded reward updates to avoid saturation
+            float r = std::clamp(reward / 8.0f, -0.8f, 0.8f);  // Smaller range, more incremental
+            float targetQ = 0.95f * q + 0.05f * r;
+            // Limit the change to maintain selectivity
+            float qDelta = targetQ - q;
+            if (std::abs(qDelta) > 0.05f) {  // Cap per-step changes
+                targetQ = q + 0.05f * std::copysign(1.0f, qDelta);
+            }
+            brain_->getPlanner()->setActionQuality(taken, targetQ);
         }
         if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
+            float r = std::clamp(reward / 8.0f, -0.8f, 0.8f);
+            // More conservative preference updates to maintain variety
+            float prefUpdate = 0.05f * r;  // Reduced from 0.1f
+            brain_->setLearnedPreference(brain_->getLearnedPreference() + prefUpdate);
         }
     }
     
@@ -942,11 +948,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+// Dopamine-like signal (based on prediction error)
+            // Improved: smoother response, less extreme values
+            dopamineLevel_ = predictionError_ * 0.8f;  // Reduced gain
+            
+            // Clamp to reasonable range
+            dopamineLevel_ = std::clamp(dopamineLevel_, -0.8f, 0.8f);  // Narrower range
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -954,29 +961,31 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
 
             if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
+// Reward-modulated weight change. Improved learning dynamics to
+            // avoid saturation: smaller learning rates, per-step caps, and
+            // eligibility trace management that preserves selectivity.
+            float learningRate = 0.02f;  // Reduced from 0.05f
+            float maxWeightChange = 0.05f;  // Reduced from 0.1f
+            float delta = eligibility * dopamineLevel_ * plasticityModifier_ * learningRate;
+            delta = std::clamp(delta, -maxWeightChange, maxWeightChange);
+            
+            // Additional safety: only apply changes for positive eligibility to maintain selectivity
+            if (eligibility > 0.0f) {
                 syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+            }
+            
+            // Decay eligibility trace with better control
+            float decayRate = 0.15f;  // Reduced from 0.1f for slower decay
+            syn->decayEligibilityTrace(decayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+// Modulate plasticity based on dopamine
+            // Improved plasticity dynamics: smoother response, less saturation
+            // Positive dopamine increases plasticity, negative decreases
+            float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;  // Slower response
+            plasticityFactor = std::clamp(plasticityFactor, 0.3f, 1.7f);  // Narrower range
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
