@@ -43,77 +43,145 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
-    SimpleWorld world;
-    world.configure(16, 16, 16, 16);
-    world.reset();
-    
-    // Create agent
-    AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+// Create simple world - use larger world for better exploration
+	    SimpleWorld world;
+    world.configure(50, 50, 16, 16);  // Larger world to encourage movement
+	    world.setRandomSeed(config.randomSeed);  // For reproducible experiments
+	    world.reset();
+	    
+	    // Create agent with enhanced settings for better learning
+	    AgentBrain agent(brain);
+	    agent.initialize(world);
+	    agent.enableRewardModulation(true);
+	    agent.enableStructuralPlasticity(config.enableDevelopment);
+	    agent.enableDevelopment(config.enableDevelopment);
+	    agent.enableCuriosity(true);
+	    
+	    // Enable concept formation for text/sequence learning
+	    if (brain->getConceptFormation()) {
+	        brain->getConceptFormation()->enableConceptLearning(true);
+	    }
+	    
+	    // Enable social learning
+		    if (brain->getPlanner()) {
+	        brain->getPlanner()->enableSocialLearning(true);
+	    }
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
-    float totalReward = 0.0f;
-    float totalFiringRate = 0.0f;
-    size_t firingCount = 0;
-    
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        world.update(0.001);
-        SensoryPercept percept = world.getSensoryPercept();
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
-        
-        // Compute reward
-        float reward = actionResult.reward;
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
-        }
-    }
-    
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    // Run simulation with enhanced reward collection
+	    float totalReward = 0.0f;
+	    float totalFiringRate = 0.0f;
+	    size_t firingCount = 0;
+	    size_t successfulActions = 0;
+	    size_t totalActions = 0;
+	    
+	    // Track resource encounters for reward analysis
+	    size_t resourcesConsumed = 0;
+	    size_t hazardsHit = 0;
+	    
+	    NLM_LOG_INFO("Starting simulation for " + std::to_string(config.maxSteps) + " steps");
+	    
+	    for (uint64_t step = 0; step < config.maxSteps; ++step) {
+	        // Get observation for agent
+	        world.update(0.001);
+	        SensoryPercept percept = world.getSensoryPercept();
+	        
+	        // Process sensory input with error checking
+	        if (!agent.processSensoryInput(percept)) {
+	            NLM_LOG_WARNING("Sensory input processing issue at step " + std::to_string(step));
+	        }
+	        
+	        // Brain step with timing tracking
+	        brain->step(step, step * 0.001);
+	        
+	        // Get motor command and check validity
+	        MotorCommand cmd = agent.decodeMotorCommand();
+	        if (cmd == MotorCommand::Wait && step > 0) {
+	            NLM_LOG_DEBUG("Agent chose to wait at step " + std::to_string(step));
+	        }
+	        
+	        // Apply action to world with comprehensive logging
+	        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
+	        totalActions++;
+	        
+	        // Track interaction outcomes
+	        if (actionResult.success) {
+	            successfulActions++;
+	            
+	            // Detailed interaction tracking
+	            if (actionResult.message == "consumed_resource") {
+	                resourcesConsumed++;
+	                NLM_LOG_DEBUG("Resource consumed at step " + std::to_string(step));
+	            } else if (actionResult.message == "hit_hazard") {
+	                hazardsHit++;
+	                NLM_LOG_DEBUG("Hazard hit at step " + std::to_string(step));
+	            } else if (actionResult.message == "too soon") {
+	                NLM_LOG_DEBUG("Action rejected (rate limit) at step " + std::to_string(step));
+	            }
+	        }
+	        
+	        // Apply reward modulation with enhanced error handling
+	        try {
+	            agent.applyRewardModulation(actionResult.reward, 0.0f);
+	            totalReward += actionResult.reward;
+	            
+	            // Log reward details periodically
+	            if (step % 500 == 0 && actionResult.reward != 0.0f) {
+	                NLM_LOG_INFO("Step " + std::to_string(step) + " | Reward: " + std::to_string(actionResult.reward) + 
+	                          " | Total: " + std::to_string(totalReward) + 
+	                          " | Successful actions: " + std::to_string(successfulActions));
+	            }
+	        } catch (const std::exception& e) {
+	            NLM_LOG_ERROR("Exception applying reward modulation at step " + std::to_string(step) + ": " + std::string(e.what()));
+	        }
+	        
+	        // Update development system if enabled
+	        if (config.enableDevelopment) {
+	            try {
+	                agent.updateDevelopment(0.001);
+	            } catch (const std::exception& e) {
+	                NLM_LOG_ERROR("Exception in development update at step " + std::to_string(step) + ": " + std::string(e.what()));
+	            }
+	        }
+	        
+	        // Collect metrics with enhanced tracking
+	        try {
+	            totalFiringRate += brain->getAverageFiringRate();
+	            if (brain->getFiringNeuronCount() > 0) firingCount++;
+	            
+	            // Periodic status reporting
+	            if (step % 1000 == 0) {
+	                NLM_LOG_INFO("Step " + std::to_string(step) + 
+	                          " | Reward: " + std::to_string(totalReward / (step + 1)) +
+	                          " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+	                          " | Resources: " + std::to_string(resourcesConsumed) +
+	                          " | Hazards: " + std::to_string(hazardsHit) +
+	                          " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+	                              brain->getWorkingMemory()->getActiveTraces() : 0));
+	            }
+	        } catch (const std::exception& e) {
+	            NLM_LOG_ERROR("Exception collecting metrics at step " + std::to_string(step) + ": " + std::string(e.what()));
+	        }
+	    }
+	    
+	    // Collect final metrics with enhanced analysis
+	    result.totalReward = totalReward / config.maxSteps;
+	    result.avgFiringRate = totalFiringRate / config.maxSteps;
+	    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
+	        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+	    result.noveltyLevel = agent.getNoveltyLevel();
+	    result.curiosityLevel = agent.getCuriosityLevel();
+	    result.dopamineLevel = agent.getNeuromodulationLevel();
+	    
+	    // Add detailed interaction analysis
+	    float interactionRate = successfulActions > 0 ? (float)successfulActions / (float)totalActions * 100.0f : 0.0f;
+	    float resourceEfficiency = resourcesConsumed > 0 ? (float)resourcesConsumed / (float)config.maxSteps * 1000.0f : 0.0f;
+	    NLM_LOG_INFO("Simulation Analysis: Reward=" + std::to_string(result.totalReward) +
+	              " Resources=" + std::to_string(resourcesConsumed) +
+	              " Hazards=" + std::to_string(hazardsHit) +
+	              " InteractionRate=" + std::to_string(interactionRate) +
+	              "% ResourceEfficiency=" + std::to_string(resourceEfficiency));
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);

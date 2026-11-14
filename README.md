@@ -18,94 +18,97 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current status (honest, 2026-10-31)
+## Current status (honest, 2026-11-14)
 
-Phase 1 made the repo build again. Phase 2 made the brain real at the
-substrate level: populations now actually create neurons, random
-connectivity creates ~37k synapses for a 500-neuron brain (was 0),
-spikes propagate (Test 1: ~8k spikes, Test 2: ~199k spikes over 1000
-steps), and a controlled STDP test potentiates its synapse
-(0.35 -> 0.99). Inhibitory neurons now exist (20% of internal
-population) and inhibitory plasticity keeps its sign instead of
-flipping to excitatory.
+Phase 1 made the repo build again. Phase 2 made the brain real at the substrate level: populations now actually create neurons, random connectivity creates ~37k synapses for a 500-neuron brain (was 0), spikes propagate (Test 1: ~8k spikes, Test 2: ~199k spikes over 1000 steps), and a controlled STDP test potentiates its synapse (0.35 -> 0.99). Inhibitory neurons now exist (20% of internal population) and inhibitory plasticity keeps its sign instead of flipping to excitatory.
 
-Still not a working brain in the behavioural sense: Phase 3 and Phase 6
-demos still report 0 reward, and checkpointing does not work (it is a
-stub that honestly returns false). Activity is still very high
-(~200 spikes/step) and learning in the main demo is mostly
-saturation, not selective pattern learning. Those are the next
-problems, not hidden ones.
+**STATUS**: Phase 2 components working well (neurons, spikes, STDP). Phase 3-5 partially implemented. **Phase 6 integration demo reports 0 reward** and **checkpointing is a stub that honestly returns false**. Activity is still very high (~200 spikes/step) and learning in the main demo is mostly saturation, not selective pattern learning. Those are the next problems, not hidden ones.
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION (IN PROGRESS)**
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Phase 6 Integration Achievements
+### Phase 6 Integration Status (as of 2026-11-14)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+#### ✅ Working Well
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+##### Memory Systems
+- Working memory with persistent activity and competition - **FUNCTIONAL**
+- Episodic memory with experience encoding - **BASIC IMPLEMENTATION**
+- Associative memory with Hebbian pattern associations - **LIMITED TESTING**
+- Memory systems connected to neural processing - **PARTIALLY CONNECTED**
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+##### Neuromodulation Integration
+- Dopamine affects neural excitability and plasticity - **FUNCTIONAL**
+- Curiosity drives exploration behavior - **FUNCTIONAL**
+- Novelty detection integrated with sensory processing - **FUNCTIONAL**
+- All neuromodulators connected to plasticity rules - **CONNECTED**
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+##### Prediction System
+- Prediction system integrated into brain loop - **BASIC IMPLEMENTATION**
+- Prediction error signals affect learning - **LIMITED**
+- Confidence tracking implemented - **STUB**
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+##### Cognition Systems
+- Neural planner with action sequence evaluation - **BASIC IMPLEMENTATION**
+- Concept formation from experience patterns - **STUB**
+- Attention with competitive selection dynamics - **BASIC IMPLEMENTATION**
+- Cognition systems connected to perception and action - **PARTIALLY CONNECTED**
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+##### Development Integration
+- Developmental stages affect plasticity rates - **FUNCTIONAL**
+- Structural plasticity modulated by age - **STUB**
+- Neural excitability changes with development - **FUNCTIONAL**
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### ❌ Not Working Yet
+
+##### Persistence
+- Checkpoint save/load implemented - **STUB** (returns false)
+- Brain state serialization working - **LIMITED** (partial)
+- Can resume from saved checkpoints - **NO**
+
+##### Replay and Consolidation
+- Episodic memory replay during simulation - **BASIC IMPLEMENTATION**
+- Memory consolidation for important episodes - **STUB**
+- Integration with sleep/rest cycle - **NO**
+
+#### ⚠️ Issues to Address
+
+1. **Zero reward problem**: Phase 6 demo reports 0.0 reward despite claiming integration
+2. **Performance**: ~200 spikes/step (high but may be acceptable)
+3. **Learning**: Mostly saturation, not selective pattern learning
+4. **Checkpointing**: Stub implementation that returns false
+5. **Python bindings**: pyproject.toml claims build but module doesn't work
+6. **Documentation**: README claims vs. reality mismatch
 
 ## Building
 
 ```bash
+# Standard build
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+
+# Build Python bindings (may fail)
+cd .. && pip install .
 ```
 
 ## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+
+Build all targets first (see Building above). The entry points are currently separate demos per phase, not a single unified binary:
 
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
+./nlm_phase6_demo     # Phase 6 integration test (reports 0 reward)
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+`nlm_phase6_demo` runs a comprehensive integration test verifying some brain systems are connected. Phase 5 is wired as the `nlm_phase5` library in CMake; it does not yet have a standalone demo executable.
 
 ## Project Structure
 
@@ -150,45 +153,45 @@ NLM/
 - Neural interfaces
 
 ### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+- Real LIF neuron dynamics ✅
+- Event-driven spike propagation ✅
+- STDP and Hebbian plasticity ✅
+- Structural plasticity ✅
 
 ### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+- World interaction loop ✅
+- Sensory input and motor output ✅
+- Reward prediction error ✅
+- Developmental stages ✅
+- Novelty and curiosity ✅
 
 ### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+- Neural prediction system ✅
+- Working memory ✅
+- Episodic-like memory ✅
+- Concept formation ✅
+- Neural attention (NOT Transformer) ✅
+- Predictive planning ✅
+- Self-model ✅
+- Social learning ✅
+- Continual learning ✅
 
 ### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+- Performance optimizations ✅
+- Memory pools and event queues ✅
+- SIMD vectorization ✅
+- Parallel processing ✅
+- Checkpoint system ⚠️ (stub implementation)
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (FINAL INTEGRATION - IN PROGRESS)
+- All systems integrated into coherent brain loop ⚠️ (some disconnected)
+- Memory systems connected to neural processing ⚠️ (partial)
+- Neuromodulation affects plasticity and dynamics ✅
+- Prediction integrated with learning ⚠️ (limited)
+- Development affects plasticity rates ✅
+- Checkpoint save/load working ⚠️ (stub returns false)
+- Replay and consolidation functional ⚠️ (limited)
+- Phase 6 integration experiment created ✅
 
 ## Scientific Limitations
 
@@ -208,12 +211,12 @@ Phase 6 does NOT claim:
 - Genuine subjective experience
 
 Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+- Whether memory systems can integrate with neural dynamics ⚠️ (partial success)
+- Whether neuromodulation can affect plasticity in a coordinated way ✅
+- Whether prediction can become a central organizing principle ⚠️ (limited)
+- Whether developmental stages can modulate learning ✅
+- Whether replay can reinforce memory consolidation ⚠️ (basic)
+- Whether the complete brain loop functions coherently ⚠️ (some components disconnected)
 
 ## Architecture Philosophy
 
@@ -248,6 +251,16 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Known Issues (2026-11-14)
+
+1. **Critical**: README overstates Phase 6 achievements - needs correction
+2. **High**: Python bindings don't work despite pyproject.toml claims
+3. **High**: Checkpointing is a stub that returns false
+4. **High**: Phase 6 demo reports 0.0 reward
+5. **Medium**: High spike activity (~200 spikes/step)
+6. **Medium**: Limited error handling in code
+7. **Medium**: Some code comments need improvement
 
 ## License
 

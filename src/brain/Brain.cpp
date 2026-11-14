@@ -209,10 +209,17 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
-    for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
-    }
+    // Create regions with error checking
+	    for (size_t i = 0; i < regionCount; ++i) {
+	        RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+	        auto* region = getRegion(regionId);
+	        if (!region) {
+	            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+	            return false;
+	        }
+	    }
+	    
+	    NLM_LOG_INFO("Successfully created " + std::to_string(regionCount) + " regions");
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
@@ -1141,45 +1148,56 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
 
-        // Apply neuron states, including the fields the old load dropped
-        // (refractory remaining, firing rate, last spike time): without
-        // them a reloaded brain restarts its firing-rate EMA and
-        // refractory state from zero and does not continue where the
-        // saved brain left off.
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        auto& state = neuron->getState();
-                        if (idx < neuronData.firingState.size()) {
-                            state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            state.refractoryRemaining = neuronData.refractoryRemaining[idx];
-                        }
-                        if (idx < neuronData.refractoryPeriod.size()) {
-                            state.refractoryPeriod = neuronData.refractoryPeriod[idx];
-                        }
-                        if (idx < neuronData.lastSpikeTime.size()) {
-                            state.lastSpikeTime = neuronData.lastSpikeTime[idx];
-                        }
-                        // Firing rate is the decode signal, so a
-                        // reloaded brain must resume with the saved
-                        // rates, not restart its EMA from zero.
-                        if (idx < neuronData.firingRate.size()) {
-                            state.firingRate = neuronData.firingRate[idx];
-                        }
-                    }
-                    idx++;
-                }
-            }
-        }
+    // Apply neuron states with comprehensive error checking
+	    size_t idx = 0;
+	    bool neuronsRestored = true;
+	    for (auto& region : pImpl->regions) {
+	        for (auto& pop : region->getPopulations()) {
+	            for (auto* neuron : pop->getNeurons()) {
+	                if (idx >= neuronData.membranePotential.size()) {
+	                    NLM_LOG_ERROR("Neuron data truncation: expected " + std::to_string(getTotalNeuronCount()) +
+	                                  " neurons but only " + std::to_string(idx) + " found");
+	                    neuronsRestored = false;
+	                    break;
+	                }
+	                
+	                try {
+	                    neuron->setMembranePotential(neuronData.membranePotential[idx]);
+	                    neuron->setRestingPotential(neuronData.restingPotential[idx]);
+	                    neuron->setThreshold(neuronData.threshold[idx]);
+	                    neuron->setResetPotential(neuronData.resetPotential[idx]);
+	                    neuron->setLeakConductance(neuronData.leakConductance[idx]);
+	                    auto& state = neuron->getState();
+	                    if (idx < neuronData.firingState.size()) {
+	                        state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
+	                    }
+	                    if (idx < neuronData.refractoryRemaining.size()) {
+	                        state.refractoryRemaining = neuronData.refractoryRemaining[idx];
+	                    }
+	                    if (idx < neuronData.refractoryPeriod.size()) {
+	                        state.refractoryPeriod = neuronData.refractoryPeriod[idx];
+	                    }
+	                    if (idx < neuronData.lastSpikeTime.size()) {
+	                        state.lastSpikeTime = neuronData.lastSpikeTime[idx];
+	                    }
+	                    if (idx < neuronData.firingRate.size()) {
+	                        state.firingRate = neuronData.firingRate[idx];
+	                    }
+	                } catch (const std::exception& e) {
+	                    NLM_LOG_ERROR("Exception restoring neuron state at index " + std::to_string(idx) + ": " + std::string(e.what()));
+	                    neuronsRestored = false;
+	                }
+	                idx++;
+	            }
+	        }
+	}
+	
+	if (!neuronsRestored) {
+	    NLM_LOG_ERROR("Failed to restore complete neuron state");
+	    return false;
+	}
+	
+	NLM_LOG_INFO("Successfully restored " + std::to_string(idx) + " neurons from checkpoint");
 
         // Read synapses
         SynapseCheckpointData synapseData;
