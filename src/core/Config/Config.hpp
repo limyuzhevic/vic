@@ -80,20 +80,28 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Load from different sources
+    bool loadFromFile(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromJSON(const std::string& jsonContent);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Save to file
+    bool saveToFile(const std::string& filepath) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Helper methods for JSON parsing
+    std::string configValueToString(const ConfigValue& value) const;
+    std::string escapeString(const std::string& str) const;
     
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // JSON parsing utilities (internal)
+    static void skipWhitespace(const std::string& json, size_t& pos);
+    static bool parseJSON(const std::string& json, std::vector<ConfigEntry>& outEntries);
+    static bool parseJSONString(const std::string& json, size_t& pos, std::string& out);
+    static bool parseJSONNumber(const std::string& json, size_t& pos, ConfigValue& out);
+    static bool parseJSONBoolean(const std::string& json, size_t& pos, bool& out);
+    static bool parseJSONArray(const std::string& json, size_t& pos, ConfigValue& out);
+    static bool parseJSONObject(const std::string& json, size_t& pos, std::vector<ConfigEntry>& outEntries);
+    static bool parseJSONValue(const std::string& json, size_t& pos, ConfigValue& out);
+
     
 private:
     struct Impl;

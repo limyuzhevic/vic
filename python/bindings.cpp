@@ -424,6 +424,341 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced utility functions for power users
+
+    // Configuration utilities
+    m.def("createAdvancedConfig", [](const std::string& json) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromJSON(json)) {
+            throw std::runtime_error("Failed to parse JSON configuration");
+        }
+        return config;
+    }, py::arg("json"), "Create configuration from JSON string with advanced parsing");
+
+    m.def("mergeConfigs", [](const std::shared_ptr<Config>& base, const std::shared_ptr<Config>& override) {
+        auto merged = std::make_shared<Config>(*base);
+        // Merge override into base
+        for (const auto& entry : override->pImpl->entries) {
+            if (!entry.key.empty()) {
+                merged->set(entry.key, entry.value, entry.source);
+            }
+        }
+        return merged;
+    }, py::arg("base"), py::arg("override"), 
+        "Merge two configurations, with override taking precedence");
+
+    // Simulation utilities
+    m.def("runSimulationBatch", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent,
+                                   int steps, bool verbose = false) {
+        std::vector<std::map<std::string, float>> results;
+        results.reserve(steps);
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Process sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get action and apply to world
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Collect statistics
+            if (verbose || step % 100 == 0) {
+                std::map<std::string, float> stats;
+                stats["step"] = static_cast<float>(step);
+                stats["spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+                stats["firing_neurons"] = static_cast<float>(brain->getFiringNeuronCount());
+                stats["reward"] = agent->getNeuromodulationLevel();
+                stats["curiosity"] = agent->getCuriosityLevel();
+                stats["novelty"] = agent->getNoveltyLevel();
+                results.push_back(stats);
+            }
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("steps"), py::arg("verbose") = false,
+        "Run a complete simulation batch and return statistics");
+
+    // Performance monitoring
+    m.def("monitorBrainPerformance", [](std::shared_ptr<Brain> brain, 
+                                         const std::vector<int>& steps) {
+        std::map<std::string, std::vector<float>> performance;
+        
+        for (int step : steps) {
+            // Record various metrics
+            performance["spike_rate"].push_back(
+                static_cast<float>(brain->getTotalSpikeCount()) / (step + 1));
+            performance["firing_ratio"].push_back(
+                static_cast<float>(brain->getFiringNeuronCount()) / 
+                std::max(1.0f, static_cast<float>(brain->getTotalNeuronCount())));
+            performance["e_i_ratio"].push_back(
+                brain->getExcitationInhibitionRatio());
+        }
+        
+        return performance;
+    }, py::arg("brain"), py::arg("steps"), 
+        "Monitor brain performance over time");
+
+    // Statistical analysis
+    m.def("computeStatistics", [](const std::vector<float>& data) {
+        std::map<std::string, float> stats;
+        
+        if (data.empty()) {
+            return stats;
+        }
+        
+        float sum = std::accumulate(data.begin(), data.end(), 0.0f);
+        float mean = sum / data.size();
+        
+        float variance = 0.0f;
+        for (float val : data) {
+            variance += (val - mean) * (val - mean);
+        }
+        variance /= data.size();
+        float stddev = std::sqrt(variance);
+        
+        float min = *std::min_element(data.begin(), data.end());
+        float max = *std::max_element(data.begin(), data.end());
+        
+        stats["mean"] = mean;
+        stats["stddev"] = stddev;
+        stats["min"] = min;
+        stats["max"] = max;
+        
+        return stats;
+    }, py::arg("data"), 
+        "Compute basic statistics for a dataset");
+
+    // Brain analysis utilities
+    m.def("analyzeBrainConnectivity", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, float> analysis;
+        
+        size_t total_neurons = brain->getTotalNeuronCount();
+        size_t total_synapses = brain->getTotalSynapseCount();
+        
+        if (total_neurons > 0) {
+            analysis["avg_synapses_per_neuron"] = static_cast<float>(total_synapses) / total_neurons;
+            analysis["connection_density"] = std::min(1.0f, static_cast<float>(total_synapses) / (total_neurons * total_neurons));
+        }
+        
+        analysis["total_neurons"] = static_cast<float>(total_neurons);
+        analysis["total_synapses"] = static_cast<float>(total_synapses);
+        analysis["firing_ratio"] = static_cast<float>(brain->getFiringNeuronCount()) / std::max(1.0f, static_cast<float>(total_neurons));
+        
+        return analysis;
+    }, py::arg("brain"), 
+        "Analyze brain connectivity and structure");
+
+    // Advanced simulation control
+    m.def("controlledStep", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                              std::shared_ptr<AgentBrain> agent, int step, double time,
+                              bool logActivity = false) {
+        // Record pre-step state
+        auto preState = std::make_map<std::string, float>{
+            {"step", static_cast<float>(step)},
+            {"time", static_cast<float>(time)},
+            {"spikes", static_cast<float>(brain->getTotalSpikeCount())},
+            {"firing", static_cast<float>(brain->getFiringNeuronCount())},
+            {"e_i_ratio", brain->getExcitationInhibitionRatio()}
+        };
+        
+        // Run simulation step
+        world->update(time);
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        brain->step(step, time);
+        auto action = agent->decodeMotorCommand();
+        world->applyMotorCommand(action, time);
+        agent->applyRewardModulation(agent->getNeuromodulationLevel(), 0.0f);
+        
+        // Record post-step state
+        auto postState = std::make_map<std::string, float>{
+            {"step", static_cast<float>(step)},
+            {"time", static_cast<float>(time)},
+            {"spikes", static_cast<float>(brain->getTotalSpikeCount())},
+            {"firing", static_cast<float>(brain->getFiringNeuronCount())},
+            {"e_i_ratio", brain->getExcitationInhibitionRatio()},
+            {"reward", agent->getNeuromodulationLevel()},
+            {"curiosity", agent->getCuriosityLevel()}
+        };
+        
+        if (logActivity) {
+            std::cout << "Step " << step << ": " << std::endl;
+            std::cout << "  Pre: " << preState["spikes"] << " spikes, " << preState["firing"] << " firing" << std::endl;
+            std::cout << "  Post: " << postState["spikes"] << " spikes, " << postState["firing"] << " firing" << std::endl;
+            std::cout << "  Action: " << (int)action << std::endl;
+        }
+        
+        return std::make_pair(preState, postState);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("step"), py::arg("time"), py::arg("logActivity") = false,
+        "Perform a controlled simulation step with detailed logging");
+
+    // Validation utilities
+    m.def("validateBrainState", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::string> issues;
+        
+        if (brain->getTotalNeuronCount() == 0) {
+            issues.push_back("No neurons in brain");
+        }
+        
+        if (brain->getTotalSynapseCount() == 0) {
+            issues.push_back("No synapses in brain");
+        }
+        
+        float e_i_ratio = brain->getExcitationInhibitionRatio();
+        if (std::isinf(e_i_ratio) && e_i_ratio < 0) {
+            issues.push_back("Invalid excitation/inhibition ratio");
+        }
+        
+        if (brain->getTotalSpikeCount() > 1000000) {
+            issues.push_back("Extremely high spike count - possible runaway excitation");
+        }
+        
+        return issues;
+    }, py::arg("brain"), 
+        "Validate brain state and return any issues found");
+
+    // Learning and training utilities
+    m.def("trainBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                          std::shared_ptr<AgentBrain> agent,
+                          const std::vector<std::pair<float, float>>& reward_schedule,
+                          int steps_per_epoch, int num_epochs) {
+        std::vector<std::map<std::string, float>> training_history;
+        
+        for (int epoch = 0; epoch < num_epochs; ++epoch) {
+            float epoch_reward = 0.0f;
+            int epoch_spikes = 0;
+            
+            for (int step = 0; step < steps_per_epoch; ++step) {
+                // Get current reward target
+                float target_reward = reward_schedule[epoch % reward_schedule.size()].first;
+                float reward_weight = reward_schedule[epoch % reward_schedule.size()].second;
+                
+                // Update world
+                world->update(0.1);
+                
+                // Process sensory input
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                
+                // Run brain step
+                brain->step(step);
+                
+                // Get action
+                auto action = agent->decodeMotorCommand();
+                
+                // Apply motor command with reward modulation
+                world->applyMotorCommand(action, world->getSimulationTime());
+                agent->applyRewardModulation(target_reward * reward_weight, 0.0f);
+                
+                // Collect statistics
+                epoch_reward += agent->getNeuromodulationLevel();
+                epoch_spikes += brain->getTotalSpikeCount();
+            }
+            
+            std::map<std::string, float> epoch_stats;
+            epoch_stats["epoch"] = static_cast<float>(epoch);
+            epoch_stats["reward"] = epoch_reward / steps_per_epoch;
+            epoch_stats["spikes"] = static_cast<float>(epoch_spikes);
+            epoch_stats["spike_rate"] = static_cast<float>(epoch_spikes) / steps_per_epoch;
+            
+            training_history.push_back(epoch_stats);
+            
+            std::cout << "Epoch " << epoch << ": Reward = " << epoch_stats["reward"] 
+                     << ", Spike Rate = " << epoch_stats["spike_rate"] << std::endl;
+        }
+        
+        return training_history;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("reward_schedule"), py::arg("steps_per_epoch"), py::arg("num_epochs"),
+        "Train brain using a reward schedule");
+
+    // Export/import utilities
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Export brain state to file");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Import brain state from file");
+
+    // Utility functions
+    m.def("benchmarkPerformance", [](std::shared_ptr<Brain> brain, 
+                                     const std::vector<int>& steps) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (int step : steps) {
+            brain->step(step);
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        std::map<std::string, float> results;
+        results["total_steps"] = static_cast<float>(steps.size());
+        results["time_ms"] = static_cast<float>(duration.count());
+        results["steps_per_second"] = static_cast<float>(steps.size()) / 
+            std::max(1.0f, duration.count() / 1000.0f);
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), 
+        "Benchmark brain performance");
+
+    // Advanced configuration utilities
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        std::map<std::string, float> stats;
+        
+        auto keys = config->getKeys();
+        stats["key_count"] = static_cast<float>(keys.size());
+        
+        if (!keys.empty()) {
+            // Count different value types
+            int int_count = 0, float_count = 0, bool_count = 0, string_count = 0, 
+                vector_count = 0, other_count = 0;
+            
+            for (const auto& key : keys) {
+                auto val = config->get<std::string>(key);
+                if (val.has_value()) {
+                    // Try to determine type (simplified)
+                    if (val->find('.') != std::string::npos) {
+                        float_count++;
+                    } else if (val->find('"') != std::string::npos) {
+                        string_count++;
+                    } else {
+                        int_count++;
+                    }
+                }
+            }
+            
+            stats["int_values"] = static_cast<float>(int_count);
+            stats["float_values"] = static_cast<float>(float_count);
+            stats["string_values"] = static_cast<float>(string_count);
+            stats["bool_values"] = static_cast<float>(bool_count);
+            stats["vector_values"] = static_cast<float>(vector_count);
+            stats["other_values"] = static_cast<float>(other_count);
+        }
+        
+        return stats;
+    }, py::arg("config"), "Get statistics about configuration values");
+
+    // Initialize constants
+    m.attr("DEFAULT_BRAIN_NEURONS") = 1000;
+    m.attr("DEFAULT_WORLD_WIDTH") = 20;
+    m.attr("DEFAULT_WORLD_HEIGHT") = 20;
+    m.attr("DEFAULT_VISION_WIDTH") = 8;
+    m.attr("DEFAULT_VISION_HEIGHT") = 8;
+    m.attr("DEFAULT_SIMULATION_STEPS") = 1000;
+    m.attr("DEFAULT_CHECKPOINT_INTERVAL") = 1000;
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
