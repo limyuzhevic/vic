@@ -65,7 +65,7 @@ public:
     void restoreSnapshot(const std::vector<NeuronId>& neurons,
                          const std::vector<float>& activations,
                          const std::vector<SimulationStep>& timestamps) {
-        size_t n = std::min({neurons.size(), activations.size(), timestamps.size()});
+        size_t n = std::min(neurons.size(), std::min(activations.size(), timestamps.size()));
         memoryNeurons_.assign(neurons.begin(), neurons.begin() + static_cast<std::ptrdiff_t>(n));
         memoryActivations_.assign(activations.begin(), activations.begin() + static_cast<std::ptrdiff_t>(n));
         memoryTimestamps_.assign(timestamps.begin(), timestamps.begin() + static_cast<std::ptrdiff_t>(n));

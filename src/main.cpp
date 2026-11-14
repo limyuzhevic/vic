@@ -277,8 +277,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float beforeWeight = syn->getWeight();
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
 
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
@@ -293,7 +293,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
+                  " (Δ=" + std::to_string(delta) + ")");
 
     float totalDelta = delta;
     
@@ -310,9 +310,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
+    // Initialize logger early for all logging
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
@@ -326,14 +324,14 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments and provide help
     std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -342,15 +340,63 @@ int main(int argc, char** argv) {
         }
     }
     
+    // Show help if requested
+    if (showHelp) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Usage: ./nlm_main [OPTIONS]");
+        NLM_LOG_INFO("Options:");
+        NLM_LOG_INFO("  --help, -h                Show this help message");
+        NLM_LOG_INFO("  --config=FILE             Load configuration from FILE");
+        NLM_LOG_INFO("  --config FILE             Load configuration from FILE");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration file format: key=value pairs");
+        NLM_LOG_INFO("Default configuration available in: configs/default.cfg");
+        NLM_LOG_INFO("");
+        return 0;
+    }
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Note: Configuration file \"" + configFile + "\" not found or invalid");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Validate critical configuration parameters
+    bool configValid = true;
+    
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    if (neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount));
+        configValid = false;
+    }
+    
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount));
+        configValid = false;
+    }
+    
+    float timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep));
+        configValid = false;
+    }
+    
+    if (!configValid) {
+        NLM_LOG_ERROR("Configuration validation failed. Using default values.");
+    } else {
+        NLM_LOG_INFO("Configuration validation passed.");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
