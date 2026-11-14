@@ -3,11 +3,22 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <set>
+
+// Optional JSON/YAML includes - only if available
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Optional: Add JSON/YAML specific storage for enhanced features
+    std::unordered_map<std::string, std::string> metadata;
+    std::set<std::string> requiredKeys;
+    std::unordered_map<std::string, std::string> keyDescriptions;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,11 +30,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first
+#ifdef HAVE_NLOHMANN_JSON
+    auto json = std::make_unique<nlohmann::json>();
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.good()) {
+        try {
+            *json = nlohmann::json::parse(jsonFile);
+            // Parse JSON into config entries
+            parseJson(*json, ConfigSource::File);
+            NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+            return true;
+        } catch (const nlohmann::json::parse_error& e) {
+            NLM_LOG_WARNING("Failed to parse JSON file " + filepath + ": " + std::string(e.what()));
+        } catch (const nlohmann::json::type_error& e) {
+            NLM_LOG_WARNING("Type error in JSON file " + filepath + ": " + std::string(e.what()));
+        }
+    }
+#endif
     
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_INFO("Configuration file not found: " + filepath);
         return false;
     }
     
@@ -50,6 +79,10 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    if (hasAnyEntries()) {
+        NLM_LOG_INFO("Loaded configuration from file: " + filepath);
     }
     
     return true;
@@ -79,6 +112,48 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Try JSON format first for better serialization
+#ifdef HAVE_NLOHMANN_JSON
+    std::ofstream jsonFile(filepath);
+    if (jsonFile.good()) {
+        nlohmann::json json;
+        
+        // Convert config entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            // Handle different value types
+            std::visit([&json, &entry](auto&& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    json[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    json[entry.key] = val;
+                }
+            }, entry.value);
+        }
+        
+        // Add metadata
+        json["metadata"]["version"] = "0.1.0";
+        json["metadata"]["source"] = "NLM Config";
+        
+        jsonFile << json.dump(2); // Pretty output with indentation
+        NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
+        return true;
+    }
+#endif
+    
+    // Fall back to simple key=value format
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +161,27 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert value back to string
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = " << \"\" << val << "\"\" << std::endl;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (val ? "true" : "false") << std::endl;
+            } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+                file << entry.key << " = " << val << std::endl;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Use fixed precision to avoid scientific notation
+                file << entry.key << " = " << std::fixed << std::setprecision(6) << val << std::endl;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]" << std::endl;
+            }
+        }, entry.value);
     }
     
     return true;
