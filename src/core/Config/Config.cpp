@@ -3,11 +3,13 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string errorMessage;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -44,7 +46,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
             }
             
@@ -86,7 +88,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else {
+                file << value;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -234,5 +247,296 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// JSON/YAML Parsing Implementations
+
+static std::string getFileExtension(const std::string& filepath) {
+    size_t pos = filepath.find_last_of('.');
+    if (pos == std::string::npos) return "";
+    return filepath.substr(pos + 1);
+}
+
+// Detect file format based on extension
+static std::string detectFileFormat(const std::string& filepath) {
+    std::string ext = getFileExtension(filepath);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == "json" || ext == "jsonl") {
+        return "json";
+    } else if (ext == "yaml" || ext == "yml") {
+        return "yaml";
+    }
+    return "keyvalue";
+}
+
+// Convert JSON value to ConfigValue
+static ConfigValue jsonValueToConfigValue(const json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Check if it's an array of integers or doubles or strings
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                std::vector<int64_t> intArray;
+                for (const auto& item : j) {
+                    intArray.push_back(item.get<int64_t>());
+                }
+                return intArray;
+            } else if (j[0].is_number_float()) {
+                std::vector<double> doubleArray;
+                for (const auto& item : j) {
+                    doubleArray.push_back(item.get<double>());
+                }
+                return doubleArray;
+            } else if (j[0].is_string()) {
+                std::vector<std::string> stringArray;
+                for (const auto& item : j) {
+                    stringArray.push_back(item.get<std::string>());
+                }
+                return stringArray;
+            }
+        }
+        // Empty array or mixed types - fallback to string representation
+        return j.dump();
+    } else if (j.is_object()) {
+        // Convert object to string representation for now
+        return j.dump();
+    } else {
+        // null, number without type, etc.
+        return j.dump();
+    }
+}
+
+// Convert ConfigValue to string for saving
+static std::string configValueToString(const ConfigValue& value) {
+    return std::visit([](const auto& val) -> std::string {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return "\"" + val + "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, int64_t> ||
+                            std::is_same_v<T, double>) {
+            return std::to_string(val);
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            std::string result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(val[i]);
+            }
+            result += "]";
+            return result;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            std::string result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(val[i]);
+            }
+            result += "]";
+            return result;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            std::string result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "\"" + val[i] + "\"";
+            }
+            result += "]";
+            return result;
+        } else {
+            return std::to_string(val);
+        }
+    }, value);
+}
+
+// Parse key=value format file
+static bool parseKeyValueFile(Config* config, const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            config->set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+// Parse JSON file
+static bool parseJSONFile(Config* config, const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json j;
+        file >> j;
+        
+        // Parse JSON object recursively
+        if (j.is_object()) {
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                ConfigValue value = jsonValueToConfigValue(it.value());
+                config->set(it.key(), value, ConfigSource::File);
+            }
+        }
+        return true;
+    } catch (const json::parse_error& e) {
+        // Fall back to key=value format if JSON parsing fails
+        return parseKeyValueFile(config, filepath);
+    } catch (...) {
+        return false;
+    }
+}
+
+// Parse YAML file (placeholder - would need a YAML parser library)
+static bool parseYAMLFile(Config* config, const std::string& filepath) {
+    // For now, fallback to key=value format
+    // In a real implementation, you would use a YAML parser like YAML-cpp
+    return parseKeyValueFile(config, filepath);
+}
+
+// Config implementation for new methods
+
+// Configuration validation
+bool Config::validate() const {
+    return !pImpl->entries.empty(); // Basic validation - should check all entries
+}
+
+std::string Config::getLastError() const {
+    return ""; // Placeholder - should track errors
+}
+
+void Config::clearLastError() {
+    // Placeholder - clear error state
+}
+
+// Configuration file operations with better error reporting
+bool Config::loadFromFile(const std::string& filepath, bool silent) {
+    std::string ext = getFileExtension(filepath);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    // Try to parse based on file extension
+    if (ext == "json" || ext == "jsonl") {
+        return parseJSONFile(this, filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return parseYAMLFile(this, filepath);
+    } else {
+        // Fall back to key=value format for backward compatibility
+        return parseKeyValueFile(this, filepath);
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath, bool silent) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else {
+                file << value;
+            }
+        }, entry.value);
+        file << "\n\n";
+    }
+    
+    return true;
+}
+
+// Configuration type checking
+template<typename T>
+std::optional<T> Config::safeGet(const std::string& key, T defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// Configuration batch operations
+void Config::applyConfig(const std::string& filepath, ConfigSource source) {
+    if (loadFromFile(filepath)) {
+        // Mark entries loaded from file as having this source
+        for (auto& entry : pImpl->entries) {
+            if (entry.source == ConfigSource::File) {
+                entry.source = source;
+            }
+        }
+    }
+}
+
+void Config::mergeConfig(const Config& other) {
+    for (const auto& entry : other.pImpl->entries) {
+        // Don't overwrite existing entries from higher priority sources
+        if (!has(entry.key) || static_cast<int>(entry.source) > static_cast<int>(getSourceForKey(entry.key))) {
+            set(entry.key, entry.value, entry.source);
+        }
+    }
+}
+
+// Error handling
+void Config::setError(const std::string& error) {
+    // Placeholder - should store error message
+    errorMessage = error;
+}
+
+std::string Config::getFormattedError(const std::string& operation) const {
+    // Placeholder - should format error message
+    if (!errorMessage.empty()) {
+        return "Error during " + operation + ": " + errorMessage;
+    }
+    return "Error during " + operation;
+}
+
+// Source getter for a specific key
+ConfigSource Config::getSourceForKey(const std::string& key) const {
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == key) {
+            return entry.source;
+        }
+    }
+    return ConfigSource::Default;
+}
+
+// Explicit template instantiations for safeGet
+template std::optional<int> Config::safeGet<int>(const std::string&, const int&) const;
+template std::optional<int64_t> Config::safeGet<int64_t>(const std::string&, const int64_t&) const;
+template std::optional<uint64_t> Config::safeGet<uint64_t>(const std::string&, const uint64_t&) const;
+template std::optional<float> Config::safeGet<float>(const std::string&, const float&) const;
+template std::optional<double> Config::safeGet<double>(const std::string&, const double&) const;
+template std::optional<bool> Config::safeGet<bool>(const std::string&, const bool&) const;
+template std::optional<std::string> Config::safeGet<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

@@ -92,16 +92,52 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
-    
+// Get configuration summary
+     std::string summary() const;
+     
+     // Configuration validation
+     bool validate() const;
+     std::string getLastError() const;
+     void clearLastError();
+     
+     // Configuration file operations with better error reporting
+     bool loadFromFile(const std::string& filepath, bool silent = false);
+     bool saveToFile(const std::string& filepath, bool silent = false) const;
+     
+     // Configuration type checking
+     template<typename T>
+     std::optional<T> safeGet(const std::string& key, T defaultValue) const;
+     
+     // Configuration batch operations
+     void applyConfig(const std::string& filepath, ConfigSource source);
+     void mergeConfig(const Config& other);
+     
+// Get configuration source for a specific key
+     ConfigSource getSourceForKey(const std::string& key) const;
+     
+     // Error handling
+     void setError(const std::string& error);
+     std::string getFormattedError(const std::string& operation) const;
+     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Configuration source member (for error handling)
+    mutable std::string errorMessage;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+};
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // Error handling
+    void setError(const std::string& error);
+    std::string getFormattedError(const std::string& operation) const;
 };
 
 } // namespace nlm
