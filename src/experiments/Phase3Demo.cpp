@@ -24,20 +24,23 @@ public:
     Phase3Demo() {}
     ~Phase3Demo() {}
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    void run(int numEpisodes = 5, int stepsPerEpisode = 200, const std::string& configFile = "configs/default.cfg") {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
         // Create configuration
         auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
         
-        // Create world
-        SimpleWorld world;
-        world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
+        // Load from config file
+        if (config->loadFromFile(configFile)) {
+            std::cout << "Loaded configuration from: " << configFile << "\n";
+        } else {
+            std::cout << "Using default configuration (file not found: " << configFile << ")\n";
+            // Apply default configuration
+            configureEnvironment(config);
+            configureBrain(config);
+        }
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
@@ -292,14 +295,28 @@ public:
     }
     
 private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
+    void configureEnvironment(std::shared_ptr<Config> config, const std::string& configFile = "configs/default.cfg") {
+        // Try to load from file first
+        if (config->loadFromFile(configFile)) {
+            std::cout << "Loaded configuration from: " << configFile << "\n";
+            return; // Use file configuration
+        }
+        
+        // Apply default values
         config->set("environment_width", 20);
         config->set("environment_height", 20);
         config->set("vision_width", 16);
         config->set("vision_height", 16);
     }
     
-    void configureBrain(std::shared_ptr<Config> config) {
+    void configureBrain(std::shared_ptr<Config> config, const std::string& configFile = "configs/default.cfg") {
+        // Try to load from file first
+        if (config->loadFromFile(configFile)) {
+            std::cout << "Loaded configuration from: " << configFile << "\n";
+            return; // Use file configuration
+        }
+        
+        // Apply default values
         config->set("neuron_count", 500);
         config->set("region_count", 2);
         config->set("connection_probability", 0.1f);
@@ -344,16 +361,51 @@ private:
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    std::string configFile = "configs/default.cfg";
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: " << argv[0] << " [numEpisodes] [stepsPerEpisode] [--config=config.cfg]" << std::endl;
+            std::cout << "  numEpisodes: Number of episodes to run (default: 5)" << std::endl;
+            std::cout << "  stepsPerEpisode: Steps per episode (default: 200)" << std::endl;
+            std::cout << "  --config=file.cfg: Configuration file path (default: configs/default.cfg)" << std::endl;
+            return 0;
+        } else if (arg.substr(0, 2) == "--" && arg.find('=') != std::string::npos) {
+            std::string key = arg.substr(2, arg.find('=') - 2);
+            std::string value = arg.substr(arg.find('=') + 1);
+            if (key == "config") {
+                configFile = value;
+            }
+        } else if (arg[0] == '-' && arg.size() > 1) {
+            // Handle short options
+            if (arg == "-h" || arg == "--help") {
+                std::cout << "Usage: " << argv[0] << " [numEpisodes] [stepsPerEpisode] [--config=config.cfg]" << std::endl;
+                std::cout << "  numEpisodes: Number of episodes to run (default: 5)" << std::endl;
+                std::cout << "  stepsPerEpisode: Steps per episode (default: 200)" << std::endl;
+                std::cout << "  --config=file.cfg: Configuration file path (default: configs/default.cfg)" << std::endl;
+                return 0;
+            }
+        } else if (numEpisodes == 5) {  // Only set if not already set
+            numEpisodes = std::atoi(arg.c_str());
+        } else if (stepsPerEpisode == 200) {  // Only set if not already set
+            stepsPerEpisode = std::atoi(arg.c_str());
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    // Validate parameters
+    if (numEpisodes <= 0) {
+        std::cerr << "Error: numEpisodes must be positive" << std::endl;
+        return 1;
+    }
+    if (stepsPerEpisode <= 0) {
+        std::cerr << "Error: stepsPerEpisode must be positive" << std::endl;
+        return 1;
     }
     
     nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    demo.run(numEpisodes, stepsPerEpisode, configFile);
     
     return 0;
 }
