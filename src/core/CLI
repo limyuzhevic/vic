@@ -1,0 +1,12 @@
+/workspace/app/src/core/CLI/CLIApplication.h
+workspace/app/src/core/CLI/CLIOutput.h
+workspace/app/src/core/CLI/CLIParser.h
+workspace/app/src/core/CLI/CLITools.h
+workspace/app/src/core/CLI/CLICommand.h
+workspace/app/src/core/CLI/CLIRunner.h
+workspace/app/src/core/CLI/CLIOptions.h
+workspace/app/src/core/CLI/CLIUtils.h
+workspace/app/src/core/CLI/CLIConfig.h
+workspace/app/src/core/CLI/ProgressReporter.h
+workspace/app/src/core/CLI/BatchProcessor.h
+workspace/app/src/core/CLI/CLIError.h
