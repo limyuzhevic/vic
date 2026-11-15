@@ -401,8 +401,33 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) {
+        error_ = "Stream not open";
+        return false;
+    }
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) {
+        error_ = "Failed to write header";
+        return false;
+    }
+    bytesWritten_ += sizeof(header_);
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& section) {
+    if (!stream_.is_open()) {
+        error_ = "Stream not open";
+        return false;
+    }
+    stream_.write(reinterpret_cast<const char*>(&section), sizeof(section));
+    if (!stream_) {
+        error_ = "Failed to write section header";
+        return false;
+    }
+    bytesWritten_ += sizeof(section);
+    return true;
+}
 bool CheckpointWriter::padToAlignment(size_t) { return true; }
 
 // ---------------- CheckpointManager ----------------
