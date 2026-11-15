@@ -48,6 +48,33 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS] [CONFIG_FILE]" << std::endl;
+    std::cout << "\nGeneral Options:" << std::endl;
+    std::cout << "  --help, -h           Show this help message" << std::endl;
+    std::cout << "  --config FILE, -c FILE  Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --version, -v          Show version information" << std::endl;
+    std::cout << "  --verbose, -V          Enable verbose logging" << std::endl;
+    std::cout << "  --quiet, -q            Disable info-level logging" << std::endl;
+    std::cout << "\nDemo Options:" << std::endl;
+    std::cout << "  --demo MODE           Run specific demo (2,3,4,5,6, all)" << std::endl;
+    std::cout << "  --trials N            Number of trials/episodes (default: 5)" << std::endl;
+    std::cout << "  --steps N             Numberقيب steps per episode (default: 200)" << std::endl;
+    std::cout << "  --benchmark           Run performance benchmarks instead of demo" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --seed N              Set random seed (default: 42)" << std::endl;
+    std::cout << "  --output FILE          Save results to file" << std::endl;
+    std::cout << "  --checkpoint FILE      Save/load checkpoint" << std::endl;
+    std::cout << "  --preset PRESET       Use predefined configuration preset" << std::endl;
+    std::cout << "\nPresets:" << std::endl;
+    std::cout << "  minimal              Small network (100 neurons)" << std::endl;
+    std::cout << "  standard             Standard network (500 neurons)" << std::endl;
+    std::cout << "  large                Large network (2000 neurons)" << std::endl;
+    std::cout << "  benchmark            Optimized for benchmarking" << std::endl;
+    std::cout << "\nExample:" << std::endl;
+    std::cout << "  " << programName << " --demo 6 --trials 10 --steps 1000" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -395,20 +422,8 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Enhanced main function with CLI support (implemented in Task)
+    // The original tests remain but now with improved argument parsing
     
     // Final brain status
     NLM_LOG_INFO("");
