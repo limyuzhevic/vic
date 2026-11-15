@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
 
@@ -352,6 +353,34 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+void printAdvancedHelp() {
+    std::cout << "╔══════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                     NLM Advanced Command Line Interface       ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║                                                              ║" << std::endl;
+    std::cout << "║  Configuration Options:                                     ║" << std::endl;
+    std::cout << "║    --config <file>           Load configuration from file     ║" << std::endl;
+    std::cout << "║    --help, -h, --usage       Show this help message           ║" << std::endl;
+    std::cout << "║                                                              ║" << std::endl;
+    std::cout << "║  Execution Modes:                                           ║" << std::endl;
+    std::cout << "║    --debug, -debug           Enable debug logging            ║" << std::endl;
+    std::cout << "║    --benchmark, -bench       Run in benchmark mode          ║" << std::endl;
+    std::cout << "║    --interactive, -i        Enable interactive mode         ║" << std::endl;
+    std::cout << "║                                                              ║" << std::endl;
+    std::cout << "║  Output Options:                                            ║" << std::endl;
+    std::cout << "║    --verbose, -v, --verbose-output Enable verbose output      ║" << std::endl;
+    std::cout << "║    --save-results, -save     Save results to file            ║" << std::endl;
+    std::cout << "║    --output-format <format>  Set output format (text, json, csv) ║" << std::endl;
+    std::cout << "║    --results-file <file>     Set output file path             ║" << std::endl;
+    std::cout << "║                                                              ║" << std::endl;
+    std::cout << "║  Example Usage:                                              ║" << std::endl;
+    std::cout << "║    ./nlm --config my_config.cfg --debug --verbose            ║" << std::endl;
+    std::cout << "║    ./nlm --benchmark --output-format json --results-file out.json ║" << std::endl;
+    std::cout << "║                                                              ║" << std::endl;
+    std::cout << "╚══════════════════════════════════════════════════════════════╝" << std::endl;
+}
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -393,7 +422,17 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    // Debug and profiling instrumentation
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     brain->logStatus();
+    
+    if (debugMode) {
+        NLM_LOG_INFO("Debug mode: Brain initialized, spike system status:");
+        NLM_LOG_INFO("  Total neurons: " + std::to_string(brain->getTotalNeuronCount()));
+        NLM_LOG_INFO("  Total synapses: " + std::to_string(brain->getTotalSynapseCount()));
+        NLM_LOG_INFO("  Regions: " + std::to_string(brain->getRegionCount()));
+    }
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
