@@ -16,12 +16,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <unordered_map>
-#include <cmath>
-#include <cstring>
-#include <sstream>
+#include <limits>
 
 namespace nlm {
 
@@ -78,10 +73,7 @@ struct Brain::Impl {
     std::vector<Neuron*> motorNeurons;
     // NeuronId -> neuron, for O(1) synaptic delivery (was a linear scan
     // over all neurons per delayed spike, which made real networks unusable).
-    std::unordered_map<uint64_t, Neuron*> neuronById;
-    bool spikeHandlersRegistered = false;
-    
-    // Integration state
+    std::mutex spikeRegistrationMutex;
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
@@ -104,6 +96,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , spikeHandlersRegistered(false)
+        , spikeRegistrationMutex()  // Initialize mutex
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -179,7 +173,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Properly delete the current pImpl if it exists
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -303,28 +300,31 @@ bool Brain::initialize() {
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
-    if (!pImpl->spikeHandlersRegistered) {
-        pImpl->spikeHandlersRegistered = true;
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        auto it = pImpl->neuronById.find(event.destination_neuron.index());
-        if (it != pImpl->neuronById.end()) {
-            Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-            if (event.is_excitatory) {
-                neuron->receiveExcitatoryInput(synapticCurrent);
-            } else {
-                neuron->receiveInhibitoryInput(-synapticCurrent);
-            }
+    {
+        std::lock_guard<std::mutex> lock(pImpl->spikeRegistrationMutex);
+        if (!pImpl->spikeHandlersRegistered) {
+            pImpl->spikeHandlersRegistered = true;
+            // Register spike handlers for event-driven processing
+            pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+                // Count spikes
+                ++pImpl->totalSpikesThisStep;
+                ++pImpl->totalSpikesTotal;
+            });
+            
+            // Register delayed spike handler to deliver synaptic input
+            pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+                auto it = pImpl->neuronById.find(event.destination_neuron.index());
+                if (it != pImpl->neuronById.end()) {
+                    Neuron* neuron = it->second;
+                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    if (event.is_excitatory) {
+                        neuron->receiveExcitatoryInput(synapticCurrent);
+                    } else {
+                        neuron->receiveInhibitoryInput(-synapticCurrent);
+                    }
+                }
+            });
         }
-    });
     }  // spikeHandlersRegistered
     
     // Configure checkpoint manager
@@ -892,8 +892,13 @@ template <typename T>
 void p5AppendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
     p5AppendU64(out, static_cast<uint64_t>(v.size()));
     if (!v.empty()) {
+        // Check for potential integer overflow before calculating bytes
+        if (sizeof(T) > 0 && v.size() > std::numeric_limits<size_t>::max() / sizeof(T)) {
+            return; // Abort to prevent overflow
+        }
+        size_t bytesNeeded = static_cast<size_t>(v.size()) * sizeof(T);
         const uint8_t* b = reinterpret_cast<const uint8_t*>(v.data());
-        out.insert(out.end(), b, b + v.size() * sizeof(T));
+        out.insert(out.end(), b, b + bytesNeeded);
     }
 }
 struct P5Reader {
@@ -916,12 +921,23 @@ struct P5Reader {
     bool vec(std::vector<T>& v) {
         uint64_t n = 0;
         if (!u64(n)) return false;
+        
+        // Check for potential integer overflow in n * sizeof(T)
+        if (sizeof(T) > 0 && n > std::numeric_limits<size_t>::max() / sizeof(T)) {
+            ok = false;
+            return false;
+        }
+        
         if (n > 10000000) { ok = false; return false; }
-        if (end - p < static_cast<std::ptrdiff_t>(n * sizeof(T))) { ok = false; return false; }
+        
+        // Calculate bytes needed, checking for overflow first
+        size_t bytesNeeded = static_cast<size_t>(n) * sizeof(T);
+        if (end - p < static_cast<std::ptrdiff_t>(bytesNeeded)) { ok = false; return false; }
+        
         v.resize(static_cast<size_t>(n));
         if (n > 0) {
-            std::memcpy(v.data(), p, static_cast<size_t>(n) * sizeof(T));
-            p += static_cast<std::ptrdiff_t>(n * sizeof(T));
+            std::memcpy(v.data(), p, bytesNeeded);
+            p += static_cast<std::ptrdiff_t>(bytesNeeded);
         }
         return true;
     }

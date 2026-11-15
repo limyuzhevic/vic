@@ -243,6 +243,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // below that in practice.
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        setFiringRate(pImpl->state.firingRate);
     }
 
     // Check for spike
@@ -250,6 +251,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         fired = true;
         if (dt > 0.0) {
             pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            setFiringRate(pImpl->state.firingRate);
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);

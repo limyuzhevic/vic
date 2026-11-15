@@ -1,14 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-#include <algorithm>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -56,22 +45,22 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file with automatic format detection
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with automatic format selection based on extension
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +91,36 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format-specific implementations
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath)/Character errors:
+- Line 130: Expected a string, but got a closing brace. The string value was "}"
+
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    
+    // Conversion functions
+    static ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+    static ConfigValue yamlToConfigValue(const YAML::Node& yamlValue);
+    static nlohmann::json configValueToJSON(const ConfigValue& configValue);
+    static YAML::Node configValueToYAML(const ConfigValue& configValue);
 };
+
+// JSON and YAML library availability flags
+#ifdef HAS_NLOHMANN_JSON
+    #define HAS_JSON_SUPPORT 1
+#else
+    #define HAS_JSON_SUPPORT 0
+#endif
+
+#ifdef HAS_YAML_CPP
+    #define HAS_YAML_SUPPORT 1
+#else
+    #define HAS_YAML_SUPPORT 0
+#endif
 
 } // namespace nlm
