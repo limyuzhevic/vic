@@ -6,11 +6,50 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <stdexcept>
+#include <filesystem>
+#include <sstream>
+#include <fstream>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Configuration exception classes
+class ConfigException : public std::runtime_error {
+    explicit ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigFileError : public ConfigException {
+    explicit ConfigFileError(const std::string& message) : ConfigException("Config file error: " + message) {}
+};
+
+class ConfigParsingError : public ConfigException {
+    explicit ConfigParsingError(const std::string& message) : ConfigException("Config parsing error: " + message) {}
+};
+
+class ConfigValidationError : public ConfigException {
+    explicit ConfigValidationError(const std::string& message) : ConfigException("Config validation error: " + message) {}
+};
+
+// Configuration validation helper functions
+namespace ConfigValidation {
+    // Validate key name
+    void validateKey(const std::string& key);
+    
+    // Validate value for key
+    template<typename T>
+    void validateValue(const std::string& key, const T& value);
+    
+    // Validate range for numeric values
+    template<typename T>
+    void validateRange(const std::string& key, const T& value, T min, T max);
+    
+    // Convert string to value with validation
+    template<typename T>
+    T parseValue(const std::string& str);
+}
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -57,21 +96,21 @@ public:
     Config& operator=(Config&&) noexcept;
     
     // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    void loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    void loadFromArgs(int argc, char** argv);
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    void saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
+    template<typename T>
+    T get(const std::string& key) const;
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +141,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool fileExists(const std::string& filepath);
+    
+    // Validation helpers
+    static void validateKey(const std::string& key);
+    static void validateKeyName(const std::string& key);
 };
 
 } // namespace nlm

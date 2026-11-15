@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <regex>
 
 namespace nlm {
 
@@ -10,7 +12,14 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default configuration
+    set("random_seed", int64_t(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", int64_t(1000), ConfigSource::Default);
+    set("region_count", int64_t(2), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -18,53 +27,179 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Configuration validation helper functions
+namespace ConfigValidation {
+    void validateKey(const std::string& key) {
+        if (key.empty()) {
+            throw ConfigValidationError("Key cannot be empty");
+        }
+        if (key.length() > 256) {
+            throw ConfigValidationError("Key cannot exceed 256 characters");
+        }
+        // Key should contain only alphanumeric characters and underscores
+        std::regex keyPattern("^[a-zA-Z0-9_]+$");
+        if (!std::regex_match(key, keyPattern)) {
+            throw ConfigValidationError("Key must contain only letters, numbers, and underscores");
+        }
+    }
+    
+    template<typename T>
+    void validateValue(const std::string& key, const T& value) {
+        // Basic validation - can be extended with specific key validations
+        if (std::is_integral_v<T> && value < 0) {
+            throw ConfigValidationError("Value for key \"" + key + "\" cannot be negative");
+        }
+        if constexpr (std::is_floating_point_v<T>) {
+            if (std::isnan(value) || std::isinf(value)) {
+                throw ConfigValidationError("Value for key \"" + key + "\" cannot be NaN or infinity");
+            }
+        }
+    }
+    
+    template<typename T>
+    void validateRange(const std::string& key, const T& value, T min, T max) {
+        if (value < min || value > max) {
+            throw ConfigValidationError("Value for key \"" + key + "\" (" + std::to_string(value) +
+                                       ") is outside valid range [" + std::to_string(min) + ", " + std::to_string(max) + "]");
+        }
+    }
+    
+    template<typename T>
+    T parseValue(const std::string& str) {
+        std::istringstream iss(str);
+        T value;
+        if (!(iss >> value)) {
+            throw ConfigParsingError("Cannot parse value \"" + str + "\" to " + typeid(T).name());
+        }
+        return value;
+    }
+    
+    // Explicit instantiations for common types
+    template void validateValue<int>(const std::string& key, const int& value);
+    template void validateValue<int64_t>(const std::string& key, const int64_t& value);
+    template void validateValue<double>(const std::string& key, const double& value);
+    template void validateValue<float>(const std::string& key, const float& value);
+    template void validateValue<bool>(const std::string& key, const bool& value);
+    template void validateValue<std::string>(const std::string& key, const std::string& value);
+    
+    template int parseValue<int>(const std::string& str);
+    template int64_t parseValue<int64_t>(const std::string& str);
+    template double parseValue<double>(const std::string& str);
+    template float parseValue<float>(const std::string& str);
+    template bool parseValue<bool>(const std::string& str);
+}
+
+void Config::loadFromFile(const std::string& filepath) {
+    // Check if file exists first
+    if (!std::filesystem::exists(filepath)) {
+        throw ConfigFileError("Configuration file does not exist: " + filepath);
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileError("Cannot open configuration file: " + filepath);
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (pos == std::string::npos) {
+            throw ConfigParsingError("Invalid configuration line " + std::to_string(lineNumber) + ": missing '='");
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        validateKey(key);
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Try to parse as different types (int, double, bool, string)
+        try {
+            // Try int first
+            int intValue = ConfigValidation::parseValue<int>(value);
+            set(key, intValue, ConfigSource::File);
+        } catch (const ConfigParsingError&) {
+            try {
+                // Try double
+                double doubleValue = ConfigValidation::parseValue<double>(value);
+                set(key, doubleValue, ConfigSource::File);
+            } catch (const ConfigParsingError&) {
+                try {
+                    // Try bool
+                    if (value == "true") {
+                        set(key, true, ConfigSource::File);
+                    } else if (value == "false") {
+                        set(key, false, ConfigSource::File);
+                    } else {
+                        // Fall back to string
+                        set(key, value, ConfigSource::File);
+                    }
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
             }
-            
-            set(key, value, ConfigSource::File);
         }
     }
-    
-    return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
+void Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return; // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Validate argument format
+        if (arg.empty()) {
+            throw ConfigParsingError("Empty command line argument");
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+            if (pos == std::string::npos) {
+                throw ConfigParsingError("Invalid argument format: missing '=' in --key=value");
+            }
+            if (pos == 2) {
+                throw ConfigParsingError("Invalid argument format: missing key in --key=value");
+            }
+            
+            std::string key = arg.substr(2, pos - 2);
+            std::string value = arg.substr(pos + 1);
+            
+            // Validate key and value
+            validateKey(key);
+            
+            // Try to parse value
+            try {
+                // Try numeric types first
+                if (value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos) {
+                    double doubleValue = ConfigValidation::parseValue<double>(value);
+                    set(key, doubleValue, ConfigSource::CommandLine);
+                } else {
+                    // Try int
+                    int intValue = ConfigValidation::parseValue<int>(value);
+                    set(key, intValue, ConfigSource::CommandLine);
+                }
+            } catch (...) {
+                // Fall back to string
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,27 +207,76 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Validate key and value
+            validateKey(key);
+            
+            // Try to parse value
+            try {
+                if (value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos) {
+                    double doubleValue = ConfigValidation::parseValue<double>(value);
+                    set(key, doubleValue, ConfigSource::CommandLine);
+                } else {
+                    int intValue = ConfigValidation::parseValue<int>(value);
+                    set(key, intValue, ConfigSource::CommandLine);
+                }
+            } catch (...) {
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        else {
+            throw ConfigParsingError("Invalid argument format: " + arg);
         }
     }
-    return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+void Config::saveToFile(const std::string& filepath) const {
+    // Check if directory exists
+    std::filesystem::path path(filepath);
+    if (!path.parent_path().empty() && !std::filesystem::exists(path.parent_path())) {
+        throw ConfigFileError("Directory does not exist: " + path.parent_path().string());
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileError("Cannot create configuration file: " + filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << value;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    validateKey(key);
+    
+    // Validate value
+    ConfigValidation::validateValue(key, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -130,6 +314,9 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
+    // Validate key before removing
+    validateKey(key);
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -152,24 +339,28 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() rubles) entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
+        std::visit([&oss](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\"" << value << "\"";
             } else if constexpr (std::is_same_v<T, std::vector<int>> ||
                                  std::is_same_v<T, std::vector<double>> ||
                                  std::is_same_v<T, std::vector<std::string>>) {
                 oss << "[";
-                for (size_t i = 0; i < arg.size(); ++i) {
+                for (size_t i = 0; i < value.size(); ++i) {
                     if (i) oss << ", ";
-                    oss << arg[i];
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        oss << "\"" << value[i] << "\"";
+                    } else {
+                        oss << value[i];
+                    }
                 }
                 oss << "]";
             } else {
-                oss << arg;
+                oss << value;
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
@@ -190,35 +381,21 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
-        }
-    }, it->value);
+void Config::validateKey(const std::string& key) {
+    ConfigValidation::validateKey(key);
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+void Config::validateKeyName(const std::string& key) {
+    ConfigValidation::validateKey(key);
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
+bool Config::fileExists(const std::string& filepath) {
+    return std::filesystem::exists(filepath);
+}
+
+// Explicit template instantiations for common types
+
+// Config::get specializations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
@@ -227,6 +404,7 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+// Config::getOr specializations
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
