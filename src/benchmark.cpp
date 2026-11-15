@@ -32,6 +32,15 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
+    // Validate benchmark parameters
+    if (neuronCount <= 0) {
+        throw std::invalid_argument("Invalid neuron count: " + std::to_string(neuronCount));
+    }
+    
+    if (steps <= 0) {
+        throw std::invalid_argument("Invalid step count: " + std::to_string(steps));
+    }
+    
     // Create configuration
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
@@ -42,7 +51,10 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
+    if (!brain->initialize()) {
+        std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+        throw std::runtime_error("Brain initialization failed");
+    }
     
     // Run simulation
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -58,6 +70,12 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     auto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+    
+    // Validate timing results
+    if (totalTime <= 0.0) {
+        std::cerr << "ERROR: Invalid timing result: " << totalTime << std::endl;
+        totalTime = 0.001;  // fallback
+    }
     
     // Collect results
     BenchmarkResult result;
@@ -85,12 +103,28 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
     std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
     
+    // Validate input results
+    if (results.empty()) {
+        std::cerr << "WARNING: No benchmark results to display" << std::endl;
+        return;
+    }
+    
+    // Check for invalid results
+    for (const auto& r : results) {
+        if (r.neurons == 0 && r.synapses == 0) {
+            std::cerr << "WARNING: Benchmark result with zero neurons and synapses" << std::endl;
+        }
+        if (r.stepsPerSecond <= 0.0) {
+            std::cerr << "WARNING: Invalid steps per second: " << r.stepsPerSecond << std::endl;
+        }
+    }
+    
     for (const auto& r : results) {
         std::cout << "║ " << std::setw(13) << r.neurons 
                   << " ║ " << std::setw(13) << r.synapses
-                  << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << r.stepsPerSecond
-                  << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << r.spikesPerStep
-                  << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) << r.synapsesPerNeuron
+                  << " ║ " << std::setw(9) << std::setprecision(0) << r.stepsPerSecond
+                  << " ║ " << std::setw(11) << std::setprecision(2) << r.spikesPerStep
+                  << " ║ " << std::setw(20) << std::setprecision(2) << r.synapsesPerNeuron
                   << " ║" << std::endl;
     }
     

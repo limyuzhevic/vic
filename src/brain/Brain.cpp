@@ -201,13 +201,28 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
-    // Get configuration values
-    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
-    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Validate configuration values before use
+    if (neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron count in configuration: " + std::to_string(neuronCount));
+        return false;
+    }
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+    if (regionCount <= 0) {
+        NLM_LOG_ERROR("Invalid region count in configuration: " + std::to_string(regionCount));
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability in configuration: " + std::to_string(connectionProbability));
+        return false;
+    }
+    
+    // Ensure neuron count is distributed properly across regions
+    if (neuronCount < regionCount) {
+        NLM_LOG_WARNING("Neuron count " + std::to_string(neuronCount) + 
+                       " is less than region count " + std::to_string(regionCount) + "; adjusting");
+        neuronCount = regionCount;
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {

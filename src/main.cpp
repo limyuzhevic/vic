@@ -368,15 +368,30 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Validate configuration parameters
+    if (config->has("neuron_count")) {
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+        if (neuronCount <= 0) {
+            NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+            return 1;
+        }
+        if (neuronCount > 100000) {
+            NLM_LOG_WARNING("Large neuron count may impact performance: " + std::to_string(neuronCount));
+        }
+    }
+    
+    if (config->has("region_count")) {
+        int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+        if (regionCount <= 0) {
+            NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount));
+            return 1;
+        }
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", )`
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

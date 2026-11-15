@@ -119,22 +119,19 @@ public:
     void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
                            const std::vector<float>& afterVision);
     
-    // Reset agent for new episode
-    void reset();
+        // Configurable parameters for agent behavior
+    float textNeuronBase_;
+    float textNeuronCount_;
+    float touchThreshold_;
+    float resourceVisionMin_;
+    float hazardVisionMax_;
+    float maxTouchThreshold_;
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Initialize configuration from brain config
+    void initializeConfiguration();
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Apply configuration to agent parameters
+    void applyConfiguration();
     
 private:
     // Motor decoding: convert neural activity to motor command

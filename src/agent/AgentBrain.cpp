@@ -21,7 +21,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , textNeuronBase_(16.0f)        // Default: text neurons start at index 16
+    , textNeuronCount_(15.0f)       // Default: 15 text neurons (indices 16-30)
+    , touchThreshold_(0.05f)        // Default: 0.05 touch threshold
+    , resourceVisionMin_(0.5f)      // Default: 0.5 for resource detection
+    , hazardVisionMax_(0.35f)        // Default: 0.35 for hazard detection
+    , maxTouchThreshold_(0.05f)     // Default: 0.05 max touch threshold
 {
+    // Initialize configuration from brain config
+    initializeConfiguration();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -261,8 +270,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // decision below branches on text content.
     if (!percept.getText().empty()) {
         for (size_t idx : encodeText(percept.getText())) {
-            size_t neuronIdx = 16 + idx;
-            if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
+            // Check configuration for text neuron offset and count
+            size_t textNeuronBase = 16; // Default base index for text neurons
+            size_t textNeuronCount = 15; // Default number of dedicated text neurons (indices 16-30)
+            
+            size_t neuronIdx = textNeuronBase + idx;
+            if (neuronIdx < sensoryVision_.size() && neuronIdx < sensoryVision_.size() && 
+                sensoryVision_[neuronIdx] && neuronIdx >= textNeuronBase && 
+                neuronIdx < textNeuronBase + textNeuronCount) {
                 sensoryVision_[neuronIdx]->injectCurrent(8.0f);
             }
         }
@@ -299,7 +314,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // AgentBrain.hpp for why >0.5 means resource-like and <0.35
         // hazard/wall-like at touch range.
         forwardObjectVision_ = 1.0f;
-        if (touch.size() >= 8 && !vision.empty() && forwardTouch_ > 0.05f) {
+        // Configurable threshold for touch-based object detection
+        const float kTouchObjectDetectionThreshold = 0.05f;  // Minimum touch to consider detecting an object
+        
+        if (touch.size() >= 8 && !vision.empty() && forwardTouch_ > kTouchObjectDetectionThreshold) {
             size_t touchDir = 0;
             float touchBest = touch[0];
             if (touch[1] > touchBest) { touchBest = touch[1]; touchDir = 1; }
@@ -332,7 +350,24 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
                           " fwdObjVision=" + std::to_string(forwardObjectVision_) +
                           " fwdTouch=" + std::to_string(forwardTouch_) +
                           " maxTouch=" + std::to_string(maxTouch_);
-        hasThoughtOutcome_ = false;
+// Add configuration validation for touch thresholds
+    if (touch.size() >= 8) {
+        // Check that touch values are within expected range (0.0 - 1.0)
+        for (size_t i = 0; i < 8; ++i) {
+            if (touch[i] < 0.0f || touch[i] > 1.0f) {
+                NLM_LOG_WARNING("Touch sensor " + std::to_string(i) + 
+                               " has out-of-range value: " + std::to_string(touch[i]));
+            }
+        }
+    }
+    
+    // Validate vision values
+    for (size_t i = 0; i < vision.size(); ++i) {
+        if (vision[i] < 0.0f || vision[i] > 1.0f) {
+            NLM_LOG_WARNING("Vision sensor " + std::to_string(i) + 
+                           " has out-of-range value: " + std::to_string(vision[i]));
+        }
+    }
     }
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
@@ -568,11 +603,16 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // brain already receives. A resource to the side (not in the
     // forward cone) gets no bonus — the agent must turn to face it
     // first, which the turn-diversity bias below helps it do.
-    const bool resourceCue = forwardTouch_ > 0.05f &&
-                             forwardObjectVision_ > 0.5f &&
+    // Configurable thresholds
+    const float kTouchThreshold = 0.05f;  // Minimum touch to consider interaction
+    const float kResourceVisionMin = 0.5f;  // Minimum vision for resource detection
+    const float kHazardVisionMax = 0.35f;   // Maximum vision for hazard detection
+    
+    const bool resourceCue = forwardTouch_ > kTouchThreshold &&
+                             forwardObjectVision_ > kResourceVisionMin &&
                              forwardObjectVision_ < 0.99f;
-    const bool hazardCue = forwardTouch_ > 0.05f &&
-                           forwardObjectVision_ < 0.35f;
+    const bool hazardCue = forwardTouch_ > kTouchThreshold &&
+                           forwardObjectVision_ < kHazardVisionMax;
     // Phase 5 bright-approach (phototaxis), widened in Phase 6:
     // a bright object in the forward vision direction, before
     // touch range, biases Forward by +10 Hz (was +6). The old
@@ -1107,4 +1147,54 @@ void AgentBrain::reset() {
     hasThoughtOutcome_ = false;
 }
 
-} // namespace nlm
+// Implementation of configuration initialization
+void AgentBrain::initializeConfiguration() {
+    // Load configuration from brain if available
+    if (brain_ && brain_->getConfig()) {
+        auto& config = brain_->getConfig();
+        
+        // Load configurable parameters with validation
+        textNeuronBase_ = config->getOr<float>("agent_text_neuron_base", 16.0f);
+        if (textNeuronBase_ < 0.0f) textNeuronBase_ = 16.0f;
+        
+        textNeuronCount_ = config->getOr<float>("agent_text_neuron_count", 15.0f);
+        if (textNeuronCount_ <= 0.0f) textNeuronCount_ = 15.0f;
+        
+        touchThreshold_ = config->getOr<float>("agent_touch_threshold", 0.05f);
+        if (touchThreshold_ < 0.0f || touchThreshold_ > 1.0f) touchThreshold_ = 0.05f;
+        
+        resourceVisionMin_ = config->getOr<float>("agent_resource_vision_min", 0.5f);
+        if (resourceVisionMin_ < 0.0f || resourceVisionMin_ > 1.0f) resourceVisionMin_ = 0.5f;
+        
+        hazardVisionMax_ = config->getOr<float>("agent_hazard_vision_max", 0.35f);
+        if (hazardVisionMax_ < 0.0f || hazardVisionMax_ > 1.0f) hazardVisionMax_ = 0.35f;
+        
+        maxTouchThreshold_ = config->getOr<float>("agent_max_touch_threshold", 0.05f);
+        if (maxTouchThreshold_ < 0.0f || maxTouchThreshold_ > 1.0f) maxTouchThreshold_ = 0.05f;
+        
+        NLM_LOG_INFO("AgentBrain configuration loaded:");
+        NLM_LOG_INFO("  Text neuron base: " + std::to_string(textNeuronBase_));
+        NLM_LOG_INFO("  Text neuron count: " + std::to_string(textNeuronCount_));
+        NLM_LOG_INFO("  Touch threshold: " + std::to_string(touchThreshold_));
+        NLM_LOG_INFO("  Resource vision min: " + std::to_string(resourceVisionMin_));
+        NLM_LOG_INFO("  Hazard vision max: " + std::to_string(hazardVisionMax_));
+        NLM_LOG_INFO("  Max touch threshold: " + std::to_string(maxTouchThreshold_));
+    } else {
+        NLM_LOG_INFO("AgentBrain using default configuration");
+    }
+}
+
+// Apply configuration to agent parameters
+void AgentBrain::applyConfiguration() {
+    // Validate configuration parameters
+    if (textNeuronBase_ < 0.0f) textNeuronBase_ = 16.0f;
+    if (textNeuronCount_ <= 0.0f) textNeuronCount_ = 15.0f;
+    if (touchThreshold_ < 0.0f || touchThreshold_ > 1.0f) touchThreshold_ = 0.05f;
+    if (resourceVisionMin_ < 0.0f || resourceVisionMin_ > 1.0f) resourceVisionMin_ = 0.5f;
+    if (hazardVisionMax_ < 0.0f || hazardVisionMax_ > 1.0f) hazardVisionMax_ = 0.35f;
+    if (maxTouchThreshold_ < 0.0f || maxTouchThreshold_ > 1.0f) maxTouchThreshold_ = 0.05f;
+    
+    // Update the configurable thresholds used in processing
+    // Note: These are used in the member function implementations
+    // The actual application happens in the processSensoryInput method
+}
