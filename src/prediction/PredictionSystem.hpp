@@ -8,32 +8,47 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Phase 6: Real predictive coding using neural dynamics
+// 
+// Key mechanisms:
+// - Uses neural activity patterns for prediction
+// - Prediction error drives learning
+// - Integrates with neuromodulation systems
+// - Leverages working memory for prediction maintenance
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
-    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    // Make prediction for next timestep based on current brain state
+    // Uses neural dynamics and working memory for prediction
+    std::unique_ptr<SensoryInput> predictNextState(const class Brain* brain);
     
-    // Update predictions based on actual observation
+    // Update predictions based on actual observation using prediction error
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
-    // Get prediction error
+    // Get prediction error (used by neuromodulation systems)
     float getPredictionError() const;
     
-    // Get prediction confidence
+    // Get prediction confidence (used by action selection)
     float getConfidence() const;
     
-    // Get prediction history
+    // Get prediction history (for analysis and debugging)
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
-    void train(const SensoryInput& observation);
+    // Train prediction model using current experience
+    void train(const class Brain* brain, const SensoryInput& observation);
+    
+    // Set prediction confidence based on neuromodulatory input
+    void setConfidence(float confidence, float noveltyLevel, float curiosityLevel);
+    
+    // Get neural prediction activity for integration with other systems
+    const std::vector<float>& getPredictionActivity() const;
+    
+    // Reset prediction system
+    void reset();
     
 private:
     struct Impl;
