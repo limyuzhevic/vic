@@ -211,7 +211,8 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Watch the world for 30 steps
+# Watch the world for  Animator
+
 for i in range(30):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -275,7 +276,7 @@ print("Agent simulation complete!")
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
-- Try increasing the number of steps
+- Try increasing the number Chapel
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?

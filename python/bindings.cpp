@@ -146,9 +146,6 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
@@ -160,8 +157,23 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto result = self.get<std::string>(key);
+            if (result.has_value()) {
+                // Return as Python object with type information
+                return *result;
+            } else {
+                throw py::key_error("Key not found in configuration: " + key);
+            }
+        }, py::arg("key"), "Get a configuration value by key")
+        .def("getOr", &Config::getOr,
+             "Get configuration value with default fallback")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("set", &Config::set,
+             "Set a configuration value", py::arg("key"), py::arg("value"), py::arg("source") = nlm::ConfigSource::Runtime)
+        .def("remove", &Config::remove,
+             "Remove a configuration key", py::arg("key"))
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
@@ -304,7 +316,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with timestamp")\n        // Sensory input and current injection methods
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -314,14 +326,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
+
+        // Action and motor output
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
+
+        // State management
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+
+        // Region management
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         // getRegion is const/non-const overloaded; bind the mutable one.
@@ -336,6 +354,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
+
+        // Statistics and monitoring
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -350,16 +370,32 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
+
+        // Development system
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+
+        // Configuration access
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+
+        // Logging and diagnostics
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+
+        // Inter-region connection management (Phase 6)
+        .def("addInterRegionConnection", &Brain::addInterRegionConnection,
+             py::arg("source"), py::arg("target"), py::arg("weight") = 0.0f, py::arg("delay") = 1,
+             "Add inter-region connection")
+        .def("removeInterRegionConnection", &Brain::removeInterRegionConnection,
+             py::arg("source"), py::arg("target"),
+             "Remove inter-region connection")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -392,21 +428,59 @@ PYBIND11_MODULE(pynlm, m) {
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             "Get motor group activities for analysis")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+             "Observe another agent's behavior (Phase 6)")
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get internal firing rates for recall probe (Phase 6)")
+
+        // Phase 6 cognition counters
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount)
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount)
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount)
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount)
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount)
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount)
+
+        // Phase 6 wired systems
+        .def("getConceptCount", &AgentBrain::getConceptCount)
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence)
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount)
+
+        // Phase 5 thought trace
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get thought trace (human-readable record of recent loop)")
+
+        // Learned preference (Phase 5 personality trait)
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait (personality)")
+        .def("setLearnedPreference", [](AgentBrain& self, float preference) {
+            // Note: In real implementation, learned preference is stored
+            // on the Brain, but AgentBrain provides access for convenience
+            self.getBrain()->setLearnedPreference(preference);
+        }, py::arg("preference"),
+             "Set learned preference trait (personality)")
+
+        // Phase 5 diagnostic counters (for monitoring)
+        .def("getReflexBonusCount", &AgentBrain::getReflexBonusCount)
+        .def("getReflexSuppressCount", &AgentBrain::getReflexSuppressCount)
+        .def("getWtaPulseCount", &AgentBrain::getWtaPulseCount)
+
+        // Enhanced configuration methods
+        .def("setMaxEnergy", &AgentBrain::setMaxEnergy, py::arg("e"),
+             "Set maximum energy level")
+        .def("getMaxEnergy", &AgentBrain::getMaxEnergy,
+             "Get maximum energy level")
+        .def("setEnergyDecayRate", &AgentBrain::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getEnergyDecayRate", &AgentBrain::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setRandomSeed", &AgentBrain::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible behavior")
+        .def("getRandomSeed", &AgentBrain::getRandomSeed,
+             "Get random seed")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
