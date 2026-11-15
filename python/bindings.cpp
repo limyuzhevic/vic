@@ -424,10 +424,300 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // END: Basic utility functions
 
-} // namespace nlm
+    // BEGIN: Advanced Python utilities and enhanced features
+    
+    // Advanced performance monitoring utility
+    py::class_<PerformanceMonitor>(m, "PerformanceMonitor", R"pbdoc(Performance monitoring utility for NLM simulations)pbdoc")
+        .def(py::init<>())
+        .def("start", &PerformanceMonitor::start)
+        .def("stop", &PerformanceMonitor::stop)
+        .def("getElapsedTime", &PerformanceMonitor::getElapsedTime)
+        .def("getStepsPerSecond", &PerformanceMonitor::getStepsPerSecond)
+        .def("reset", &PerformanceMonitor::reset)
+        .def("recordSpikeCount", &PerformanceMonitor::recordSpikeCount)
+        .def("getStatistics", &PerformanceMonitor::getStatistics)
+        .def("getDetailedReport", &PerformanceMonitor::getDetailedReport);
+
+    // Advanced simulation controller
+    py::class_<SimulationController>(m, "SimulationController", R"pbdoc(Simulation controller for advanced NLM simulation management)pbdoc")
+        .def(py::init<>())
+        .def("runEpisode", &SimulationController::runEpisode)
+        .def("runCustomPattern", &SimulationController::runCustomPattern)
+        .def("enableRealTimeMode", &SimulationController::enableRealTimeMode)
+        .def("disableRealTimeMode", &SimulationController::disableRealTimeMode)
+        .def("isRealTimeMode", &SimulationController::isRealTimeMode)
+        .def("setTargetFPS", &SimulationController::setTargetFPS)
+        .def("getCurrentFPS", &SimulationController::getCurrentFPS)
+        .def("getSimulationTime", &SimulationController::getSimulationTime)
+        .def("setMaxSteps", &SimulationController::setMaxSteps)
+        .def("getMaxSteps", &SimulationController::getMaxSteps)
+        .def("pause", &SimulationController::pause)
+        .def("resume", &SimulationController::resume)
+        .def("getBrain", &SimulationController::getBrain, py::return_value_policy::reference_internal);
+
+    // Advanced brain analyzer
+    py::class_<BrainAnalyzer>(m, "BrainAnalyzer", R"pbdoc(Brain analyzer for detailed NLM brain analysis)pbdoc")
+        .def(py::init<>())
+        .def("analyzeConnectivity", &BrainAnalyzer::analyzeConnectivity)
+        .def("analyzePlasticity", &BrainAnalyzer::analyzePlasticity)
+        .def("analyzeExcitatoryInhibition", &BrainAnalyzer::analyzeExcitatoryInhibition)
+        .def("analyzeSpikePatterns", &BrainAnalyzer::analyzeSpikePatterns)
+        .def("getConnectionDensity", &BrainAnalyzer::getConnectionDensity)
+        .def("getPlasticityMetrics", &BrainAnalyzer::getPlasticityMetrics)
+        .def("getNetworkEfficiency", &BrainAnalyzer::getNetworkEfficiency)
+        .def("getStabilityMetrics", &BrainAnalyzer::getStabilityMetrics)
+        .def("generateReport", &BrainAnalyzer::generateReport)
+        .def("generateJSONReport", &BrainAnalyzer::generateJSONReport);
+
+    // Advanced configuration presets utility
+    py::class_<ConfigPresets>(m, "ConfigPresets", R"pbdoc(Configuration presets utility for NLM)pbdoc")
+        .def(py::init<>())
+        .def("getPresets", &ConfigPresets::getPresets)
+        .def("getPreset", &ConfigPresets::getPreset)
+        .def("addPreset", &ConfigPresets::addPreset)
+        .def("removePreset", &ConfigPresets::removePreset)
+        .def("applyPreset", &ConfigPresets::applyPreset)
+        .def("importPresets", &ConfigPresets::importPresets)
+        .def("exportPresets", &ConfigPresets::exportPresets)
+        .def("createFromConfig", &ConfigPresets::createFromConfig);
+
+    // Advanced debug and inspection utilities
+    py::class_<DebugTools>(m, "DebugTools", R"pbdoc(Debug and inspection tools for NLM)pbdoc")
+        .def(py::init<>())
+        .def("watchSpikeCount", &DebugTools::watchSpikeCount)
+        .def("watchFiringNeurons", &DebugTools::watchFiringNeurons)
+        .def("watchSynapticWeights", &DebugTools::watchSynapticWeights)
+        .def("watchDevelopmentStage", &DebugTools::watchDevelopmentStage)
+        .def("watchNeuromodulation", &DebugTools::watchNeuromodulation)
+        .def("getNeuronInfo", &DebugTools::getNeuronInfo)
+        .def("getSynapseInfo", &DebugTools::getSynapseInfo)
+        .def("dumpBrainState", &DebugTools::dumpBrainState)
+        .def("generateDebugReport", &DebugTools::generateDebugReport);
+
+    // Basic visualization utilities
+    py::class_<VisualizationUtils>(m, "VisualizationUtils", R"pbdoc(Basic visualization utilities for NLM)pbdoc")
+        .def(py::init<>())
+        .def("plotSpikeRaster", &VisualizationUtils::plotSpikeRaster)
+        .def("plotActivityOverTime", &VisualizationUtils::plotActivityOverTime)
+        .def("plotConnectionMatrix", &VisualizationUtils::plotConnectionMatrix)
+        .def("plotWeightDistribution", &VisualizationUtils::plotWeightDistribution)
+        .def("saveVisualization", &VisualizationUtils::saveVisualization)
+        .def("createNetworkGraph", &VisualizationUtils::createNetworkGraph);
+
+    // Advanced experiment management utilities
+    py::class_<ExperimentManager>(m, "ExperimentManager", R"pbdoc(Experiment management utilities for NLM)pbdoc")
+        .def(py::init<>())
+        .def("createExperiment", &ExperimentManager::createExperiment)
+        .def("runExperiment", &ExperimentManager::runExperiment)
+        .def("compareExperiments", &ExperimentManager::compareExperiments)
+        .def("getExperimentResults", &ExperimentManager::getExperimentResults)
+        .def("saveExperimentResults", &ExperimentManager::saveExperimentResults)
+        .def("importResults", &ExperimentManager::importResults)
+        .def("exportResults", &ExperimentManager::exportResults);
+
+    // Module-level advanced utility functions
+    m.def("createPerformanceMonitor", []() -> std::shared_ptr<PerformanceMonitor> {
+        return std::make_shared<PerformanceMonitor>();
+    }, "Create a performance monitor");
+
+    m.def("createSimulationController", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<SimulationController> {
+        return std::make_shared<SimulationController>(brain);
+    }, py::arg("brain"), "Create a simulation controller for a brain");
+
+    m.def("createBrainAnalyzer", []() -> std::shared_ptr<BrainAnalyzer> {
+        return std::make_shared<BrainAnalyzer>();
+    }, "Create a brain analyzer");
+
+    m.def("createExperimentManager", []() -> std::shared_ptr<ExperimentManager> {
+        return std::make_shared<ExperimentManager>();
+    }, "Create an experiment manager");
+
+    m.def("createDebugTools", []() -> std::shared_ptr<DebugTools> {
+        return std::make_shared<DebugTools>();
+    }, "Create debug tools");
+
+    m.def("createVisualizationUtils", []() -> std::shared_ptr<VisualizationUtils> {
+        return std::make_shared<VisualizationUtils>();
+    }, "Create visualization utilities");
+
+    m.def("createConfigPresets", []() -> std::shared_ptr<ConfigPresets> {
+        return std::make_shared<ConfigPresets>();
+    }, "Create configuration presets utility");
+
+    m.def("runQuickBenchmark", [](std::shared_ptr<Brain> brain, size_t steps) -> BenchmarkResult {
+        return runQuickBenchmark(brain, steps);
+    }, py::arg("brain"), py::arg("steps"), "Run a quick benchmark on a brain");
+
+    m.def("compareBrains", [](const std::vector<std::shared_ptr<Brain>>& brains, const std::vector<size_t>& steps) -> std::vector<BenchmarkResult> {
+        return compareBrains(brains, steps);
+    }, py::arg("brains"), py::arg("steps"), "Compare multiple brains");
+
+    m.def("exportBrainToJSON", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        exportBrainToJSON(brain, filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Export brain state to JSON file");
+
+    m.def("importBrainFromJSON", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        return importBrainFromJSON(filepath);
+    }, py::arg("filepath"), "Import brain state from JSON file");
+
+    m.def("createReplayConfiguration", [](std::shared_ptr<Brain> brain, size_t replaySteps) -> std::shared_ptr<Config> {
+        return createReplayConfiguration(brain, replaySteps);
+    }, py::arg("brain"), py::arg("replaySteps"), "Create a configuration for replay simulation");
+
+    m.def("generateLearningReport", [](std::shared_ptr<Brain> brain, size_t steps) -> std::string {
+        return generateLearningReport(brain, steps);
+    }, py::arg("brain"), py::arg("steps"), "Generate a learning report for a brain");
+
+    m.def("createScenario", [](const std::string& name, const std::string& description, std::function<void(std::shared_ptr<Brain>, std::shared_ptr<Config>)> setupFunc) {
+        return createScenario(name, description, setupFunc);
+    }, py::arg("name"), py::arg("description"), py::arg("setupFunc"), "Create a custom simulation scenario");
+
+    m.def("getAdvancedPresets", []() -> std::vector<std::string> {
+        return getAdvancedPresets();
+    }, "Get available advanced configuration presets");
+
+    m.def("getDefaultAdvancedConfig", []() -> std::shared_ptr<Config> {
+        return getDefaultAdvancedConfig();
+    }, "Get default advanced configuration");
+
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) -> bool {
+        return validateConfiguration(config);
+    }, py::arg("config"), "Validate a configuration");
+
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain, size_t steps, std::shared_ptr<PerformanceMonitor> monitor) -> ProfileResult {
+        return profileSimulation(brain, steps, monitor);
+    }, py::arg("brain"), py::arg("steps"), py::arg("monitor") = nullptr, "Profile a simulation run");
+
+    m.def("analyzeLearningCurve", [](std::shared_ptr<Brain> brain, size_t steps) -> LearningCurveAnalysis {
+        return analyzeLearningCurve(brain, steps);
+    }, py::arg("brain"), py::arg("steps"), "Analyze learning curve of a brain");
+
+    m.def("createNeuralNetworkVisualizer", []() -> std::shared_ptr<NeuralNetworkVisualizer> {
+        return std::make_shared<NeuralNetworkVisualizer>();
+    }, "Create a neural network visualizer");
+
+    m.def("createExperimentRunner", []() -> std::shared_ptr<ExperimentRunner> {
+        return std::make_shared<ExperimentRunner>();
+    }, "Create an experiment runner");
+
+    m.def("createHyperparameterOptimizer", []() -> std::shared_ptr<HyperparameterOptimizer> {
+        return std::make_shared<HyperparameterOptimizer>();
+    }, "Create a hyperparameter optimizer");
+
+    m.def("createTransferLearningUtils", []() -> std::shared_ptr<TransferLearningUtils> {
+        return std::make_shared<TransferLearningUtils>();
+    }, "Create transfer learning utilities");
+
+    m.def("createAdvancedDebugTools", []() -> std::shared_ptr<DebugTools> {
+        return std::make_shared<DebugTools>();
+    }, "Create advanced debug tools with comprehensive inspection capabilities");
+
+    m.def("createBrainInspector", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<BrainInspector> {
+        return std::make_shared<BrainInspector>(brain);
+    }, py::arg("brain"), "Create a brain inspector for detailed brain analysis");
+
+    m.def("createMemoryProfiler", []() -> std::shared_ptr<MemoryProfiler> {
+        return std::make_shared<MemoryProfiler>();
+    }, "Create a memory profiler for detailed memory analysis");
+
+    m.def("createNetworkAnalyzer", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NetworkAnalyzer> {
+        return std::make_shared<NetworkAnalyzer>(brain);
+    }, py::arg("brain"), "Create a network analyzer for brain connectivity analysis");
+
+    m.def("createPerformanceDebugger", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PerformanceDebugger> {
+        return std::make_shared<PerformanceDebugger>(brain);
+    }, py::arg("brain"), "Create a performance debugger for step-by-step performance analysis");
+
+    m.def("createConfigDebugger", [](std::shared_ptr<Config> config) -> std::shared_ptr<ConfigDebugger> {
+        return std::make_shared<ConfigDebugger>(config);
+    }, py::arg("config"), "Create a configuration debugger for configuration analysis");
+
+    m.def("createSynchronizationDebugger", []() -> std::shared_ptr<SynchronizationDebugger> {
+        return std::make_shared<SynchronizationDebugger>();
+    }, "Create a synchronization debugger for thread safety analysis");
+
+    m.def("createErrorAnalyzer", []() -> std::shared_ptr<ErrorAnalyzer> {
+        return std::make_shared<ErrorAnalyzer>();
+    }, "Create an error analyzer for detailed error reporting and analysis");
+
+    m.def("createStepByStepDebugger", [](std::shared_ptr<Brain> brain, size_t maxSteps) -> std::shared_ptr<StepByStepDebugger> {
+        return std::make_shared<StepByStepDebugger>(brain, maxSteps);
+    }, py::arg("brain"), py::arg("maxSteps"), "Create a step-by-step debugger for detailed simulation inspection");
+
+    m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) -> BrainStateAnalysis {
+        return analyzeBrainState(brain);
+    }, py::arg("brain"), "Analyze and return comprehensive brain state information");
+
+    m.def("validateBrainIntegrity", [](std::shared_ptr<Brain> brain) -> bool {
+        return validateBrainIntegrity(brain);
+    }, py::arg("brain"), "Validate brain integrity and consistency");
+
+    m.def("findBrainIssues", [](std::shared_ptr<Brain> brain) -> std::vector<std::string> {
+        return findBrainIssues(brain);
+    }, py::arg("brain"), "Find and return list of brain issues and potential problems");
+
+    m.def("getBrainPerformanceProfile", [](std::shared_ptr<Brain> brain, size_t steps) -> PerformanceProfile {
+        return getBrainPerformanceProfile(brain, steps);
+    }, py::arg("brain"), py::arg("steps"), "Get comprehensive performance profile for a brain");
+
+    m.def("compareBrainsState", [](const std::vector<std::shared_ptr<Brain>>& brains) -> BrainComparison {
+        return compareBrainsState(brains);
+    }, py::arg("brains"), "Compare multiple brains and return comparison results");
+
+    m.def("analyzeLearningProgress", [](std::shared_ptr<Brain> brain, size_t steps) -> LearningAnalysis {
+        return analyzeLearningProgress(brain, steps);
+    }, py::arg("brain"), py::arg("steps"), "Analyze learning progress and patterns");
+
+    m.def("createDevelopmentDebugger", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<DevelopmentDebugger> {
+        return std::make_shared<DevelopmentDebugger>(brain);
+    }, py::arg("brain"), "Create a development debugger for developmental stage analysis");
+
+    m.def("createNeuromodulationDebugger", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuromodulationDebugger> {
+        return std::make_shared<NeuromodulationDebugger>(brain);
+    }, py::arg("brain"), "Create a neuromodulation debugger for neuromodulator analysis");
+
+    m.def("createMemoryDebugger", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<MemoryDebugger> {
+        return std::make_shared<MemoryDebugger>(brain);
+    }, py::arg("brain"), "Create a memory debugger for memory system analysis");
+
+    m.def("createPlasticityDebugger", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PlasticityDebugger> {
+        return std::make_shared<PlasticityDebugger>(brain);
+    }, py::arg("brain"), "Create a plasticity debugger for plasticity rule analysis");
+
+    m.def("exportDebugInfo", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        exportDebugInfo(brain, filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Export comprehensive debug information to file");
+
+    m.def("importDebugInfo", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        return importDebugInfo(filepath);
+    }, py::arg("filepath"), "Import brain state from debug information file");
+
+    m.def("createDebugSession", [](const std::string& sessionName) -> std::shared_ptr<DebugSession> {
+        return std::make_shared<DebugSession>(sessionName);
+    }, py::arg("sessionName"), "Create a debug session for recording and analysis");
+
+    m.def("createBenchmarkDebugger", [](std::shared_ptr<Brain> brain, const std::vector<size_t>& testConfigurations) -> std::shared_ptr<BenchmarkDebugger> {
+        return std::make_shared<BenchmarkDebugger>(brain, testConfigurations);
+    }, py::arg("brain"), py::arg("testConfigurations"), "Create a benchmark debugger for performance testing");
+
+    m.def("analyzeDebugData", [](const std::string& debugData) -> DebugAnalysis {
+        return analyzeDebugData(debugData);
+    }, py::arg("debugData"), "Analyze debug data and return comprehensive analysis");
+
+    m.def("createDebugReporter", []() -> std::shared_ptr<DebugReporter> {
+        return std::make_shared<DebugReporter>();
+    }, "Create a debug reporter for comprehensive reporting");
+
+    m.def("createLiveDebugger", [](std::shared_ptr<Brain> brain, double updateInterval) -> std::shared_ptr<LiveDebugger> {
+        return std::make_shared<LiveDebugger>(brain, updateInterval);
+    }, py::arg("brain"), py::arg("updateInterval"), "Create a live debugger for real-time debugging");
+
+    m.def("createArchiveDebugger", []() -> std::shared_ptr<ArchiveDebugger> {
+        return std::make_shared<ArchiveDebugger>();
+    }, "Create an archive debugger for historical analysis");
+
+    m.def("createProfileDebugger", [](std::shared_ptr<Brain> brain, const std::string& profileName) -> std::shared_ptr<ProfileDebugger> {
+        return std::make_shared<ProfileDebugger>(brain, profileName);
+    }, py::arg("brain"), py::arg("profileName"), "Create a profile debugger for performance profiling");
