@@ -331,6 +331,19 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
+    // Set checkpoint providers to Brain's data
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        // This would be implemented to extract neuron data from the brain
+        // For now, return empty data to indicate the provider is set
+        return false;
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        // This would be implemented to extract synapse data from the brain
+        // For now, return empty data to indicate the provider is set
+        return false;
+    });
+    
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));

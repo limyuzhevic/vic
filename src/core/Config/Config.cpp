@@ -19,8 +19,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // TODO PHASE 2: Implement proper JSON/YAML parser with validation
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -40,6 +45,13 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty() || !std::all_of(key.begin(), key.end(), [](char c) { 
+                return std::isalnum(c) || c == '_' || c == '-'; })) {
+                NLM_LOG_ERROR("Invalid key in config: " + key);
+                return false;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
