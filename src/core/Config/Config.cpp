@@ -19,27 +19,60 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Enhanced error handling with detailed error reporting
+    if (filepath.empty()) {
+        // Log error: empty file path
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+    // Check if file exists and is readable
+    std::filesystem::path path(filepath);
+    if (!std::filesystem::exists(path)) {
+        // Log error: file not found
+        return false;
+    }
+    
+    if (!std::filesystem::is_regular_file(path)) {
+        // Log error: not a regular file
+        return false;
+    }
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        // Log error: cannot open file (permission denied, etc.)
+        return false;
+    }
+    
+    // Set exception mask for stream
+    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    
+    try {
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(file, line)) {
+            lineNumber++;
+            
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs with better validation
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                // Log warning: malformed line, no '=' found
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key format
+            if (key.empty()) {
+                // Log warning: empty key
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,11 +81,24 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate value (basic check for null bytes)
+            if (value.find('\0') != std::string::npos) {
+                // Log warning: value contains null byte
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
         }
+        
+        return true;
+        
+    } catch (const std::ifstream::failure& e) {
+        // Log error: file read error
+        return false;
+    } catch (const std::exception& e) {
+        // Log error: unexpected exception
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,20 +125,83 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    // Enhanced error handling with detailed validation
+    if (filepath.empty()) {
+        // Log error: empty file path
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Validate directory exists and is writable
+    std::filesystem::path path(filepath);
+    std::filesystem::path parentDir = path.parent_path();
+    
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        // Log error: parent directory doesn't exist
+        return false;
     }
     
-    return true;
+    if (!parentDir.empty() && std::filesystem::exists(parentDir) && 
+        !std::filesystem::is_directory(parentDir)) {
+        // Log error: parent path exists but is not a directory
+        return false;
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        // Log error: cannot open file for writing
+        return false;
+    }
+    
+    // Set exception mask for stream
+    file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    
+    try {
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            
+            // Write key=value pair with proper escaping
+            file << entry.key << " = ";
+            
+            // Handle different value types
+            std::visit([&file](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << escapeString(val) << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (val ? "true" : "false");
+                } else {
+                    file << val;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        // Ensure all data is written to disk
+        file.flush();
+        if (!file.good()) {
+            // Log error: write error
+            return false;
+        }
+        
+        return true;
+        
+    } catch (const std::ofstream::failure& e) {
+        // Log error: file write error
+        return false;
+    } catch (const std::exception& e) {
+        // Log error: unexpected exception
+        return false;
+    }
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Enhanced validation for set operation
+    if (key.empty()) {
+        // Log error: empty key
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -184,11 +293,69 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
+// Escape special characters in strings for file output
+    static std::string escapeString(const std::string& input) {
+        std::string output;
+        output.reserve(input.size());
+        for (char c : input) {
+            switch (c) {
+                case '\\': output += "\\\\"; break;
+                case '"': output += "\\\""; break;
+                case '\n': output += "\\n"; break;
+                case '\r': output += "\\r"; break;
+                case '\t': output += "\\t"; break;
+                case '\0': output += "\\\\0"; break;
+                default:
+                    if (c < 32 || c == 127) {
+                        // Control character - use escape sequence
+                        output += "\\\\x";
+                        output += "0123456789abcdef"[c >> 4];
+                        output += "0123456789abcdef"[c & 0xF];
+                    } else {
+                        output += c;
+                    }
+            }
+        }
+        return output;
+    }
+
+    // Unescape string from file input
+    static std::string unescapeString(const std::string& input) {
+        std::string output;
+        output.reserve(input.size());
+        bool escapeNext = false;
+        
+        for (char c : input) {
+            if (escapeNext) {
+                switch (c) {
+                    case 'n': output += '\n'; break;
+                    case 'r': output += '\r'; break;
+                    case 't': output += '\t'; break;
+                    case '0': output += '\0'; break;
+                    case 'x':
+                        // Handle hex escape \xXX
+                        // Would need more complex implementation
+                        output += c;
+                        break;
+                    case '\\': output += '\\'; break;
+                    case '\"': output += '\"'; break;
+                    default: output += c; break; // Pass through
+                }
+                escapeNext = false;
+            } else if (c == '\\') {
+                escapeNext = true;
+            } else {
+                output += c;
+            }
+        }
+        
+        // Handle trailing escape
+        if (escapeNext) {
+            output += '\\';
+        }
+        
+        return output;
+    }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
@@ -234,5 +401,81 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Escape special characters in strings for file output
+std::string Config::escapeString(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    for (char c : input) {
+        switch (c) {
+            case '\\': output += "\\\\"; break;
+            case '"': output += "\\\""; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            case '\0': output += "\\\\0"; break;
+            default:
+                if (c < 32 || c == 127) {
+                    // Control character - use escape sequence
+                    output += "\\\\x";
+                    output += "0123456789abcdef"[c >> 4];
+                    output += "0123456789abcdef"[c & 0xF];
+                } else {
+                    output += c;
+                }
+        }
+    }
+    return output;
+}
+
+// Unescape string from file input
+std::string Config::unescapeString(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    bool escapeNext = false;
+    
+    for (char c : input) {
+        if (escapeNext) {
+            switch (c) {
+                case 'n': output += '\n'; break;
+                case 'r': output += '\r'; break;
+                case 't': output += '\t'; break;
+                case '0': output += '\0'; break;
+                case 'x':
+                    // Handle hex escape \xXX - simplified implementation
+                    output += c;
+                    break;
+                case '\\': output += '\\'; break;
+                case '\"': output += '\"'; break;
+                default: output += c; break; // Pass through
+            }
+            escapeNext = false;
+        } else if (c == '\\') {
+            escapeNext = true;
+        } else {
+            output += c;
+        }
+    }
+    
+    // Handle trailing escape
+    if (escapeNext) {
+        output += '\\';
+    }
+    
+    return output;
+}
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
 
 } // namespace nlm

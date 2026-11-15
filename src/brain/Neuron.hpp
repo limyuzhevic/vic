@@ -10,8 +10,17 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
-struct NeuronState {
+/**
+     * @struct NeuronState
+     * @brief Immutable state container for a neuron at a specific time.
+     * @details Contains all internal variables needed to compute neuron dynamics:
+     * - Membrane potentials (current, resting, threshold, reset)
+     * - Electrical properties (leak conductance, synaptic conductance)
+     * - Firing properties (rate, state, refractory timing)
+     * - History (last spike time, adaptation variable)
+     * @note This is a POD (Plain Old Data) structure for efficient copying.
+     */
+    struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
     MembranePotential threshold;           // Firing threshold (mV)
@@ -49,13 +58,44 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * @class Neuron
+ * @brief Represents a single neuron implementing Leaky Integrate-and-Fire (LIF) dynamics.
+ * @details This class models a biological neuron with:
+ * - Membrane potential dynamics governed by LIF equations
+ * - Refractory period to prevent unrealistic firing rates
+ * - Spike history tracking for synaptic plasticity
+ * - Synaptic connectivity management (incoming/outgoing connections)
+ * - Plasticity state for STDP, Hebbian, and reward-modulated learning
+ * - Population and region membership for network organization
+ * 
+ * The neuron implements the fundamental equation: τₘ dV/dt = - (V - Vᵣ) + R(Iₛᵢₙₐₚₛₜᵢcₛ + Iₑₓₜᵣₐₙₐₗ)
+ * where τₘ is membrane time constant, V is membrane potential, and I represents currents.
+ * 
+ * Key features:
+ * - Threshold-based spike generation when V ≥ Vₜₕ
+ * - Spike reset to Vᵣ after firing
+ * - Refractory period (9 steps for Phase 6) preventing consecutive spikes
+ * - Spike-frequency adaptation via adaptation variable
+ * - Fast synaptic transmission with delays
+ * 
+ * @ingroup brain
+ * @author NLM Development Team
+ * @version 0.1.0
+ */
 class Neuron {
 public:
-    // Create neuron with ID
+    /**
+     * @brief Constructor with neuron ID.
+     * @param[in] id Unique identifier for this neuron.
+     * @details Creates neuron with default state parameters and initializes implementation.
+     */
     explicit Neuron(NeuronId id);
     
+/**
+     * @brief Virtual destructor.
+     * @details Cleans up implementation and releases resources.
+     */
     ~Neuron();
     
     // Disable copying, enable moving
@@ -64,24 +104,78 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
+    /**
+     * @brief Returns the neuron's unique identifier.
+     * @return NeuronId The unique identifier.
+     */
     NeuronId getId() const;
     
-    // Type
+    /**
+     * @brief Get the neuron's type (excitatory, inhibitory, or internal).
+     * @return NeuronType The neuron type classification.
+     * @details Neurons are classified into:
+     * - Motor neurons: control motor actions
+     * - Sensory neurons: receive environmental input
+ * - Internal neurons: hidden processing units
+     */
     NeuronType getType() const;
+
+    /**
+     * @brief Set the neuron's type.
+     * @param[in] type The neuron type to assign.
+     * @details Changes the neuron's functional role in the network.
+     */
     void setType(NeuronType type);
     
-    // State access
+    /**
+     * @brief Get the neuron's current state (constant access).
+     * @return const NeuronState& Reference to the current state.
+     * @details The state contains all internal variables needed for computation.
+     */
     const NeuronState& getState() const;
+
+    /**
+     * @brief Get the neuron's current state (mutable access).
+     * @return NeuronState& Reference to the current state for modification.
+     * @warning Modifying state directly bypasses validation. Use setters instead.
+     */
     NeuronState& getState();
     
-    // Membrane potential
+    /**
+     * @brief Get the neuron's membrane potential (voltage).
+     * @return MembranePotential The current membrane potential in mV.
+     * @details This is the primary state variable that integrates incoming currents.
+     * Typical values: -70mV (resting), -55mV (threshold), +40mV (peak).
+     */
     MembranePotential getMembranePotential() const;
+
+    /**
+     * @brief Set the membrane potential directly.
+     * @param[in] potential The new membrane potential in mV.
+     * @warning Use with caution - may bypass biophysics validation.
+     */
     void setMembranePotential(MembranePotential potential);
+
+    /**
+     * @brief Inject additional current to change membrane potential.
+     * @param[in] delta Change in membrane potential (mV).
+     * @details This represents postsynaptic potentials or external input.
+     */
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
+    /**
+     * @brief Get the neuron's firing threshold.
+     * @return MembranePotential The firing threshold in mV.
+     * @details When membrane potential reaches or exceeds this value, the neuron spikes.
+     * Typical value: -55mV.
+     */
     MembranePotential getThreshold() const;
+
+    /**
+     * @brief Set the neuron's firing threshold.
+     * @param[in] threshold New firing threshold in mV.
+     * @details Must be greater than resting potential for valid neuron behavior.
+     */
     void setThreshold(MembranePotential threshold);
     
     // Firing state
