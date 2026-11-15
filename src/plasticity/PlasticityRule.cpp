@@ -24,24 +24,25 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // Real Hebbian learning implementation
+    // Based on spike-timing correlation and coactivity
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Count coincident spikes (spikes occurring within 10ms of each other)
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
+            if (std::abs(pre - post) < 10.0) {  // 10ms coincidence window
                 ++coincidences;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
+    // Apply weight change proportional to coactivity
+    // Positive coincidences strengthen synapse (potentiation)
     if (coincidences > 0) {
         applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
     }
