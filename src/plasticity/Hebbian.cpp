@@ -1,9 +1,3 @@
-#include "Hebbian.hpp"
-#include "../brain/Synapse.hpp"
-#include <algorithm>
-
-namespace nlm {
-
 struct Hebbian::Impl {
     float learningRate;
     float maxWeight;
@@ -14,14 +8,30 @@ struct Hebbian::Impl {
              covarianceThreshold(0.0f) {}
 };
 
+struct RewardModulatedHebbian::Impl {
+    float learningRate;
+    float predictionErrorScale;  // Scale with prediction error signal
+    float maxWeight;
+    float minWeight;
+    
+    Impl() : learningRate(0.01f), predictionErrorScale(0.5f), maxWeight(1.0f), minWeight(-1.0f) {}
+};
+
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
 Hebbian::~Hebbian() = default;
 
+void Hebbian::configure(float learningRate, float maxWeight, float minWeight, float covarianceThreshold) {
+    pImpl->learningRate = std::clamp(learningRate, 0.0f, 1.0f);
+    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 0.0f);
+    pImpl->covarianceThreshold = covarianceThreshold;
+}
+
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -104,6 +114,22 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::setMinWeight(float minWeight) {
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 0.0f);
+}
+
+float Hebbian::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void Hebbian::setCovarianceThreshold(float threshold) {
+    pImpl->covarianceThreshold = threshold;
+}
+
+float Hebbian::getCovarianceThreshold() const {
+    return pImpl->covarianceThreshold;
 }
 
 } // namespace nlm

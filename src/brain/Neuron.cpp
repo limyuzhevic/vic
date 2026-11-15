@@ -121,26 +121,32 @@ float Neuron::getLastSpikeTime() const {
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Scale amplitude to realistic values (typical EPSP is 0.5-5.0 mV)
+    constexpr float kSynapticScalingFactor = 0.1f;  // Scale down for realistic PSPs
+    pImpl->synapticInput += amplitude * kSynapticScalingFactor;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Scale amplitude to realistic values (typical IPSP is 0.5-5.0 mV)
+    constexpr float kSynapticScalingFactor = 0.1f;  // Scale down for realistic PSPs
+    pImpl->synapticInput -= amplitude * kSynapticScalingFactor;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    // Scale amplitude for realistic neuromodulatory effects
+    constexpr float kModulatoryScalingFactor = 0.01f;  // Much smaller effect
+    pImpl->state.adaptationVariable += amplitude * kModulatoryScalingFactor;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Scale current to realistic LIF parameters (typical synaptic input is 0.1-10.0 mV)
+    // Current should represent postsynaptic potential, not raw current
+    constexpr float kCurrentScalingFactor = 0.1f;  // Scale down to realistic values
+    pImpl->synapticInput += current * kCurrentScalingFactor;
 }
 
 void Neuron::clearTotalCurrent() {

@@ -145,8 +145,19 @@ struct Brain::Impl {
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float tau = config->getOr<float>("stdp_time_constant", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        // Configure Hebbian learning parameters
+        float hebbianLearningRate = config->getOr<float>("plasticity_learning_rate", 0.01f);
+        float hebbianMaxWeight = config->getOr<float>("brain_initial_weight_max", 1.0f);
+        float hebbianMinWeight = config->getOr<float>("brain_initial_weight_min", -1.0f);
+        hebbian->configure(hebbianLearningRate, hebbianMaxWeight, hebbianMinWeight, 0.0f);
+        
+        NLM_LOG_INFO("Hebbian learning configured:");
+        NLM_LOG_INFO("  Learning rate: " + std::to_string(hebbianLearningRate));
+        NLM_LOG_INFO("  Max weight: " + std::to_string(hebbianMaxWeight));
+        NLM_LOG_INFO("  Min weight: " + std::to_string(hebbianMinWeight));
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
