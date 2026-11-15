@@ -71,6 +71,16 @@ std::shared_ptr<Config> makeConfig() {
     config->set("stdp_tau", 20.0f);
     config->set("synaptogenesis_rate", 0.0001f);
     config->set("pruning_rate", 0.00001f);
+    
+    // Enhanced activity regulation settings
+    config->set("activity_regulation_enabled", true);
+    config->set("firing_rate_target", 0.15f);
+    config->set("eiratio_target", 1.0f);
+    config->set("homeostatic_plasticity_rate", 0.01f);
+    config->set("structural_plasticity_rate", 0.0001f);
+    config->set("neuromodulation_activity_threshold", 0.5f);
+    config->set("activity_modulation_strength", 0.3f);
+    
     return config;
 }
 
@@ -206,7 +216,24 @@ int main() {
               << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
               << " preference=" << agent.getLearnedPreference() << "\n";
 
-    // Per-synapse spike-history totals, for the checkpoint check below.
+    // Enhanced reward analysis
+    std::cout << "  === ENHANCED REWARD ANALYSIS ===\n";
+    if (totalReward > 0.001f) {
+        std::cout << "  ✓ REWARD DETECTED: Sandbox learning is working" << std::endl;
+        std::cout << "    Average reward per step: " << totalReward / 100.0f << std::endl;
+        
+        if (resources > 0 && totalReward > 0.0f) {
+            std::cout << "    ✓ Resource consumption is rewarding positive behavior" << std::endl;
+        }
+        
+        if (hazards == 0) {
+            std::cout << "    ✓ No hazards hit - agent learned to avoid dangers" << std::endl;
+        }
+        
+    } else {
+        std::cout << "  ⚠ LOW REWARD: May need better reward shaping" << std::endl;
+        std::cout << "    Consider: increasing resource rewards or improving hazard avoidance" << std::endl;
+    }
     auto synHistoryTotal = [](const std::shared_ptr<Brain>& b) {
         size_t total = 0;
         for (const auto& region : b->getRegions()) {

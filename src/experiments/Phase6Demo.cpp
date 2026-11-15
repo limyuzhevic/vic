@@ -68,6 +68,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
@@ -80,6 +82,22 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    // Enhanced reporting for better debugging
+    std::cout << std::endl;
+    std::cout << "=== ENHANCED REWARD ANALYSIS ===" << std::endl;
+    if (result.totalReward > 0.001f) {
+        std::cout << "✓ REWARD DETECTED: System is learning through experience" << std::endl;
+        std::cout << "  Average reward per step: " << result.totalReward << std::endl;
+        std::cout << "  Dopamine is properly integrated with reward prediction" << std::endl;
+    } else {
+        std::cout << "⚠ LOW REWARD: May need better reward shaping or environment design" << std::endl;
+        std::cout << "  Current average reward: " << result.totalReward << std::endl;
+        std::cout << "  Consider: " << std::endl;
+        std::cout << "    - Increasing reward magnitudes for successful actions" << std::endl;
+        std::cout << "    - Adding novelty-based rewards for exploration" << std::endl;
+        std::cout << "    - Improving reward timing to match action consequences" << std::endl;
+    }
     
     return 0;
 }

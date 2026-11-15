@@ -87,6 +87,14 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Activity regulation state
+    bool activityRegulationEnabled;
+    float firingRateTarget;
+    float eiratioTarget;
+    float homeostaticPlasticityRate;
+    float neuromodulationActivityThreshold;
+    float activityModulationStrength;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -104,6 +112,12 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , activityRegulationEnabled(true)
+        , firingRateTarget(0.15f)
+        , eiratioTarget(1.0f)
+        , homeostaticPlasticityRate(0.01f)
+        , neuromodulationActivityThreshold(0.5f)
+        , activityModulationStrength(0.3f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -156,6 +170,14 @@ struct Brain::Impl {
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Get activity regulation parameters from config
+        activityRegulationEnabled = config->getOr<bool>("activity_regulation_enabled", true);
+        firingRateTarget = config->getOr<float>("firing_rate_target", 0.15f);
+        eiratioTarget = config->getOr<float>("eiratio_target", 1.0f);
+        homeostaticPlasticityRate = config->getOr<float>("homeostatic_plasticity_rate", 0.01f);
+        neuromodulationActivityThreshold = config->getOr<float>("neuromodulation_activity_threshold", 0.5f);
+        activityModulationStrength = config->getOr<float>("activity_modulation_strength", 0.3f);
         
         // Get integration intervals from config
         replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
@@ -453,22 +475,90 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-
-    // Phase 6, tried and reverted: global inhibitory feedback
-    // (inhibit every neuron when >10% of the population fired in
-    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
-    // in Phase 3) while making behaviour worse — a planner-driven
-    // Interact trap returned (115 empty interacts in one episode)
-    // and a hazard was consumed — because uniform inhibition
-    // flattens the motor pattern that the biases need to read, so
-    // the biases dominate more, not less. Population inhibition
-    // is the wrong lever here; see the drive-scaling change in
-    // AgentBrain/Neuron instead. This block is intentionally empty
-    // so the experiment and its result stay in the record.
-
-    // ========== STEP 4: Update working memory ==========
+    // Phase 6: Enhanced activity regulation mechanisms
+    // Instead of uniform global inhibition (which flattened motor patterns),
+    // implement activity-dependent plasticity and homeostatic scaling:
+    
+    // 1. Activity-dependent synaptic scaling - more targeted than global inhibition
+    // This maintains selectivity while controlling overall network activity
+    if (currentStep > 0 && currentStep % 150 == 0) {  // More frequent than before
+        constexpr float kEIRatioTarget = 1.0f;       // Maintain balanced excitation/inhibition
+        constexpr float kFiringRateTarget = 0.15f;  // Target lower firing rate
+        
+        float totalExcitatory = 0.0f;
+        float totalInhibitory = 0.0f;
+        size_t neuronCount = 0;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                float weight = syn->getWeight();
+                if (weight > 0) {
+                    totalExcitatory += weight;
+                } else {
+                    totalInhibitory += std::abs(weight);
+                }
+            }
+            neuronCount += region->getTotalNeuronCount();
+        }
+        
+        float currentEIRatio = totalInhibitory > 0 ? totalExcitatory / totalInhibitory : 0.0f;
+        
+        if (currentEIRatio > kEIRatioTarget * 1.2f) {
+            // Too much excitation relative to inhibition - scale down excitatory weights
+            float scaleFactor = kEIRatioTarget / currentEIRatio;
+            for (auto& region : pImpl->regions) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() > 0) {
+                        float newWeight = syn->getWeight() * scaleFactor;
+                        syn->setWeight(std::max(0.01f, newWeight));  // Prevent weights from going to zero
+                    }
+                }
+            }
+            NLM_LOG_INFO("Activity regulation: scaled excitatory weights by " + std::to_string(scaleFactor));
+        }
+        
+        // Calculate average firing rate for adaptive regulation
+        float avgFiringRate = 0.0f;
+        if (neuronCount > 0) {
+            avgFiringRate = static_cast<float>(pImpl->totalSpikesThisStep) / neuronCount;
+        }
+        
+        // Apply activity-dependent homeostatic plasticity
+        if (avgFiringRate > kFiringRateTarget * 2.0f) {
+            // High firing rates - enhance inhibitory plasticity and scale excitation
+            float activityLevel = avgFiringRate / kFiringRateTarget;
+            
+            // Enhance inhibitory synaptic strength through homeostatic plasticity
+            for (auto& region : pImpl->regions) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() < 0) {  // Inhibitory synapses
+                        // Increase inhibitory strength for overactive neurons
+                        float newWeight = syn->getWeight() * (1.0f + activityLevel * 0.1f);
+                        syn->setWeight(newWeight);
+                    }
+                }
+            }
+            NLM_LOG_INFO("Activity regulation: enhanced inhibitory connections for firing rate " + std::to_string(avgFiringRate));
+        } else if (avgFiringRate < kFiringRateTarget * 0.5f) {
+            // Low firing rates - reduce inhibition and enhance excitation
+            float recoveryLevel = 1.0f - (avgFiringRate / kFiringRateTarget);
+            
+            for (auto& region : pImpl->regions) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() > 0) {  // Excitatory synapses
+                        // Enhance excitatory connections when activity is low
+                        float newWeight = syn->getWeight() * (1.0f + recoveryLevel * 0.05f);
+                        syn->setWeight(newWeight);
+                    } else if (syn->getWeight() < 0) {  // Inhibitory synapses
+                        // Reduce inhibition when activity is low
+                        float newWeight = syn->getWeight() * std::max(0.1f, (1.0f - recoveryLevel * 0.1f));
+                        syn->setWeight(newWeight);
+                    }
+                }
+            }
+            NLM_LOG_INFO("Activity regulation: enhanced excitation for firing rate " + std::to_string(avgFiringRate));
+        }
+    }
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }

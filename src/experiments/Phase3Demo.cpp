@@ -269,20 +269,24 @@ public:
             float rewardChange = last.totalReward - first.totalReward;
             float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
             
-            std::cout << "\nBehavioral change:\n";
+            std::cout << "\nBEHAVIORAL CHANGE ANALYSIS:\n";
             if (rewardChange > 0) {
-                std::cout << "  Reward INCREASED by " << rewardChange << " (positive learning)\n";
+                std::cout << "  ✓ REWARD INCREASED by " << rewardChange << " (positive learning)\n";
+                std::cout << "  The brain is successfully learning from experience!" << std::endl;
             } else if (rewardChange < -5) {
-                std::cout << "  Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
+                std::cout << "  ⚠ REWARD DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
+                std::cout << "  The brain may be exploring new strategies or experiencing temporary setbacks" << std::endl;
             }
             
             if (std::abs(actionChange) > 10) {
-                std::cout << "  Forward actions changed by " << actionChange << "\n";
+                std::cout << "  ✓ ACTION PATTERN CHANGED by " << actionChange << " (behavioral adaptation)\n";
+                std::cout << "  The brain's navigation strategy has evolved" << std::endl;
             }
             
             // Synapse change
             if (last.totalSynapses != first.totalSynapses) {
-                std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
+                std::cout << "  ✓ SYNAPTIC PLASTICITY: Synapses changed from " << first.totalSynapses << " to " << last.totalSynapses << "\n";
+                std::cout << "  The brain's connectivity is adapting through experience" << std::endl;
             }
         }
         
@@ -310,6 +314,15 @@ private:
         config->set("stdp_tau", 20.0f);
         config->set("synaptogenesis_rate", 0.0001f);
         config->set("pruning_rate", 0.00001f);
+        
+        // Enhanced activity regulation settings for better learning
+        config->set("activity_regulation_enabled", true);
+        config->set("firing_rate_target", 0.15f);
+        config->set("eiratio_target", 1.0f);
+        config->set("homeostatic_plasticity_rate", 0.01f);
+        config->set("structural_plasticity_rate", 0.0001f);
+        config->set("neuromodulation_activity_threshold", 0.5f);
+        config->set("activity_modulation_strength", 0.3f);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

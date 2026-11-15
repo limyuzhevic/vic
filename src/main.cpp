@@ -329,6 +329,26 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+    // Print help information
+    if (argc > 1 && (argv[1] == std::string("--help") || argv[1] == std::string("-h"))) {
+        std::cout << "\n=== NLM Command Line Options ===\n";
+        std::cout << "  -h, --help          Show this help message\n";
+        std::cout << "  --config=file      Load configuration from file (default: configs/default.cfg)\n";
+        std::cout << "  \n  Configuration Options:\n";
+        std::cout << "    activity_regulation_enabled=true|false (default: true)\n";
+        std::cout << "    firing_rate_target=value (default: 0.15)\n";
+        std::cout << "    eiratio_target=value (default: 1.0)\n";
+        std::cout << "    homeostatic_plasticity_rate=value (default: 0.01)\n";
+        std::cout << "    structural_plasticity_rate=value (default: 0.0001)\n";
+        std::cout << "    pruning_rate=value (default: 0.00001)\n";
+        std::cout << "  \n  Demo Options:\n";
+        std::cout << "    --demo=phase2|phase3|phase4|phase5|phase6    Select demo to run (default: phase2)\n";
+        std::cout << "    \n  Standard Options:\n";
+        std::cout << "    --help              Show help information\n";
+        std::cout << "\n";
+        return 0;
+    }
+    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
