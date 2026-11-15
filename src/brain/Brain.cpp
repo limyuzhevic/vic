@@ -344,6 +344,10 @@ void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
+void Brain::step(SimulationStep currentStep) {
+    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+}
+
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
@@ -366,14 +370,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Initialize step state
+    initializeStepState(currentStep, currentTime);
+    
+    // Execute the main simulation steps
+    executeCoreSimulationSteps(currentTime);
+    
+    // Execute memory and cognitive updates
+    executeMemoryAndCognitiveUpdates(currentTime);
+    
+    // Execute developmental and long-term updates
+    executeDevelopmentalUpdates(currentStep, currentTime);
+    
+    // Collect and log statistics
+    collectStepStatistics();
+}
+
+void Brain::initializeStepState(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+}
+
+void Brain::executeCoreSimulationSteps(Timestamp currentTime) {
+    // STEP 1: Process pending delayed spikes (deliver synaptic input)
+    pImpl->spikeSystem->processDelayedSpikes(pImpl->currentStep, pImpl->currentTime);
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    // STEP 2: Update all neurons (LIF dynamics)
+    updateNeuronMembranePotentials(currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // STEP 3: Detect spikes and schedule spike events
+    detectAndProcessSpikes();
+    
+    // Process immediate spikes
+    pImpl->spikeSystem->processSpikes(pImpl->currentStep);
+}
+
+void Brain::updateNeuronMembranePotentials(Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -381,99 +414,124 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+}
+
+void Brain::detectAndProcessSpikes() {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    // Phase 5 fix: the old activation was
-                    // |membrane - resting| / 10, but a neuron that just
-                    // spiked has membrane == reset, and reset == resting
-                    // for every neuron (Neuron::initializeRandom is never
-                    // called — only synaptic connectivity is randomized
-                    // — so all neurons keep the default -70/-70). The
-                    // stored activation was therefore always 0, and
-                    // decayWeakTraces removed every trace on the next
-                    // update, so working memory was permanently empty
-                    // (0 traces in every demo) despite hundreds of
-                    // spikes per step. A spike is itself the activation
-                    // event, so a just-fired neuron stores 1.0; the
-                    // existing decay then keeps it alive only while the
-                    // neuron keeps firing, which is the intended
-                    // working-memory behaviour.
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
-                    }
-                }
+                processNeuronSpiking(neuron, region.get());
             }
         }
     }
+}
+
+void Brain::processNeuronSpiking(Neuron* neuron, NeuralRegion* region) {
+    // Check if neuron just fired this step
+    const auto& state = neuron->getState();
+    bool justFired = (state.firingState == FiringState::Refractory &&
+                     state.lastSpikeTime >= 0.0f &&
+                     std::abs(static_cast<float>(pImpl->currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+
+    if (justFired) {
+        // Neuron fired this step - queue the spike
+        SpikeEvent event(neuron->getId(), pImpl->currentTime, pImpl->currentStep);
+        pImpl->spikeSystem->queueSpike(event);
+
+        // Record post-synaptic spike for incoming synapses (plasticity)
+        auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+        for (Synapse* syn : incomingSynapses) {
+            syn->recordPostSpike(pImpl->currentTime);
+        }
+
+        // Get outgoing synapses and schedule delayed spike events
+        auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+        for (Synapse* syn : outgoingSynapses) {
+            // Create delayed spike event
+            Delay delay = syn->getDelay();
+            SimulationStep deliveryStep = pImpl->currentStep + delay;
+            Timestamp deliveryTime = pImpl->currentTime + delay * pImpl->timestep;
+
+            DelayedSpikeEvent delayedEvent(
+                neuron->getId(),
+                syn->getDestinationNeuron(),
+                syn->getId(),
+                syn->getWeight(),
+                syn->getType(),
+                pImpl->currentTime,
+                deliveryTime,
+                pImpl->currentStep,
+                deliveryStep
+            );
+
+            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+
+            // Record pre-synaptic spike for plasticity
+            syn->recordPreSpike(pImpl->currentTime);
+        }
+        
+        // Store to working memory - neurons that fire become part of working memory
+        storeNeuronInWorkingMemory(neuron);
+    }
+}
+
+void Brain::storeNeuronInWorkingMemory(Neuron* neuron) {
+    // Phase 5 fix: the old activation was
+    // |membrane - resting| / 10, but a neuron that just
+    // spiked has membrane == reset, and reset == resting
+    // for every neuron (Neuron::initializeRandom is never
+    // called — only synaptic connectivity is randomized
+    // — so all neurons keep the default -70/-70). The
+    // stored activation was therefore always 0, and
+    // decayWeakTraces removed every trace on the next
+    // update, so working memory was permanently empty
+    // (0 traces in every demo) despite hundreds of
+    // spikes per step. A spike is itself the activation
+    // event, so a just-fired neuron stores 1.0; the
+    // existing decay then keeps it alive only while the
+    // neuron keeps firing, which is the intended
+    // working-memory behaviour.
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
+    }
+}
+
+void Brain::executeMemoryAndCognitiveUpdates(Timestamp currentTime) {
+    // STEP 4: Update working memory
+    updateWorkingMemory();
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    // STEP 5: Apply neuromodulation effects
+    applyNeuromodulationEffects(currentTime);
+    
+    // STEP 6: Apply plasticity rules
+    applyPlasticityRules();
+    
+    // STEP 7: Update episodic memory
+    updateEpisodicMemory();
+    
+    // STEP 8: Update prediction system
+    updatePredictionSystem();
+    
+    // STEP 9: Update attention system
+    updateAttentionSystem();
+    
+    // STEP 10: Update concept formation
+    updateConceptFormation();
+    
+    // STEP 11: Apply structural plasticity
+    applyStructuralPlasticity();
+    
+    // STEP 12: Replay important memories
+    replayImportantMemories();
+}
 
-    // Phase 6, tried and reverted: global inhibitory feedback
-    // (inhibit every neuron when >10% of the population fired in
-    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
-    // in Phase 3) while making behaviour worse — a planner-driven
-    // Interact trap returned (115 empty interacts in one episode)
-    // and a hazard was consumed — because uniform inhibition
-    // flattens the motor pattern that the biases need to read, so
-    // the biases dominate more, not less. Population inhibition
-    // is the wrong lever here; see the drive-scaling change in
-    // AgentBrain/Neuron instead. This block is intentionally empty
-    // so the experiment and its result stay in the record.
-
-    // ========== STEP 4: Update working memory ==========
+void Brain::updateWorkingMemory() {
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+}
+
+void Brain::applyNeuromodulationEffects(Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -481,7 +539,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                 pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, 
+                                 pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -505,8 +565,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+}
+
+void Brain::applyPlasticityRules() {
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -540,11 +601,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            syn->step(pImpl->currentTime);
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
+    // STEP 6b: Homeostatic synaptic scaling (Phase 4)
+    applyHomeostaticSynapticScaling();
+}
+
+void Brain::applyHomeostaticSynapticScaling() {
     // Every 100 steps, cap each neuron's total incoming excitatory
     // weight. STDP/Hebbian with soft bounds stop individual weights
     // saturating, but they do not stop the *sum* of ~25 incoming
@@ -559,7 +624,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
     // leak — below the ~15 mV spike gap, so a neuron must integrate
     // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
+    if (pImpl->currentStep > 0 && pImpl->currentStep % 100 == 0) {
         constexpr float kIncomingExcitatoryCap = 3.0f;
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
@@ -579,8 +644,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
+}
 
-    // ========== STEP 7: Update episodic memory ==========
+void Brain::updateEpisodicMemory() {
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -588,7 +654,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->episodicMemory) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
+            episode.timestamp = pImpl->currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             // Store active neurons
@@ -611,14 +677,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
-    
-    // ========== STEP 8: Update prediction system ==========
+}
+
+void Brain::updatePredictionSystem() {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
-    // ========== STEP 9: Update attention system ==========
+}
+
+void Brain::updateAttentionSystem() {
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -628,28 +696,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
-    // ========== STEP 10: Update concept formation ==========
+}
+
+void Brain::updateConceptFormation() {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+}
+
+void Brain::applyStructuralPlasticity() {
+    if (pImpl->currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+}
+
+void Brain::replayImportantMemories() {
+    if (pImpl->currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
+}
+
+void Brain::executeDevelopmentalUpdates(SimulationStep currentStep, Timestamp currentTime) {
+    // STEP 13: Apply development effects
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -679,16 +752,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // STEP 14: Periodic memory consolidation
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // STEP 15: Checkpoint management
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+}
+
+void Brain::collectStepStatistics() {
+    // Update total spike count
+    // Log step frequency if needed
+    // Any other step-specific statistics collection
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {

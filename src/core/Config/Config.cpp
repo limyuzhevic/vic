@@ -3,25 +3,191 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string configFormat; // Track the format for future operations
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Helper function to parse JSON values
+detail::ConfigValue jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int64_t>();
+    } else if (j.is_number_unsigned()) {
+        return j.get<uint64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // For now, handle simple arrays of numbers or strings
+        if (j.empty()) return std::vector<int>{};
+        
+        // Check if it's an array of numbers
+        bool allNumbers = true;
+        bool allStrings = true;
+        for (const auto& item : j) {
+            if (item.is_number()) allStrings = false;
+            if (item.is_string()) allNumbers = false;
+        }
+        
+        if (allNumbers) {
+            std::vector<double> result;
+            result.reserve(j.size());
+            for (const auto& item : j) {
+                result.push_back(item.get<double>());
+            }
+            return result;
+        } else if (allStrings) {
+            std::vector<std::string> result;
+            result.reserve(j.size());
+            for (const auto& item : j) {
+                result.push_back(item.get<std::string>());
+            }
+            return result;
+        }
+    }
+    
+    // Default to empty string for unknown types
+    return std::string();
+}
 
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
+// Helper function to parse YAML values
+ConfigValue yamlToConfigValue(const YAML::Node& node) {
+    if (node.IsScalar()) {
+        std::string value = node.Scalar();
+        // Try to parse as boolean
+        if (value == "true" || value == "false") {
+            return value == "true";
+        }
+        // Try to parse as integer
+        try {
+            if (value.find('.') == std::string::npos) {
+                int64_t intVal = std::stoll(value);
+                return intVal;
+            }
+        } catch (...) {}
+        // Try to parse as float
+        try {
+            double floatVal = std::stod(value);
+            return floatVal;
+        } catch (...) {}
+        return value;
+    } else if (node.IsSequence()) {
+        // Handle arrays
+        if (node.size() == 0) return std::vector<double>{};
+        
+        // Determine if array contains numbers or strings
+        bool allNumbers = true;
+        bool allStrings = true;
+        for (const auto& item : node) {
+            if (item.IsScalar()) {
+                std::string val = item.Scalar();
+                // Check if it looks like a number
+                bool looksLikeNumber = true;
+                for (char c : val) {
+                    if (!std::isdigit(c) && c != '.' && c != '-' && c != 'e' && c != 'E') {
+                        looksLikeNumber = false;
+                        break;
+                    }
+                }
+                if (looksLikeNumber) {
+                    allStrings = false;
+                } else {
+                    allNumbers = false;
+                }
+            }
+        }
+        
+        if (allNumbers) {
+            std::vector<double> result;
+            result.reserve(node.size());
+            for (const auto& item : node) {
+                result.push_back(std::stod(item.Scalar()));
+            }
+            return result;
+        } else if (allStrings) {
+            std::vector<std::string> result;
+            result.reserve(node.size());
+            for (const auto& item : node) {
+                result.push_back(item.Scalar());
+            }
+            return result;
+        }
+    }
+    
+    return std::string();
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format by extension
+    std::string extension = std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
+    bool success = false;
+    if (extension == ".json" || extension == ".json5" || extension == ".jsonc") {
+        success = loadFromJSON(filepath);
+        pImpl->configFormat = "JSON";
+    } else if (extension == ".yaml" || extension == ".yml") {
+        success = loadFromYAML(filepath);
+        pImpl->configFormat = "YAML";
+    } else {
+        // Default to simple key=value format for backward compatibility
+        success = loadFromSimpleFormat(filepath);
+        pImpl->configFormat = "simple";
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Recursively parse JSON
+        parseJSONToConfig(j, "");
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Recursively parse YAML
+        parseYAMLToConfig(doc, "");
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    // Original simple format implementation for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +209,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -55,184 +221,152 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
+void Config::parseJSONToConfig(const nlohmann::json& j, const std::string& prefix) {
+    if (j.is_object()) {
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = prefix.empty() ? it.key() : (prefix + "." + it.key());
+            parseJSONToConfig(*it, key);
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+    } else {
+        // Store the value
+        set(keyToConfigKey(prefix), jsonToConfigValue(j), ConfigSource::File);
     }
-    return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+void Config::parseYAMLToConfig(const YAML::Node& node, const std::string& prefix) {
+    if (node.IsMap()) {
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::string key = prefix.empty() ? it->first.as<std::string>() : 
+                                     (prefix + "." + it->first.as<std::string>());
+            parseYAMLToConfig(*it, key);
+        }
+    } else {
+        // Store the value
+        set(keyToConfigKey(prefix), yamlToConfigValue(node), ConfigSource::File);
+    }
+}
+
+std::string Config::keyToConfigKey(const std::string& key) {
+    // Convert dotted notation to a string suitable for config keys
+    // For example, "brain.synapse.weight" becomes "brain.synapse.weight"
+    return key;
+}
+
+bool Config::validate(const std::vector<ConfigValidationRule>& rules) const {
+    std::vector<std::string> errors;
+    
+    for (const auto& rule : rules) {
+        if (!has(rule.key)) {
+            errors.push_back("Configuration key '" + rule.key + "' not found");
+        } else {
+            auto value = get(rule.key);
+            if (!value) {
+                errors.push_back("Configuration key '" + rule.key + "' has invalid type");
+            } else if (!rule.validator(*value)) {
+                errors.push_back("Configuration key '" + rule.key + "' fails validation");
+            }
+        }
+    }
+    
+    if (!errors.empty()) {
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : errors) {
+            NLM_LOG_ERROR("  - " + error);
+        }
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
+    NLM_LOG_INFO("Configuration validation passed");
     return true;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+bool Config::validate(const std::string& key, std::function<bool(const ConfigValue&)> validator) const {
+    if (!has(key)) {
+        NLM_LOG_ERROR("Configuration validation failed: key '" + key + "' not found");
+        return false;
+    }
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    auto value = get(key);
+    if (!value) {
+        NLM_LOG_ERROR("Configuration validation failed: key '" + key + "' has invalid type");
+        return false;
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int64_t value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    if (!validator(*value)) {
+        NLM_LOG_ERROR("Configuration validation failed: key '" + key + "' fails validation");
+        return false;
     }
-    return keys;
+    
+    NLM_LOG_INFO("Configuration validation passed for key: '" + key + "'");
+    return true;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                                 std::is_same_v<T, std::vector<double>> ||
-                                 std::is_same_v<T, std::vector<std::string>>) {
-                oss << "[";
-                for (size_t i = 0; i < arg.size(); ++i) {
-                    if (i) oss << ", ";
-                    oss << arg[i];
-                }
-                oss << "]";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+bool Config::validateRange(const std::string& key, double min, double max) const {
+    return validate(key, [min, max](const ConfigValue& value) {
+        if (std::holds_alternative<int64_t>(value)) {
+            return static_cast<double>(std::get<int64_t>(value)) >= min && 
+                   static_cast<double>(std::get<int64_t>(value)) <= max;
+        } else if (std::holds_alternative<double>(value)) {
+            return std::get<double>(value) >= min && std::get<double>(value) <= max;
+        } else if (std::holds_alternative<float>(value)) {
+            return static_cast<double>(std::get<float>(value)) >= min && 
+                   static_cast<double>(std::get<float>(value)) <= max;
         }
-    }, it->value);
+        return false;
+    });
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+bool Config::validatePositive(const std::string& key) const {
+    return validate(key, [](const ConfigValue& value) {
+        if (std::holds_alternative<int64_t>(value)) {
+            return std::get<int64_t>(value) > 0;
+        } else if (std::holds_alternative<uint64_t>(value)) {
+            return std::get<uint64_t>(value) > 0;
+        } else if (std::holds_alternative<double>(value)) {
+            return std::get<double>(value) > 0;
+        } else if (std::holds_alternative<float>(value)) {
+            return std::get<float>(value) > 0;
+        }
+        return false;
+    });
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::validateNonNegative(const std::string& key) const {
+    return validate(key, [](const ConfigValue& value) {
+        if (std::holds_alternative<int64_t>(value)) {
+            return std::get<int64_t>(value) >= 0;
+        } else if (std::holds_alternative<uint64_t>(value)) {
+            return std::get<uint64_t>(value) >= 0;
+        } else if (std::holds_alternative<double>(value)) {
+            return std::get<double>(value) >= 0;
+        } else if (std::holds_alternative<float>(value)) {
+            return std::get<float>(value) >= 0;
+        }
+        return false;
+    });
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::validateProbability(const std::string& key) const {
+    return validate(key, [](const ConfigValue& value) {
+        if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            return val >= 0.0 && val <= 1.0;
+        } else if (std::holds_alternative<float>(value)) {
+            float val = std::get<float>(value);
+            return val >= 0.0f && val <= 1.0f;
+        }
+        return false;
+    });
+}
+
+std::string Config::getFormat() const {
+    return pImpl->configFormat;
+}
+
+Config::ValidationRule::ValidationRule(std::string k, std::function<bool(const ConfigValue&)> v)
+    : key(std::move(k)), validator(std::move(v)) {}
+
+Config::ConfigValidationRule::ConfigValidationRule(std::string k, std::function<bool(const ConfigValue&)> v)
+    : key(std::move(k)), validator(std::move(v)) {}
 
 } // namespace nlm

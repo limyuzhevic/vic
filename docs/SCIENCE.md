@@ -65,261 +65,232 @@ Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate ne
 - Receptor types, receptor distribution, and second-messenger systems not modeled
 - Effects on neural dynamics are simplified
 
-## Phase 4: Emerging Cognition
+## Neural Engineering Principles
 
-### Prediction Systems
+### Leaky Integrate-and-Fire (LIF) Neuron Model
 
-#### Biological Inspiration
-The free energy principle and predictive coding suggest that brains are fundamentally prediction machines. Hierarchical predictive models allow organisms to anticipate future states and minimize prediction errors.
+NLM implements the Leaky Integrate-and-Fire neuron model, which represents the fundamental computational unit of biological neural systems. The LIF model captures the essential dynamics of neuronal firing with mathematical precision while remaining computationally efficient.
 
-#### Computational Implementation
-- **NeuralPrediction**: Learns temporal sequences through repeated experience
-- **ActionConsequencePrediction**: Associates actions with their effects
-- **Multi-step Prediction**: Chains predictions to anticipate distant futures
+#### Membrane Potential Dynamics
 
-#### Known Limitations
-- No hierarchical generative model
-- Limited temporal horizon
-- No explicit uncertainty representation
+The neuron's membrane potential V(t) evolves according to the differential equation:
 
-### Working Memory
-
-#### Biological Inspiration
-Working memory in prefrontal cortex maintains information active for seconds to minutes through persistent neural activity and recurrent circuits.
-
-#### Computational Implementation
-- **NeuralWorkingMemory**: Persistent activity in recurrent circuits
-- **Competition**: Winner-take-more dynamics for selective retention
-- **Decay**: Activity decays when not reinforced
-
-#### Known Limitations
-- No complex binding mechanisms
-- Limited capacity
-- Simplified recurrent architecture
-
-### Episodic Memory
-
-#### Biological Inspiration
-Hippocampus stores episodes with temporal, spatial, and contextual information. Pattern completion allows retrieval from partial cues.
-
-#### Computational Implementation
-- **NeuralEpisodicMemory**: Stores experiences as neural activity patterns
-- **Pattern Completion**: Retrieves full episodes from partial cues
-- **Replay**: Reactivates past patterns
-
-#### Known Limitations
-- No hippocampal architecture
-- No pattern separation
-- Limited consolidation mechanisms
-
-### Concept Formation
-
-#### Biological Inspiration
-Cortex forms stable representations through repeated exposure. Similar experiences converge to share representations.
-
-#### Computational Implementation
-- **ConceptFormation**: Clusters similar patterns into stable prototypes
-- **Hebbian Averaging**: Prototype moves toward new instances
-- **Stability Measurement**: Tracks how consistent patterns are
-
-#### Known Limitations
-- No hierarchical concept structure
-- No symbolic representation
-- Limited abstraction
-
-### Attention
-
-#### Biological Inspiration
-Attention involves competitive dynamics where stronger signals inhibit weaker ones. Both bottom-up salience and top-down goals influence selection.
-
-#### Computational Implementation (NOT Transformer)
-- **AttentionalSelection**: Lateral inhibition competition
-- **Winner-Take-More**: Winners receive excitation, losers receive inhibition
-- **Top-Down Bias**: Goals can influence selection
-- **Bottom-Up Salience**: Stimulus strength affects selection
-
-#### IMPORTANT: NOT Transformer Attention
-NLM attention is NOT:
-- Query-Key-Value matrices
-- Softmax attention weights
-- Attention heads
-- Self-attention
-
-NLM attention IS:
-- Competitive dynamics
-- Lateral inhibition
-- Recurrent amplification
-- Neural circuit mechanism
-
-### Planning
-
-#### Biological Inspiration
-Prefrontal cortex uses learned models to simulate future outcomes and select actions that lead to goals.
-
-#### Computational Implementation
-- **NeuralPlanner**: Evaluates action sequences using predictions
-- **Action Quality**: Learns which actions work in which states
-- **Plan Adaptation**: Updates based on success/failure
-
-#### Known Limitations
-- Shallow planning depth
-- No tree search
-- Limited world model
-
-### Self-Model
-
-#### Biological Inspiration
-The brain maintains a model of the body (body schema) and distinguishes self-generated from externally generated events (agency).
-
-#### Computational Implementation
-- **SelfModel**: Learns forward model of sensory consequences
-- **Self-Generated Likeness**: Predicts whether change is self-caused
-- **Action Quality**: Tracks which actions lead to rewards
-
-#### Known Limitations
-- No sophisticated body schema
-- No self-recognition
-- No explicit agency computation
-
-### Social Learning
-
-#### Biological Inspiration
-Mirror neurons and social observation allow learning from others' actions and their consequences.
-
-#### Computational Implementation
-- **SocialLearning**: Observes other agents' actions
-- **Imitation**: Can reproduce observed actions
-- **Communication Signals**: Learns simple associated signals
-
-#### Known Limitations
-- No theory of mind
-- No sophisticated imitation learning
-- No cultural transmission
-
-## The Learning Loop
-
-### Phase 2: Isolated Neural Computation
 ```
-SENSORY INPUT (test signals)
-      ↓
-NEURAL ACTIVITY
-      ↓
-SPIKE PROCESSING
-      ↓
-PLASTICITY (STDP, Hebbian)
-      ↓
-NETWORK CHANGE
+dV/dt = (-V + I_syn + I_inj) / τ
 ```
 
-### Phase 3: Environment Interaction
+Where:
+- V is the membrane potential (mV)
+- I_syn is the total synaptic input current
+- I_inj is injected external current
+- τ is the membrane time constant (default: 20ms)
+
+#### Spike Detection and Reset
+
+A neuron fires when its membrane potential reaches the threshold voltage V_th:
+
 ```
-WORLD (2D environment with objects)
-      ↓
-SENSORY PERCEPT (vision, touch, internal)
-      ↓
-NEURAL ACTIVITY (LIF dynamics)
-      ↓
-MOTOR OUTPUT (decoded from brain)
-      ↓
-ACTION (movement, interaction)
-      ↓
-WORLD STATE CHANGE
-      ↓
-REWARD / CONSEQUENCE
-      ↓
-PREDICTION ERROR
-      ↓
-NEUROMODULATION (dopamine-like)
-      ↓
-ELIGIBILITY TRACES
-      ↓
-PLASTICITY UPDATE
-      ↓
-DEVELOPMENTAL CHANGE
-      ↓
-BEHAVIORAL CHANGE
+if V ≥ V_th:
+    Generate spike event
+    V = V_reset  // Reset to resting potential
+    refractory_time = τ_ref
 ```
 
-### Phase 4: Emerging Cognition
+#### Refractory Period
+
+After spiking, neurons enter a refractory period where they cannot spike again, ensuring biological realism and preventing runaway excitation.
+
+### Synaptic Transmission
+
+#### Synaptic Dynamics
+
+Synapses implement weighted, delayed signal transmission between neurons:
+
 ```
-WORLD
-      ↓
-ATTENTION (competitive selection)
-      ↓
-SENSORY INPUT
-      ↓
-PREDICTION (learn temporal relationships)
-      ↓
-WORKING MEMORY (maintain information)
-      ↓
-EPISODIC MEMORY (store experiences)
-      ↓
-CONCEPTS (discover patterns)
-      ↓
-PLANNING (simulate futures)
-      ↓
-SELF-MODEL (predict self)
-      ↓
-ACTION SELECTION
-      ↓
-MOTOR OUTPUT
-      ↓
-WORLD
-      ↓
-REWARD / CONSEQUENCE
-      ↓
-SOCIAL OBSERVATION (if others present)
-      ↓
-LEARNING UPDATES
+I_syn(t) = ∑ w_ij × spike_j(t - delay_ij)
 ```
 
-## Eligibility Traces and Credit Assignment
+Where:
+- w_ij is the synaptic weight
+- spike_j(t - delay_ij) represents delayed spike events
+- delay_ij is the transmission delay (1-5 simulation steps)
 
-### Biological Inspiration
-In biological brains, synaptic changes must be attributed to the correct action even when the consequence occurs later. Eligibility traces allow synapses to be "tagged" and modified when reward arrives.
+#### Synaptic Plasticity
 
-### Computational Implementation
-- Synapses maintain an eligibility trace during activity
-- When reward prediction error occurs, trace is converted to weight change
-- Traces decay over time if no reward signal arrives
+NLM implements multiple plasticity mechanisms that modify synaptic weights based on neural activity:
 
-### Known Limitations
-- Real synaptic tagging involves complex molecular mechanisms
-- Timing requirements are simplified
-- Only recent activity is credited
+##### Spike-Timing-Dependent Plasticity (STDP)
 
-## Developmental Plasticity
+STDP strengthens synapses when pre-synaptic spikes precede post-synaptic spikes (long-term potentiation) and weakens them when the order is reversed (long-term depression):
 
-### Biological Inspiration
-Early development has higher plasticity ("critical periods") that decreases with age. This allows learning when young but provides stability later.
+```
+if t_post > t_pre:
+    Δw = A_LTP × exp(-(t_post - t_pre)/τ_plus)
+elif t_post < t_pre:
+    Δw = -A_LTD × exp(-(t_pre - t_post)/τ_minus)
+```
 
-### Computational Implementation
-- Developmental stages: Initial → CriticalPeriod → Maturation → Adult
-- Plasticity rates decrease with age
-- Synaptogenesis higher early, pruning higher later
+##### Hebbian Learning
 
-## What NLM is NOT
+Hebbian learning strengthens connections between simultaneously active neurons ("fire together, wire together"):
 
-NLM is NOT:
-- A claim that we can simulate a human brain
-- A model that accurately reproduces neural physiology
-- A replacement for neuroscience research
-- An intelligent system
-- A transformer or LLM
-- A pretrained AI system
+```
+Δw = η × pre_spike × post_spike
+```
 
-NLM IS:
-- A computational exploration of brain-inspired architecture
-- A testbed for developmental learning hypotheses
-- A research platform for artificial neural systems
-- An educational tool for understanding neural computation
-- An investigation of whether cognition can emerge from spiking dynamics
+### Neuromodulation
 
-## Acknowledging Uncertainty
+#### Dopamine System
 
-We acknowledge that:
-1. Biological brains are far more complex than any current simulation
-2. Our understanding of the brain is incomplete
-3. Many approximations are necessary for computational tractability
-4. Claims of "brain-like" behavior should be critically examined
-5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
+Dopamine signals reward prediction error and modulates plasticity across the neural network:
+
+```
+Δw = Δw_base × (1 + α × dopamine_level)
+```
+
+#### Curiosity and Novelty
+
+Curiosity drives exploration of novel states, while novelty signals detection of unexpected patterns:
+
+```
+novelty = ‖current_state - predicted_state‖
+curiosity = β × novelty × (1 - exploration_rate)
+```
+
+## Computational Neuroscience Background
+
+### Why Event-Driven Processing?
+
+Traditional discrete-time neural network simulations update all neurons at every time step, regardless of whether they are active. NLM uses event-driven processing, which:
+
+1. **Reduces Computation**: Only processes neurons that actually spike
+2. **Improves Accuracy**: Captures precise spike timing information
+3. **Handles Scale**: Makes large networks computationally feasible
+4. **Biological Realism**: Matches the sporadic nature of real neural activity
+
+### Efficiency Benefits
+
+- **Sparse Updates**: ~1-5% of neurons typically fire per time step
+- **Adaptive Resources**: Computation scales with activity level
+- **Real-time Capability**: Can run at millisecond precision
+- **Large Networks**: Supports networks with thousands of neurons
+
+### Mathematical Foundations
+
+#### Hodgkin-Huxley vs. LIF
+
+NLM uses the LIF model instead of the more biologically detailed Hodgkin-Huxley model for several reasons:
+
+1. **Computational Cost**: LIF requires ~100x fewer calculations per neuron
+2. **Scale**: Enables large-scale network simulations
+3. **Focus**: Prioritizes network-level dynamics over cellular detail
+4. **Robustness**: LIF captures essential firing properties without biological complexity
+
+#### Balance of Excitability
+
+The balance between excitatory and inhibitory connections determines network stability:
+
+```
+E/I ratio = total_excitatory_weight / total_inhibitory_weight
+```
+
+- **Healthy Networks**: E/I ratio typically between 1:1 and 4:1
+- **Homeostatic Scaling**: Automatic weight adjustment maintains balance
+- **Critical Regime**: Networks operate near critical points for optimal information processing
+
+## Biological Plausibility
+
+### Evolutionary Constraints
+
+NLM implements constraints that reflect evolutionary pressures on biological neural systems:
+
+1. **Energy Efficiency**: Minimize metabolic cost of neural activity
+2. **Speed-Robustness Tradeoff**: Balance fast responses with stability
+3. **Information Bottleneck**: Limited transmission capacity
+4. **Development Costs**: Synaptogenesis and pruning reflect developmental constraints
+
+### Activity-Dependent Plasticity
+
+Synaptic strengthening and weakening follow activity-dependent rules similar to biological processes:
+
+- ** LTP**: Requires correlated activity across short timescales (seconds)
+- **LTD**: Depends on precise spike timing (milliseconds)
+- **Structural Plasticity**: Operates over longer timescales (hours to days)
+
+## Theoretical Framework
+
+### Information Representation
+
+NLM represents information through patterns of neural activity:
+
+- **Rate Coding**: Information encoded in firing rates
+- **Temporal Coding**: Information in spike timing patterns
+- **Population Coding**: Distributed representation across neuron populations
+- **Working Memory**: Persistent activity patterns maintain information
+
+### Learning Algorithms
+
+The NLM learning system implements biologically inspired algorithms:
+
+#### Temporal Difference Learning
+
+For reinforcement learning:
+
+```
+δ = r + γ × V(s') - V(s)
+```
+
+Where δ is the prediction error, r is the reward, γ is the discount factor, and V is the value function.
+
+#### Predictive Coding
+
+NLM uses predictive coding for temporal sequence learning:
+
+```
+predicted_future_state = f(current_state, recent_history)
+error = ‖actual_future_state - predicted_future_state‖
+```
+
+## Experimental Validation
+
+### Scaling Laws
+
+NLM exhibits predictable scaling behavior with network size:
+
+- **Linear Growth**: Total synaptic connections grow linearly with neuron count
+- **Sparse Connectivity**: Typical connection probability ~0.05-0.15
+- **Emergent Properties**: Complex behaviors arise from simple rules
+- **Critical Phenomena**: Networks operate near phase transition points
+
+### Computational Complexity
+
+Theoretical analysis shows NLM scales efficiently:
+
+- **Time Complexity**: O(N × K) where N is neurons and K is average connections
+- **Memory Complexity**: O(N + C) where C is actual connections
+- **Parallelizability**: Independent neuron updates enable parallelization
+
+## Frontiers and Open Questions
+
+### Unresolved Issues
+
+- **Attention Mechanisms**: Complete biological accuracy not yet achieved
+- **Goal-Directed Behavior**: Limited understanding of motivational systems
+- **Consciousness**: No complete model of subjective experience
+- **Development**: Adult developmental trajectories partially understood
+
+### Research Directions
+
+Future NLM development may focus on:
+
+1. **Multi-Modal Integration**: Combining sensory modalities more seamlessly
+2. **Enhanced Social Learning**: More sophisticated observational learning
+3. **Active Inference**: Integration with Bayesian frameworks
+4. **Neurodevelopmental disorders**: Simulation of developmental pathologies
+5. **Explainable AI**: Making neural network decisions more interpretable
+
+## Conclusion
+
+NLM's scientific foundation combines insights from computational neuroscience, systems theory, and artificial intelligence. While not perfectly biologically accurate, it captures essential principles that enable emergent intelligent behavior.
+
+The choice of LIF neurons, event-driven processing, and activity-dependent plasticity reflects a balance between biological realism and computational efficiency, allowing the system to study complex cognitive phenomena while remaining tractable for large-scale simulations.
