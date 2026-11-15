@@ -173,6 +173,12 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
+# Advanced Phase 6 demo executable
+add_executable(advanced_phase6_demo
+    src/experiments/AdvancedPhase6Demo.cpp
+)
+target_link_libraries(advanced_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlm_phase3 nlm_phase5)
+
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
