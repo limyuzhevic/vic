@@ -32,25 +32,112 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add timestamp with milliseconds for better debugging
+    auto time = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(time);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time.time_since_epoch() % std::chrono::seconds(1)
+    );
+    oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    
+    // Add thread ID for better debugging in multi-threaded environments
+    oss << " [tid:" << std::this_thread::get_id() << "] ";
+    
+    // Add file and line number if available
+    if (!entry.file.empty()) {
+        oss << "(" << entry.file << ":" << entry.line << ")";
+    }
     
     oss << " " << entry.message;
     
+    // Add function name if available (for better stack traces)
+    if (!entry.function.empty()) {
+        oss << " [" << entry.function << "]";
+    }
+    
     std::string output = oss.str();
     
-    // Console output
+    // Console output with better formatting
     if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        std::cout << levelToColor(entry.level) << output << "\033[0m" << std::endl;
     } else {
-        std::cout << output << "\n";
+        std::cout << output << std::endl;
     }
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
+        pImpl->fileOut << output << std::endl;
         pImpl->fileOut.flush();
+    }
+}
+
+// Enhanced log method with more context
+void ConsoleLogger::logWithContext(const LogEntry& entry, const std::string& context) {
+    if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    std::ostringstream oss;
+    oss << "[" << levelToString(entry.level) indigo "] ";
+    
+    // Add timestamp with microseconds for precision debugging
+    auto time = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(time);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time.time_since_epoch() % std::chrono::seconds(1)
+    );
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+        time.time_since_epoch() % std::chrono::seconds(1)
+    ) % 1000;
+    
+    oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count()
+        << "." << std::setfill('0') << std::setw(3) << us.count();
+    
+    // Add thread ID for debugging
+    oss << " [tid:" << std::this_thread::get_id() << "] ";
+    
+    // Add context prefix if provided
+    if (!context.empty()) {
+        oss << "[" << context << "] ";
+    }
+    
+    // Add file and line number
+    if (!entry.file.empty()) {
+        oss << "(" << entry.file << ":" << entry.line << ")";
+    }
+    
+    oss << " " << entry.message;
+    
+    if (!entry.function.empty()) {
+        oss << " [" << entry.function << "]";
+    }
+    
+    std::string output = oss.str();
+    
+    if (pImpl->useColors) {
+        std::cout << levelToColor(entry.level) << output << "\033[0m" << std::endl;
+    } else {
+        std::cout << output << std::endl;
+    }
+    
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut << output << std::endl;
+        pImpl->fileOut.flush();
+    }
+}
+
+// New method to enable structured logging with different formats
+void ConsoleLogger::enableStructuredLogging(bool enable, const std::string& format) {
+    if (enable) {
+        pImpl->useColors = false; // Disable colors for structured output
+        // Store format string for future use
+        // This could be expanded to support JSON, XML, etc.
+    } else {
+        pImpl->useColors = true;
     }
 }
 

@@ -325,32 +325,91 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+    // Phase 6: Better command-line argument parsing with more options
+    if (argc > 1) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle various command-line options
+            if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile = argv[++i];
+                }
+            }
+            // Phase 6: New options for enhanced debugging and performance
+            else if (arg == "--verbose" || arg == "-v") {
+                Logger::getGlobal().setLevel(LogLevel::Debug);
+                NLM_LOG_INFO("Verbose logging enabled");
+            }
+            else if (arg == "--silent" || arg == "-s") {
+                Logger::getGlobal().setLevel(LogLevel::Error);
+                NLM_LOG_INFO("Silent mode enabled (only errors)");
+            }
+            else if (arg == "--benchmark" || arg == "-b") {
+                NLM_LOG_INFO("Benchmark mode enabled - collecting performance metrics");
+                // Enable timing and performance measurements
+                enableBenchmark = true;
+            }
+            else if (arg == "--help" || arg == "-h") {
+                printHelpAndExit();
+            }
+            else if (arg == "--experiment" || arg == "-e") {
+                if (i + 1 < argc) {
+                    experimentType = argv[++i];
+                    NLM_LOG_INFO("Selected experiment type: " + experimentType);
+                }
+            }
+            else if (arg.substr(0, 9) == "--neuron=") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    config->set("neuron_count", std::stoll(value), ConfigSource::CommandLine);
+                }
+            }
+            else if (arg.substr(0, 10) == "--region=") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    config->set("region_count", std::stoll(value), ConfigSource::CommandLine);
+                }
+            }
+            else if (arg.substr(0, 16) == "--connection=") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    config->set("connection_probability", std::stof(value), ConfigSource::CommandLine);
+                }
+            }
+            else if (arg.substr(0, 13) == "--seed=") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    config->set("random_seed", std::stoll(value), ConfigSource::CommandLine);
+                }
+            }
+            else if (arg.substr(0, 15) == "--timestep=") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    config->set("simulation_timestep", std::stod(value), ConfigSource::CommandLine);
+                }
+            }
+            // Handle --key value format for simple options
+            else if (arg[0] == '-' && arg.length() > 1) {
+                std::string key = arg.substr(1);
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    std::string value = argv[++i];
+                    config->set(key, value, ConfigSource::CommandLine);
+                }
+            }
+            else {
+                // Pass through as experiment argument or unknown argument
+                experimentArgs.push_back(arg);
             }
         }
     }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -432,4 +491,50 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// New helper function to print help and exit
+void printHelpAndExit() {
+    printBanner();
+    std::cout << "\n=== NLM Phase 2 Command Line Options ===\n\n";
+    std::cout << "Basic Usage:\n";
+    std::cout << "  ./nlm                           Run standard Phase 2 tests\n";
+    std::cout << "  ./nlm --config file.cfg        Load custom configuration\n\n";
+    
+    std::cout << "Configuration Options:\n";
+    std::cout << "  --neuron=<count>              Set number of neurons (default: 500)\n";
+    std::cout << "  --region=<count>              Set number of regions (default: 1)\n";
+    std::cout << "  --connection=<prob>           Set connection probability (default: 0.15)\n";
+    std::cout << "  --seed=<num>                  Set random seed (default: 42)\n";
+    std::cout << "  --timestep=<ms>               Set simulation timestep (default: 0.001)\n\n";
+    
+    std::cout << "Debug and Verbosity:\n";
+    std::cout << "  --verbose, -v                  Enable verbose debug logging\n";
+    std::cout << "  --silent, -s                  Only show errors\n";
+    std::cout << "  --benchmark, -b               Run benchmark tests\n\n";
+    
+    std::cout << "Experiment Control:\n";
+    std::cout << "  --experiment connectivity      Run basic connectivity test\n";
+    std::cout << "  --experiment plasticity        Run plasticity learning experiment\n";
+    std::cout << "  --experiment stdp              Run STDP verification\n";
+    std::cout << "  --experiment all               Run all experiments\n\n";
+    
+    std::cout << "=== General Tips ===\n\n";
+    std::cout << "For best results:\n";
+    std::cout << "  1. Always call initialize() before any step() operations\n";
+    std::cout << "  2. Use reset() between experiments to avoid state contamination\n";
+    std::cout << "  3. Monitor firing rates to ensure neurons are active\n";
+    std::cout << "  4. Check logs for any error messages\n\n";
+    
+    std::cout << "Memory usage grows with neurons and synapses - monitor system resources!\n";
+    
+    std::cout << "\nFor documentation and examples, see:\n";
+    std::cout << "  easy_usage.md           - Quick start guide\n";
+    std::cout << "  HOW_TO_USE.md           - Complete usage documentation\n";
+    std::cout << "  docs/ARCHITECTURE.md    - System architecture\n";
+    std::cout << "  docs/SCIENCE.md         - Scientific background\n\n";
+    
+    std::cout << "Enjoy exploring the NLM brain simulator!\n";
+    
+    exit(0);
 }

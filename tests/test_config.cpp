@@ -84,6 +84,21 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigJSONSupport();
+}
+
+void testConfigJSONSupport() {
+    nlm::Config config;
+    
+    // Test that config can load simple files (Phase 1 format)
+    // This is the current limitation - config.loadFromFile() 
+    // only supports simple key=value format, not JSON as documented
+    std::string testContent = "# Test config\nint_value = 42\ndouble_value = 3.14\nstring_value = \"hello\"\nbool_value = true\n";
+    
+    // For now, we can't test JSON loading since it's not implemented
+    // This is documented as a TODO in Config.cpp line 22
+    
+    std::cout << "    testConfigJSONSupport SKIPPED (JSON parsing not yet implemented)" << std::endl;
 }
 
 } // namespace test_config

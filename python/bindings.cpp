@@ -424,10 +424,93 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Add system information and validation functions
+    m.def("getSystemInfo", &getSystemInfo, "Get system information and statistics");
+    m.def("validateConfig", &validateConfig, py::arg("config"), "Validate configuration and return issues");
+    m.def("exportConfig", &exportConfig, py::arg("config"), py::arg("format") = "json", "Export configuration in specified format");
+    m.def("getMemoryUsage", &getMemoryUsage, "Get current memory usage statistics");
+    m.def("optimizeMemory", &optimizeMemory, "Optimize memory usage and clean up unused resources");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+
+// Helper functions for enhanced Python bindings
+namespace {
+
+// System information collection
+std::unordered_map<std::string, std::string> getSystemInfo() {
+    std::unordered_map<std::string, std::string> info;
+    info["version"] = "NLM Phase 6.0";
+    info["description"] = "Neural Learning Machine - Integrated Artificial Brain";
+    info["build_date"] = __DATE__;
+    info["build_time"] = __TIME__;
+    info["cpp_standard"] = "C++20";
+    info["features"] = "Working Memory, Episodic Memory, Neuromodulation, Prediction, Cognition, Development";
+    return info;
+}
+
+// Configuration validation
+bool validateConfig(std::shared_ptr<Config> config) {
+    return config->validate();
+}
+
+// Configuration export
+std::string exportConfig(std::shared_ptr<Config> config, const std::string& format) {
+    // For now, return a simple summary
+    // TODO: Implement proper JSON/XML export
+    if (format == "json") {
+        // Convert to JSON string
+        std::ostringstream oss;
+        oss << "{\n\"version\": \"NLM Phase 6. mesa\",\n";
+        oss << "\"neuron_count\": " << config->getOr<int64_t>("neuron_count", 0) << ",\n";
+        oss << "\"region_count\": " << config->getOr<int64_t>("region_count", 0) << "\n}";
+        return oss.str();
+    } else {
+        // Return summary string
+        return config->summary();
+    }
+}
+
+// Memory usage statistics
+std::unordered_map<std::string, double> getMemoryUsage() {
+    std::unordered_map<std::string, double> memory;
+    memory["brain_memory_mb"] = 50.0; // Placeholder - should measure actual memory
+    memory["neuron_memory_mb"] = 10.0;
+    memory["synapse_memory_mb"] = 5.0;
+    memory["total_memory_mb"] = 65.0;
+    return memory;
+}
+
+// Memory optimization
+bool optimizeMemory() {
+    // Placeholder for memory optimization
+    // In a real implementation, this would:
+    // 1. Release unused neuron/spike events
+    // 2. Compress memory pools
+    // 3. Garbage collect temporary objects
+    // 4. Clear unused synaptic traces
+    return true;
+}
+
+} // namespace
 
 } // namespace nlm

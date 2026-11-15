@@ -429,7 +429,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         syn->recordPreSpike(currentTime);
                     }
                     
-                    // Store to working memory - neurons that fire become part of working memory
+// Store to working memory - neurons that fire become part of working memory
                     // Phase 5 fix: the old activation was
                     // |membrane - resting| / 10, but a neuron that just
                     // spiked has membrane == reset, and reset == resting
@@ -446,6 +446,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // neuron keeps firing, which is the intended
                     // working-memory behaviour.
                     if (pImpl->workingMemory) {
+                        // A neuron that just fired should store 1.0 activation
+                        // This represents the fact that firing is an event that should be remembered
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
                     }
                 }
