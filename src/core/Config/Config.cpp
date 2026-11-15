@@ -56,11 +56,51 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Common help/usage flags
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        // Handle --help/-h
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Configuration Options:\n"
+                      << "  --config=<file>     Load configuration from file\n"
+                      << "  --help, -h           Show this help message\n"
+                      << "  --verbose, -v        Enable verbose logging\n"
+                      << "  --version, --ver     Show version information\n"
+                      << "\nCommon Configuration Options:\n"
+                      << "  --neuron_count=<N>   Number of neurons (default: 1000)\n"
+                      << "  --region_count=<N>   Number of regions (default: 1)\n"
+                      << "  --simulation_timestep=<t> Simulation timestep (default: 0.001)\n"
+                      << "  --random_seed=<S>    Random seed (default: 42)\n"
+                      << "  --connection_probability=<p> Connection probability (default: 0.1)\n"
+                      << "\nDemo-Specific Options:\n"
+                      << "  --steps=<N>          Number of simulation steps (Phase 2, 3, etc.)\n"
+                      << "  --neurons=<N>        Number of neurons for benchmark\n"
+                      << "  --demo=<name>        Demo name (phase2, phase3, phase4, phase5, phase6, benchmark)\n"
+                      << "  --quiet              Suppress output\n"
+                      << "  --debug              Enable debug mode\n"
+                      << "\nExperiment Options:\n"
+                      << "  --experiment_mode     Run in experiment collection mode\n"
+                      << "  --experiment_config   Load experiment configuration\n"
+                      << std::endl;
+            return true;
+        }
+        
+        // Handle --version
+        if (arg == "--version" || arg == "--ver") {
+            std::cout << "NLM Neural Learning Machine v0.1.0" << std::endl;
+            std::cout << "Build with C++20, scikit-build-core, pybind11" << std::endl;
+            return true;
+        }
+        
+        // Handle --verbose/-v
+        if (arg == "--verbose" || arg == "-v") {
+            std::cout << "Verbose mode enabled" << stdां std::endl;
+            return true;
+        }
+        
+        // Handle standard --key=value format
+        if (arg.substr(0,  tiểu học) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
@@ -69,7 +109,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc &&
+                arg[1] != 'v' && arg[1] != 'h' &&
+                arg.find(".") != 0) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);

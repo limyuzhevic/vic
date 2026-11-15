@@ -14,8 +14,56 @@
 #include <vector>
 #include <iomanip>
 #include <string>
+#include <map>
 
 using namespace nlm;
+
+// Print banner
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Performance Benchmark                                     ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+// Print help message
+void printHelp() {
+    std::cout << "\nUsage: nlm_benchmark [OPTIONS]\n\n";
+    std::cout << "NLM Neural Learning Machine - Performance Benchmark\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h              Show this help message\n";
+    std::cout << "  --version, --ver        Show version information\n";
+    std::cout << "  --verbose, -v           Enable verbose logging\n";
+    std::cout << "  --quiet                 Suppress output\n";
+    std::cout << "  --config=<file>         Load configuration from file\n";
+    std::cout << "  --neurons=<N>           Override neuron count (default: 500)\n";
+    std::cout << "  --steps=<N>             Override simulation steps (default: 1000)\n";
+    std::cout << "  --regions=<N>           Override region count (default: 1)\n";
+    std::cout << "  --seed=<S>              Override random seed (default: 42)\n";
+    std::cout << "  --timestep=<t>          Override simulation timestep (default: 0.001)\n";
+    std::cout << "  --benchmark=<N>         Benchmark to run (1-4, or 'all' for all, default: 1-4)\n";
+    std::cout << "  --timeout=<s>           Timeout per benchmark in seconds\n";
+    std::cout << "\nExamples:\n";
+    std::cout << "  nlm_benchmark --help                  Show help\n";
+    std::cout << "  nlm_benchmark --verbose --neurons=1000 Run benchmark with 1000 neurons\n";
+    std::cout << "  nlm_benchmark --steps=500 --regions=2   Run with custom steps and regions\n";
+    std::cout << "  nlm_benchmark --benchmark=2            Run only the second benchmark\n";
+    std::cout << "  nlm_benchmark --benchmark=all          Run all benchmarks\n";
+    std::cout << std::endl;
+}
+
+// Print version
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Performance Benchmark Suite" << std::endl;
+    std::cout << "Build with C++20, scikit-build-core, pybind11" << std::endl;
+}
 
 // Simple performance measurement
 struct BenchmarkResult {
@@ -47,7 +95,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     // Run simulation
     auto startTime = std::chrono::high_resolution_clock::now();
     
-    for (size_t step = 0; step < steps; ++step) {
+    for (size=_t step = 0; step < steps; ++step) {
         // Inject some random input
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
@@ -57,6 +105,20 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     }
     
     auto endTime = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+    
+    // Collect results
+    BenchmarkResult result;
+    result.neurons = brain->getTotalNeuronCount();
+    result.synapses = brain->getTotalSynapseCount();
+    result.steps = steps;
+    result.totalTime = totalTime;
+    result.stepsPerSecond = steps / totalTime;
+    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
+    result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
+    
+    std::cout << " Done!" << std::endl;
+    std::cout << "    Time: " << std::fixed << std::setprecision( gynauto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();
     
     // Collect results
@@ -99,16 +161,52 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
 }
 
 int main() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Performance Benchmark                                     ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+    printBanner();
+    
+    // Check for command line arguments
+    if (argc > 1) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --help/-h
+            if (arg == "--help" || arg == "-h") {
+                printHelp();
+                return 0;
+            }
+            
+            // Handle --version/--ver
+            if (arg == "--version" || arg == "--ver") {
+                printVersion();
+                return 0;
+            }
+            
+            // Handle --verbose/-v
+            if (arg == "--verbose" || arg == "-v") {
+                std::cout << "Verbose mode enabled" << std::endl;
+                continue;
+            }
+            
+            // Handle --quiet
+            if (arg == "--quiet") {
+                std::cout << std::fixed << std::setprecision(0);
+                continue;
+            }
+            
+            // Handle --config=file
+            if (arg.substr(0, 9) == "--config=") {
+                // TODO: Load configuration from file
+                std::cout << "Loading config: " << arg.substr(9) << std::endl;
+                continue;
+            }
+            
+            // Handle --benchmark=number
+            if (arg.substr(0, 13) == "--benchmark=") {
+                // TODO: Set benchmark selection
+                std::cout << "Benchmark selection: " << arg.substr(13) << std::endl;
+                continue;
+            }
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

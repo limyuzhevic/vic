@@ -326,8 +326,49 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
     auto config = std::make_shared<Config>();
+    
+    // Handle --help/-h
+    bool showHelp = false;
+    bool showVersion = false;
+    bool verboseMode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") showHelp = true;
+        if (arg == "--version" || arg == "--ver") showVersion = true;
+        if (arg == "--verbose" || arg == "-v") verboseMode = true;
+    }
+    
+    if (showHelp) {
+        printBanner();
+        std::cout << "\nUsage: nlm [OPTIONS]\n\n";
+        std::cout << "NLM Neural Learning Machine - Phase 2 Demo\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -h              Show this help message\n";
+        std::cout << "  --version, --ver        Show version information\n";
+        std::cout << "  --verbose, -v           Enable verbose logging\n";
+        std::cout << "  --config=<file>         Load configuration from file (default: configs/default.cfg)\n";
+        std::cout << "  --steps=<N>             Override number of simulation steps per test\n";
+        std::cout << "  --neurons=<N>           Override neuron count (default: 500)\n";
+        std::cout << "  --regions=<N>           Override region count (default: 1)\n";
+        std::cout << "  --seed=<S>              Override random seed (default: 42)\n";
+        std::cout << "  --timestep=<t>          Override simulation timestep (default: 0.001)\n";
+        std::cout << "  --quiet                 Suppress output\n";
+        std::cout << "  --demo=phase2           Force demo type (phase2, phase3, phase4, phase5, phase6)\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  nlm --help                          Show help\n";
+        std::cout << "  nlm --verbose --steps=2000           Run with verbose output and more steps\n";
+        std::cout << "  nlm --config=myconfig.cfg --neurons=1000  Use custom config and neuron count\n";
+        std::cout << "  nlm --demo=phase6                    Run Phase 6 integration demo\n";
+        return 0;
+    }
+    
+    if (showVersion) {
+        std::cout << "NLM Neural Learning Machine v0.1.0" << std::endl;
+        std::cout << "Phase 2: Real Neural Computation" << std::endl;
+        std::cout << "Build with C++20, scikit-build-core, pybind11" << std::endl;
+        return 0;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -349,10 +390,10 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line args using improved Config parser
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (overridden by command line args)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
