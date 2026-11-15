@@ -27,17 +27,45 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize NeuralEpisodicMemory with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralEpisodicMemory initialized");
+    
+    // Validate capacity
+    if (maxEpisodes_ == 0) {
+        NLM_LOG_WARNING("Episodic memory capacity is zero - setting to default (1000)");
+        maxEpisodes_ = 1000;
+    }
+    
+    NLM_LOG_INFO("NeuralEpisodicMemory initialized with max episodes: " + std::to_string(maxEpisodes_));
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot store episode without brain reference");
+        return;
+    }
+    
+    // Validate episode
+    if (episode.timestamp < 0) {
+        NLM_LOG_ERROR("Invalid episode timestamp");
+        return;
+    }
+    
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
     episodes_.push_back(stored);
+    
+    // Validate episode count after insertion
+    if (episodes_.size() > maxEpisodes_) {
+        NLM_LOG_WARNING("Episode count exceeds maximum capacity - will be trimmed");
+    }
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {

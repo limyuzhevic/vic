@@ -205,6 +205,58 @@ public:
     // Logging
     void logStatus() const;
     
+    // Advanced debugging and monitoring
+    
+    // System-wide debugging
+    void debugSystemState() const;
+    bool validateConfiguration() const;
+    size_t getMemoryUsage() const;
+    size_t getActiveNeuronCount() const;
+    float getGlobalExcitability() const;
+    
+    // Memory system inspection
+    size_t getWorkingMemoryCapacity() const;
+    size_t getWorkingMemoryUsage() const;
+    float getWorkingMemoryActivity() const;
+    
+    size_t getEpisodicMemoryCount() const;
+    float getEpisodicMemoryAverageReward() const;
+    
+    // Prediction system monitoring
+    float getPredictionError() const;
+    float getPredictionConfidence() const;
+    size_t getPredictionHistorySize() const;
+    
+    // Cognition system status
+    size_t getConceptCount() const;
+    size_t getPlannerDepth() const;
+    size_t getAttentionWindowSize() const;
+    
+    // Development system status
+    DevelopmentalStage getDevelopmentalStage() const;
+    bool isDevelopmentActive() const;
+    
+    // Neuromodulation levels
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionErrorSignal() const;
+    
+    // Performance statistics
+    float getExcitationInhibitionRatio() const;
+    float getAverageFiringRate() const;
+    size_t getTotalConnections() const;
+    
+    // Memory management
+    void triggerMemoryConsolidation();
+    void triggerEpisodicReplay();
+    void clearAllMemories();
+    
+    // Debugging helpers
+    void dumpBrainState(const std::string& filename) const;
+    void enableDebugLogging(bool enable);
+    bool isDebugLoggingEnabled() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

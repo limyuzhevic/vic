@@ -25,9 +25,32 @@ ConceptFormation::ConceptFormation()
 ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize ConceptFormation with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Validate parameters
+    if (formationThreshold_ < 0.0f || formationThreshold_ > 1.0f) {
+        NLM_LOG_ERROR("Invalid formation threshold: " + std::to_string(formationThreshold_) + " - clamping to 0.7");
+        formationThreshold_ = 0.7f;
+    }
+    
+    if (stabilityThreshold_ < 0.0f || stabilityThreshold_ > 1.0f) {
+        NLM_LOG_ERROR("Invalid stability threshold: " + std::to_string(stabilityThreshold_) + " - clamping to 0.5");
+        stabilityThreshold_ = 0.5f;
+    }
+    
+    if (stabilityWindow_ == 0) {
+        NLM_LOG_WARNING("Stability window is zero - setting to default (5)");
+        stabilityWindow_ = 5;
+    }
+    
+    NLM_LOG_INFO("ConceptFormation initialized with threshold: " + std::to_string(formationThreshold_) + 
+                 ", stability window: " + std::to_string(stabilityWindow_));
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,

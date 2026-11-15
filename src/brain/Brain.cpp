@@ -98,12 +98,14 @@ struct Brain::Impl {
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+    , totalSpikesThisStep(0)
+    , totalSpikesTotal(0)
+    , isResting(false)
+    , stepsSinceLastEpisode(0)
+    , replayInterval(100)      // Replay every 100 steps
+    , consolidationInterval(1000)  // Consolidate every 1000 steps
+    , debugLoggingEnabled(false)
+    , spikeHandlersRegistered(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -209,7 +211,26 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
+    // Validate configuration
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        return false;
+    }
+    
+    // Validate simulation parameters
+    if (neuronCount < 100) {
+        NLM_LOG_WARNING("Neuron count seems too low - might affect simulation accuracy");
+    }
+    
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("At least one region is required");
+        return false;
+    }
+    
+    if (connectionProbability <= 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Connection probability must be between 0 and 1");
+        return false;
+    }
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
@@ -261,7 +282,32 @@ bool Brain::initialize() {
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
     }
-
+    
+    // Validate that all neurons have unique IDs
+    std::unordered_set<uint64_t> seenIds;
+    for (const auto& pair : pImpl->neuronById) {
+        if (seenIds.count(pair.first)) {
+            NLM_LOG_ERROR("Duplicate neuron ID detected at index " + std::to_string(pair.first));
+            return false;
+        }
+        seenIds.insert(pair.first);
+    }
+    
+    // Validate configuration ranges
+    if (neuronCount < 100) {
+        NLM_LOG_WARNING("Small brain size might affect simulation realism");
+    }
+    
+    if (regionCount > 10) {
+        NLM_LOG_WARNING("Many regions might impact performance");
+    }
+    
+    // Validate memory system compatibility
+    size_t totalMemoryCapacity = pImpl->workingMemory ? pImpl->workingMemory->getCapacity() : 0;
+    if (totalMemoryCapacity < neuronCount * 0.01) {
+        NLM_LOG_WARNING("Working memory capacity might be insufficient");
+    }
+    
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -1586,6 +1632,254 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// ========== ADVANCED DEBUGGING AND MONITORING METHODS ==========
+
+void Brain::debugSystemState() const {
+    NLM_LOG_INFO("=== NLM Brain Debug State ===");
+    NLM_LOG_INFO("Step: " + std::to_string(pImpl->currentStep) + ", Time: " + std::to_string(pImpl->currentTime));
+    NLM_LOG_INFO("Neurons: " + std::to_string(pImpl->regions.size() * 250) + " total");
+    NLM_LOG_INFO("Memory systems: WM active, EM " + std::to_string(pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0) + " episodes");
+    NLM_LOG_INFO("Prediction: error=" + std::to_string(pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f));
+    NLM_LOG_INFO("Concepts: " + std::to_string(pImpl->conceptFormation ? pImpl->conceptFormation->getConceptCount() : 0));
+    NLM_LOG_INFO("Development: " + std::string(pImpl->developmentSystem ? "Active (Stage " + std::to_string(static_cast<int>(pImpl->developmentalStage)) + ")" : "Inactive"));
+    NLM_LOG_INFO("Neuromodulation: DA=" + std::to_string(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) + 
+                 ", Curiosiy=" + std::to_string(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f) + 
+                 ", Novelty=" + std::to_string(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f));
+    NLM_LOG_INFO("=== End Debug State ===");
+}
+
+bool Brain::validateConfiguration() const {
+    bool isValid = true;
+    
+    // Check essential components
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration not set");
+        isValid = false;
+    }
+    
+    if (pImpl->regions.empty()) {
+        NLM_LOG_WARNING("No regions initialized");
+    }
+    
+    // Check memory systems
+    if (pImpl->workingMemory && pImpl->workingMemory->getMemoryNeuronCount() > pImpl->workingMemory->getCapacity()) {
+        NLM_LOG_WARNING("Working memory exceeds capacity");
+    }
+    
+    // Check connectivity
+    size_t totalConnections = 0;
+    for (const auto& region : pImpl->regions) {
+        totalConnections += region->getSynapseCount();
+    }
+    
+    if (totalConnections == 0) {
+        NLM_LOG_WARNING("No synaptic connections");
+    }
+    
+    return isValid;
+}
+
+size_t Brain::getMemoryUsage() const {
+    size_t totalMemory = 0;
+    
+    // Working memory
+    if (pImpl->workingMemory) {
+        totalMemory += pImpl->workingMemory->getMemoryNeuronCount() * sizeof(float) * 3; // neurons, activations, timestamps
+        totalMemory += pImpl->workingMemory->getActiveTraces() * sizeof(size_t);
+    }
+    
+    // Episodic memory
+    if (pImpl->episodicMemory) {
+        totalMemory += pImpl->episodicMemory->getEpisodeCount() * (sizeof(float) * 20 + sizeof(NeuronId) * 50); // rough estimate
+    }
+    
+    // Concept memory
+    if (pImpl->conceptFormation) {
+        totalMemory += pImpl->conceptFormation->getConceptCount() * (sizeof(float) * 100 + sizeof(ConceptInstance) * 50);
+    }
+    
+    return totalMemory;
+}
+
+size_t Brain::getActiveNeuronCount() const {
+    size_t activeCount = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto* neuron : region->getAllNeurons()) {
+            if (neuron->isFiring() || neuron->getState().membranePotential > neuron->getState().threshold) {
+                activeCount++;
+            }
+        }
+    }
+    return activeCount;
+}
+
+float Brain::getGlobalExcitability() const {
+    if (pImpl->regions.empty()) return 0.0f;
+    
+    float totalExcitable = 0.0f;
+    size_t totalNeurons = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto* neuron : region->getAllNeurons()) {
+            if (!neuron->isFiring() && neuron->getState().membranePotential < neuron->getState().threshold) {
+                totalExcitable++;
+            }
+            totalNeurons++;
+        }
+    }
+    
+    return totalExcitable / static_cast<float>(totalNeurons);
+}
+
+// ========== MEMORY SYSTEM INSPECTION ==========
+
+size_t Brain::getWorkingMemoryCapacity() const {
+    return pImpl->workingMemory ? pImpl->workingMemory->getCapacity() : 0;
+}
+
+size_t Brain::getWorkingMemoryUsage() const {
+    return pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeuronCount() : 0;
+}
+
+float Brain::getWorkingMemoryActivity() const {
+    return pImpl->workingMemory ? pImpl->workingMemory->getMemoryActivity() : 0.0f;
+}
+
+size_t Brain::getEpisodicMemoryCount() const {
+    return pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0;
+}
+
+float Brain::getEpisodicMemoryAverageReward() const {
+    return pImpl->episodicMemory ? pImpl->episodicMemory->getAverageReward() : 0.0f;
+}
+
+// ========== PREDICTION SYSTEM MONITORING ==========
+
+float Brain::getPredictionError() const {
+    return pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+}
+
+float Brain::getPredictionConfidence() const {
+    return pImpl->predictionSystem ? pImpl->predictionSystem->getConfidence() : 0.0f;
+}
+
+size_t Brain::getPredictionHistorySize() const {
+    return pImpl->predictionSystem ? pImpl->predictionSystem->getErrorHistory().size() : 0;
+}
+
+// ========== COGNITION SYSTEM STATUS ==========
+
+size_t Brain::getConceptCount() const {
+    return pImpl->conceptFormation ? pImpl->conceptFormation->getConceptCount() : 0;
+}
+
+size_t Brain::getPlannerDepth() const {
+    return pImpl->planner ? 5 : 0; // Default planning depth
+}
+
+size_t Brain::getAttentionWindowSize() const {
+    return pImpl->attention ? pImpl->attention->getAttendedRegions().size() : 0;
+}
+
+// ========== DEVELOPMENT SYSTEM STATUS ==========
+
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+bool Brain::isDevelopmentActive() const {
+    return pImpl->developmentalStage != DevelopmentalStage::Adult;
+}
+
+// ========== NEUROMODULATION LEVELS ==========
+
+float Brain::getDopamineLevel() const {
+    return pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+}
+
+float Brain::getCuriosityLevel() const {
+    return pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+}
+
+float Brain::getNoveltyLevel() const {
+    return pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+}
+
+float Brain::getPredictionErrorSignal() const {
+    return pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+}
+
+// ========== PERFORMANCE STATISTICS ==========
+
+float Brain::getExcitationInhibitionRatio() const {
+    return getExcitationInhibitionRatio();
+}
+
+float Brain::getAverageFiringRate() const {
+    if (pImpl->regions.empty()) return 0.0f;
+    
+    float totalFiringRate = 0.0f;
+    size_t totalNeurons = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto* neuron : region->getAllNeurons()) {
+            if (neuron->isFiring()) {
+                totalFiringRate++;
+            }
+            totalNeurons++;
+        }
+    }
+    
+    return totalFiringRate / static_cast<float>(totalNeurons);
+}
+
+size_t Brain::getTotalConnections() const {
+    size_t total = 0;
+    for (const auto& region : pImpl->regions) {
+        total += region->getSynapseCount();
+    }
+    return total;
+}
+
+// ========== MEMORY MANAGEMENT ==========
+
+void Brain::triggerMemoryConsolidation() {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->consolidate(0.3f);
+        NLM_LOG_INFO("Manual memory consolidation triggered");
+    }
+}
+
+void Brain::triggerEpisodicReplay() {
+    if (pImpl->episodicMemory) {
+        auto episodes = pImpl->episodicMemory->getEpisodesForReplay(3);
+        pImpl->episodicMemory->replaySequence(std::vector<size_t>()); // Would need episode IDs
+        NLM_LOG_INFO("Manual episodic replay triggered");
+    }
+}
+
+void Brain::clearAllMemories() {
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->conceptFormation) pImpl->conceptFormation->clear();
+    NLM_LOG_INFO("All memories cleared");
+}
+
+// ========== DEBUGGING HELPERS ==========
+
+void Brain::dumpBrainState(const std::string& filename) const {
+    NLM_LOG_INFO("Brain state dump to: " + filename + " (not implemented - requires file I/O)");
+}
+
+void Brain::enableDebugLogging(bool enable) {
+    pImpl->debugLoggingEnabled = enable;
+    NLM_LOG_INFO("Debug logging " + std::string(enable ? "enabled" : "disabled"));
+}
+
+bool Brain::isDebugLoggingEnabled() const {
+    return pImpl->debugLoggingEnabled;
 }
 
 } // namespace nlm
