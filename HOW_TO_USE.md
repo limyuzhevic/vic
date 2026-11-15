@@ -463,80 +463,318 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+## Part 5: NLM Tools and Utilities
 
-### Minimal Example
+The NLM project now includes advanced tools for configuration management, simulation utilities, and development support.
+
+### 5.1 Configuration Management Tool
+
+The NLM Configuration Tool (`config_tool`) provides a command-line interface for managing brain configurations.
+
+#### Installation
+
+The config tool is built as part of the NLM project. After building NLM, you can run:
+
+```bash
+# Build the project
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# The config_tool executable will be available in the build directory
+cd build && ./bin/config_tool
+```
+
+#### Usage
+
+```bash
+# View all configuration keys
+config_tool --list
+
+# Get a specific value
+config_tool --get neuron_count
+
+# Set a value
+config_tool --set neuron_count 2000
+
+# Export configuration to file
+config_tool --export config.json
+
+# Import configuration from file
+config_tool --import config.json
+
+# Create default configuration
+config_tool --create-default my_config.cfg
+
+# Validate configuration
+config_tool --validate
+```
+
+#### Available Options
+
+- `--list`, `-l` - List all configuration keys
+- `--get <key>`, `-g <k>` - Get value for key
+- `--set <key> <value>`, `-s <k> <v>` - Set value for key
+- `--delete <key>`, `-d <k>` - Delete key
+- `--export <file>`, `-e <f>` - Export configuration to file
+- `--import <file>`, `-i <f>` - Import configuration from file
+- `--validate` - Validate configuration
+- `--create-default <file>` - Create default configuration
+- `--verbose`, `-v` - Verbose output
+- `--backup` - Create backup before saving
+- `--force` - Force operation without confirmation
+
+#### Examples
+
+```bash
+# Create and save a custom configuration
+config_tool --set neuron_count 3000
+config_tool --set connection_probability 0.15
+config_tool --set random_seed 123
+
+# Backup and update configuration
+cd configs
+config_tool --set neuron_count 5000 --backup
+
+# Compare two configurations
+config_tool --import config1.json
+config_tool --import config2.json
+config_tool --merge --format json
+```
+
+### 5.2 Python Convenience Module
+
+The NLM Convenience Module provides higher-level APIs for common operations, making it easier to create complex simulations.
+
+#### Installation
+
+After installing pynlm:
+
+```bash
+pip install -e .
+```
+
+Import the convenience module:
 
 ```python
 import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+from nlm_convenience import NLMBuilder, SimulationRunner, BrainProfiler
 ```
 
-### Environment Interaction
+#### 5.2.1 NLMBuilder - Fluent Configuration
+
+The `NLMBuilder` class provides a fluent API for creating complete NLM systems.
 
 ```python
+from nlm_convenience import NLMBuilder
+
+# Create system with all features
+brain_system = (NLMBuilder()
+    .set_brain_size(2000, 2)
+    .set_plasticity(True, True, True, True)
+    .set_neuromodulation(True, True, True, True)
+    .set_developmental(True)
+    .set_world(20, 20, 8, 8)
+    .build())
+
+brain = brain_system.brain
+agent = brain_system.agent
+world = brain_system.world
+```
+
+#### 5.2.2 SimulationRunner - Advanced Tracking
+
+```python
+from nlm_convenience import SimulationRunner
+
+runner = SimulationRunner()
+metrics = runner.run_episode(
+    brain, world, agent,
+    max_steps=1000,
+    enable_learning=True
+)
+
+print(f"Total spikes: {metrics['total_spikes']}")
+print(f"Average firing rate: {metrics['average_firing_rate']:.2f} Hz")
+```
+
+#### 5.2.3 BrainProfiler - Brain Analysis
+
+```python
+from nlm_convenience import BrainProfiler
+
+profile = BrainProfiler.analyze_spike_patterns(brain, window_size=100)
+print(f"E/I ratio: {profile['excitatory_inhibition_ratio']:.2f}")
+print(f"Burst count: {profile['burst_count']}")
+```
+
+#### 5.2.4 NLMTools - Utility Functions
+
+```python
+from nlm_convenience import NLMTools
+
+# Export brain state
+NLMTools.export_brain_state(brain, "checkpoint.bin")
+
+# Benchmark configuration
+metrics = NLMTools.benchmark_configuration(config, steps=1000)
+```
+
+#### Complete Example
+
+```python
+"""Advanced NLM simulation using convenience tools"""
+
 import pynlm
+from nlm_convenience import NLMBuilder, SimulationRunner
 
-# Setup
+# Create system
+brain_system = (NLMBuilder()
+    .set_brain_size(3000, 2)
+    .set_plasticity(True, True, True, True)
+    .set_neuromodulation(True, True, True, True)
+    .set_developmental(True)
+    .set_world(30, 30, 12, 12)
+    .build())
+
+brain = brain_system.brain
+agent = brain_system.agent
+world = brain_system.world
+
+# Run simulation with tracking
+runner = SimulationRunner()
+metrics = runner.run_episode(
+    brain, world, agent,
+    max_steps=1000,
+    enable_learning=True
+)
+
+print(f"Simulation completed: {metrics['total_spikes']} spikes,")
+print(f"{metrics['average_firing_rate']:.2f} Hz average firing rate")
+```
+
+### 5.3 Development and Debugging
+
+#### Checkpoint System
+
+```python
+# Save brain state
+brain.save("checkpoint.bin")
+
+# Load brain state
+brain.load("checkpoint.bin")
+```
+
+#### Logging Configuration
+
+```python
+# Enable verbose logging
+Logger::getGlobal().setLevel(LogLevel::Debug)
+
+# Configure file logging
+auto logger = std::make_shared<Logger>();
+auto fileLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+fileLogger->setOutputFile("simulation.log");
+logger->addLogger(fileLogger);
+Logger::setGlobal(logger);
+```
+
+### 5.4 Performance Tools
+
+#### Benchmarking
+
+```python
+// Command line
+./nlm_benchmark
+
+// Python benchmark
+from nlm_convenience import NLMTools
+metrics = NLMTools.benchmark_configuration(config, steps=1000)
+```
+
+#### Performance Profiling
+
+```python
+from nlm_convenience import BrainProfiler
+
+// Profile brain activity
+profile = BrainProfiler.analyze_spike_patterns(brain, 1000)
+```
+
+### 5.5 Complete Workflow Example
+
+```python
+"""Complete NLM workflow using tools"""
+
+import pynlm
+from nlm_convenience import NLMBuilder, SimulationRunner
+
+// 1. Create configuration using config_tool
+// config_tool --create-default config.cfg
+
+// 2. Load configuration in Python
 config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+config.loadFromFile("config.cfg")
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+// 3. Create system
+brain_system = (NLMBuilder()
+    .set_brain_size(config.getOr<int64_t>("neuron_count", 1000))
+    .set_plasticity(True, True, True, True)
+    .set_neuromodulation(True, True, True, True)
+    .build())
+
+// 4. Run simulation with full tracking
+runner = SimulationRunner()
+metrics = runner.run_episode(
+    brain_system.brain,
+    brain_system.agent,
+    brain_system.world,
+    max_steps=2000,
+    enable_learning=True
+)
+
+// 5. Export results
+NLMTools.export_brain_state(brain_system.brain, "final_checkpoint.bin")
+
+// 6. Log metrics
+NLM_LOG_INFO("Simulation complete: " + std::to_string(metrics['total_spikes']) + " spikes")
 ```
+
+## Part 6: Advanced Features
+
+### 6.1 Configuration API
+
+The configuration system now supports:
+
+- **JSON/YAML export/import** (planned)
+- **Template configurations** (planned)
+- **Configuration validation** (implemented)
+- **Merge operations** (planned)
+
+### 6.2 Python Integration
+
+- **Convenience module** (implemented)
+- **Advanced APIs** (implemented)
+- **Error handling** (improved)
+- **Documentation** (comprehensive)
+
+### 6.3 Development Tools
+
+- **Configuration tool** (implemented)
+- **Checkpoint system** (enhanced)
+- **Profiling tools** (implemented)
+- **Benchmarking** (implemented)
+
+## Next Steps
+
+1. **Explore the convenience module** - Try the advanced APIs for complex simulations
+2. **Use the config tool** - Manage configurations from the command line
+3. **Study the examples** - Review complete examples in the documentation
+4. **Benchmark your system** - Test performance with different configurations
+5. **Export results** - Save brain states and configuration for reproducibility
+
+The NLM tools and utilities make it easier to create sophisticated simulations while maintaining full access to the system's power and flexibility.
 
 ---
 
-## Troubleshooting
-
-### Build Issues
-
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
-```
-
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
-
----
-
-## Further Reading
-
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+**Note**: This documentation covers the NLM tools and utilities available in the current version. New features are continuously being added based on user feedback and requirements.

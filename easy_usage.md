@@ -287,11 +287,127 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Convenience Tools
+
+For more complex simulations and better error handling, try the **NLM Convenience Module**:
+
+The convenience module provides higher-level APIs for common operations:
+
+### 1. NLMBuilder - Fluent Configuration
+
+Create complete NLM systems with all desired features:
+
+```python
+from nlm_convenience import NLMBuilder
+
+# Create system with all features enabled
+brain_system = (NLMBuilder()
+    .set_brain_size(2000, 2)
+    .set_plasticity(True, True, True, True)
+    .set_neuromodulation(True, True, True, True)
+    .set_developmental(True)
+    .set_world(20, 20, 8, 8)
+    .build())
+
+brain = brain_system.brain
+agent = brain_system.agent
+world = brain_system.world
+```
+
+### 2. SimulationRunner - Advanced Tracking
+
+Run simulations with comprehensive metrics and statistics:
+
+```python
+from nlm_convenience import SimulationRunner
+
+runner = SimulationRunner()
+metrics = runner.run_episode(
+    brain, world, agent,
+    max_steps=2000,
+    enable_learning=True
+)
+
+print(f"Total spikes: {metrics['total_spikes']}")
+print(f"Average firing rate: {metrics['average_firing_rate']:.2f} Hz")
+print(f"Total reward: {metrics['total_reward']:.2f}")
+```
+
+### 3. BrainProfiler - Brain Analysis
+
+Analyze brain performance and dynamics:
+
+```python
+from nlm_convenience import BrainProfiler
+
+profile = BrainProfiler.analyze_spike_patterns(brain, window_size=100)
+print(f"Average firing rate: {profile['average_firing_rate']:.2f} Hz")
+print(f"E/I ratio: {profile['excitatory_inhibition_ratio']:.2f}")
+print(f"Burst count: {profile['burst_count']}")
+```
+
+### 4. NLMTools - Utility Functions
+
+Import convenience tools and utilities:
+
+```python
+from nlm_convenience import NLMTools
+
+# Save brain state
+NLMTools.export_brain_state(brain, "checkpoint.bin")
+
+# Benchmark configuration
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 500)
+metrics = NLMTools.benchmark_configuration(config, steps=1000)
+```
+
+### Complete Example
+
+```python
+"""Advanced NLM simulation using convenience tools"""
+
+import pynlm
+from nlm_convenience import NLMBuilder, SimulationRunner
+
+# Create complete system
+brain_system = (NLMBuilder()
+    .set_brain_size(3000, 2)
+    .set_plasticity(True, True, True, True)
+    .set_neuromodulation(True, True, True, True)
+    .set_developmental(True)
+    .set_world(30, 30, 12, 12)
+    .build())
+
+brain = brain_system.brain
+agent = brain_system.agent
+world = brain_system.world
+
+# Run simulation with tracking
+runner = SimulationRunner()
+metrics = runner.run_episode(
+    brain, world, agent,
+    max_steps=1000,
+    enable_learning=True
+)
+
+print(f"Simulation completed: {metrics['total_spikes']} spikes,")
+print(f"{metrics['average_firing_rate']:.2f} Hz average firing rate")
+
+# Save results
+NLMTools.export_brain_state(brain, "simulation_final.bin")
+```
+
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Explore HOW_TO_USE.md** - Read detailed documentation and examples
+2. **Read docs/ARCHITECTURE.md** - Understand system architecture
+3. **Try the convenience module** - Use the convenience tools for advanced simulations
+4. **Experiment with configurations** - Test different brain and world settings
+5. **Study the examples** - Review the complete examples in nlm_convenience.py
+
+The convenience module makes it easier to create sophisticated NLM simulations while maintaining full access to the underlying power of the system. Use it for production simulations, research experiments, or when you want cleaner, more maintainable code.
+
+That's it! You're now ready to use NLM with all its basic and advanced features.

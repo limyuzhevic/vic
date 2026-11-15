@@ -205,6 +205,9 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
+# Tools
+add_subdirectory(src/tools)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
     ARCHIVE DESTINATION lib
