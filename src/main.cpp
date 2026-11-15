@@ -222,22 +222,46 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Select a diverse set of sensory neurons to avoid saturation
+    // This prevents the entire network from firing synchronously and allows
+    // for more selective, biologically realistic learning patterns.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
+        // First pass: collect all available sensory neurons
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron->getType() == NeuronType::Sensory) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
+        
+        // If we have more than 20, randomly select 20 to avoid over-stimulation
+        if (patternNeurons.size() > 20) {
+            std::shuffle(patternNeurons.begin(), patternNeurons.end(), 
+                         *brain->getRandomGenerator());
+            patternNeurons.resize(20);
+        }
     }
+    
+    NLM_LOG_INFO("  Using " + std::to_string(patternNeurons.size()) + " sensory neurons for pattern")
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Inject current into a random subset of pattern neurons each step
+        // to simulate more natural, temporally varying input patterns
+        size_t numActive = static_cast<size_t>(std::min(
+            static_cast<double>(patternNeurons.size()) * 0.3,  // 30% active
+            patternNeurons.size()  // But don't exceed available neurons
+        ));
+        
+        // Shuffle and select active neurons for this step
+        if (numActive > 0) {
+            auto tempNeurons = patternNeurons;
+            std::shuffle(tempNeurons.begin(), tempNeurons.end(), 
+                         *brain->getRandomGenerator());
+            tempNeurons.resize(numActive);
+            
+            for (NeuronId id : tempNeurons) {
+                brain->injectCurrent(id, 30.0f);
+            }
         }
         
         brain->step(step, step * 0.001);
@@ -283,24 +307,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
-    for (int trial = 0; trial < 50; ++trial) {
+for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
-    float totalDelta = delta;
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    if (delta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+    } else if (delta < -0.001f) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");

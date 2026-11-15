@@ -90,22 +90,172 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
+## Command-Line Interface
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+NLM now includes a comprehensive command-line interface (CLI) tool called `nlm_cli` that provides:
+
+### Quick Start
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
+# Show help
+nlm_cli --help
+
+# Show version information
+nlm_cli --version
+
+# Run batch mode with 500 neurons for 100 steps
+nlm_cli --neurons 500 --steps 100
+
+# Run with custom configuration
+nlm_cli --config my_config.cfg --mode phase6
+
+# Run in interactive mode
+nlm_cli
+```
+
+### Available Commands
+
+In interactive mode, you can use:
+
+- `help` - Show help message
+- `status` - Show current brain status
+- `step <n>` - Advance brain by n steps
+- `reset` - Reset the brain
+- `inject <id> <value>` - Inject current into neuron
+- `simulate <n>` - Run simulation with n steps
+- `config <key> <value>` - Set configuration value
+- `exit` or `quit` - Exit application
+
+### Configuration Files
+
+Configuration files use simple `key=value` format:
+
+```
+# Example config file
+# Configuration comments start with #
+neuron_count = 1000
+region_count = 1
+simulation_timestep = 0.001
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+connection_probability = 0.1
+```
+
+### Command-Line Options
+
+- `--help, -h` - Show help message
+- `--version` - Show version information
+- `--config <file>` - Load configuration from file
+- `--neurons <n>` - Number of neurons (default: 500)
+- `--steps <n>` - Number of simulation steps (default: 100)
+- `--mode <mode>` - Run mode: 'phase2', 'phase3', 'phase4', 'phase6' (default: phase2)
+- `--verbose, -v` - Enable verbose output
+- `--quiet, -q` - Enable quiet output
+- `--batch <n>` - Run batch mode with n steps
+
+## Building and Running
+
+### Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Running
+
+The project provides several executables:
+
+- `nlm` - Phase 2 demo (real neural computation)
+- `nlm_cli` - **Command-line interface** (NEW - provides batch and interactive modes)
+- `nlm_phase3_demo` - Phase 3 demo (world interaction)
+- `nlm_phase4_demo` - Phase 4 demo (cognition and memory)
+- `nlm_phase6_demo` - Phase 6 integration test
+- `nlm_phase6_text_demo` - Phase 6 text/thought demo
+- `nlm_benchmark` - Performance benchmark
+
+#### Command-Line Interface (New in Phase 6)
+
+The `nlm_cli` tool provides a user-friendly interface for running NLM simulations:
+
+**Batch Mode:** Run simulations with simple command-line options
+```bash
+# Run simple simulation
+nlm_cli --neurons 500 --steps 100
+
+# Run with custom configuration
+nlm_cli --config my_config.cfg --mode phase6
+
+# Run verbose simulation
+nlm_cli --neurons 1000 --steps 2000 --verbose
+```
+
+**Interactive Mode:** Use real-time commands to control and explore the brain
+```bash
+# Start interactive mode
+nlm_cli
+
+# Available commands:
+help                Show help message
+status              Show brain status
+step <n>            Advance brain by n steps
+reset               Reset the brain
+inject <id> <val>   Inject current into neuron
+simulate <n>        Run simulation with n steps
+config <key> <val>  Set configuration value
+exit, quit          Exit application
+```
+
+**Configuration Management:** Load and save brain configurations
+```bash
+# Load configuration from file
+nlm_cli --config configs/my_config.cfg
+
+# Save configuration to file
+# (Use interactive 'config' command to save)
+```
+
+#### Traditional Demos
+
+The traditional demo executables remain for backward compatibility:
+
+```bash
+# Phase 2: Real neural computation demo
+./nlm
+
+# Phase 3: World interaction demo
 ./nlm_phase3_demo
+
+# Phase ンド: Cognition and memory demo
 ./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
+
+# Phase 6: Integration test
+./nlm_phase6_demo
+
+# Performance benchmark
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+### Python Bindings
+
+The project includes Python bindings via `pip install .`. To build with Python bindings:
+
+```bash
+cd build
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON
+make
+```
+
+Then install Python package:
+
+```bash
+cd python
+pip install .
+```
+
+See `python/README.md` for more details and API documentation.
 
 ## Project Structure
 
