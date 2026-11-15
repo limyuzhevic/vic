@@ -21,15 +21,19 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
-class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -165,6 +169,12 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Neural self-model for body awareness and action consequences
+    SelfModel* getSelfModel();
+    
+    // Social learning for imitation and observation
+    SocialLearning* getSocialLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

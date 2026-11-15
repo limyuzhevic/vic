@@ -10,11 +10,18 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralSemanticMemory.hpp"
+#include "../memory/NeuralProceduralMemory.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -37,12 +44,14 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -52,6 +61,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -117,7 +129,6 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
@@ -126,12 +137,13 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem = std::make_unique<NeuralPrediction>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -141,6 +153,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -284,16 +299,19 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
+        // Initialize prediction system
+        // (NeuralPrediction doesn't have initialize method currently)
+        // Initialize cognition systems
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        
+        pImpl->selfModel->initialize(this);
+        
+        pImpl->socialLearning->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
@@ -1474,19 +1492,99 @@ float Brain::getAverageFiringRate() const {
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    return pImpl->workingMemory.get();
+}
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
+    return pImpl->episodicMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+    // Neural self-model for body awareness and action consequences
+    SelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+    const SelfModel* Brain::getSelfModel() const {
+        return pImpl->selfModel.get();
+    }
 
-PredictionSystem* Brain::getPredictionSystem() {
+    // Social learning for imitation and observation
+    SocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
+    const SocialLearning* Brain::getSocialLearning() const {
+        return pImpl->socialLearning.get();
+    }
+
+    // Attentional selection for focus
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
+    const AttentionalSelection* Brain::getAttention() const {
+        return pImpl->attention.get();
+    }
+
+    // ========== DEVELOPMENT SYSTEM ==========
+
+NeuralPrediction* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+const NeuralPrediction* Brain::getPredictionSystem() const {
+    return pImpl->predictionSystem.get();
+}
+
+// ========== NEUROMODULATION SYSTEM ACCESSORS ==========
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+const Dopamine* Brain::getDopamine() const {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+const Curiosity* Brain::getCuriosity() const {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+const Novelty* Brain::getNovelty() const {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+const PredictionError* Brain::getPredictionErrorSignal() const {
+    return pImpl->predictionError.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+const Acetylcholine* Brain::getAcetylcholine() const {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+const Norepinephrine* Brain::getNorepinephrine() const {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+const Serotonin* Brain::getSerotonin() const {
+    return pImpl->serotonin.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
@@ -1503,15 +1601,31 @@ void Brain::setLearnedPreference(float preference) {
     pImpl->learnedPreference = std::clamp(preference, -1.0f, 1.0f);
 }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    // Neural self-model for body awareness and action consequences
+    SelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+    const SelfModel* Brain::getSelfModel() const {
+        return pImpl->selfModel.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    // Social learning for imitation and observation
+    SocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
+    const SocialLearning* Brain::getSocialLearning() const {
+        return pImpl->socialLearning.get();
+    }
 
-// ========== DEVELOPMENT SYSTEM ==========
+    // Attentional selection for focus
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
+    const AttentionalSelection* Brain::getAttention() const {
+        return pImpl->attention.get();
+    }
+
+    // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
