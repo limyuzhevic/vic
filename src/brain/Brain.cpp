@@ -285,7 +285,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -297,9 +297,15 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->novelty->initialize(this);
+    pImpl->novelty->setSalienceThreshold(0.3f);
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.

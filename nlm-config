@@ -1,0 +1,719 @@
+#!/usr/bin/env bash
+
+# NLM Configuration Manager Tool
+# A command-line tool to help users configure and run NLM simulations
+
+# Colors for output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+NC="\033[0m" # No Color
+
+echo_help() {
+    echo "NLM Configuration Manager Tool"
+    echo "==============================="
+    echo ""
+    echo "Usage: nlm-config [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  help                    Show this help message"
+    echo "  list-configs          List available configuration templates"
+    echo "  validate <file>       Validate a configuration file"
+    echo "  create <name> [type]  Create a new configuration file"
+    echo "  set <file> <key> <value>  Set a configuration value"
+    echo "  run <file> [options] Run the NLM brain with this configuration"
+    echo "  export <file> [format] Export configuration to different formats"
+    echo ""
+    echo "Common options for 'run':"
+    echo "  --verbose, -v         Enable verbose output"
+    echo "  --debug, -d           Enable debug mode"
+    echo "  --steps <N>          Number of simulation steps (default: 100)"
+    echo "  --output <file>       Save output to file"
+    echo ""
+    echo "Examples:""
+    echo "  nlm-config help"
+    echo "  nlm-config list-configs"
+    echo "  nlm-config validate configs/my_config.cfg"
+    echo "  nlm-config create my_exp phase3"
+    echo "  nlm-config run configs/default.cfg --verbose --steps 1000"
+    echo "  nlm-config export configs/default.cfg json"
+}
+
+echo_list_configs() {
+    echo "Available configuration templates:"
+    echo "================================"
+    echo ""
+    
+    # Find all config files
+    if [ -d "configs" ]; then
+        for config in configs/*.cfg; do
+            if [ -f "$config" ]; then
+                local name=$(basename "$config" .cfg)
+                echo "  $name"
+                echo "    Path: $config"
+                echo "    Preview:"
+                head -10 "$config" | sed 's/^/      /'
+                echo ""
+            fi
+        done
+    else
+        echo "  No configs directory found"
+    fi
+    
+    echo ""
+    echo "Built-in templates:"
+    echo "  phase2         - Basic neural computation (LIF neurons, STDP plasticity)"
+    echo "  phase3         - World interaction with reward and developmental stages"
+    echo "  phase6         - Full integration with memory, prediction, cognition"
+    echo "  debug          - High-verbosity debug configuration"
+    echo "  minimal        - Minimal configuration for testing"
+    echo "  research       - Research-oriented configuration with extended parameters"
+}
+
+echo_validate_config() {
+    local config_file="$1"
+    
+    if [ ! -f "$config_file" ]; then
+        echo -e "${RED}Error: Configuration file not found: $config_file${NC}"
+        return 1
+    fi
+    
+    echo -e "${BLUE}Validating configuration: $config_file${NC}"
+    echo ""
+    
+    # Check for basic structure
+    if grep -q "#.*NLM Configuration" "$config_file"; then
+        echo -e "${GREEN}✓ Basic configuration header found${NC}"
+    else
+        echo -e "${YELLOW}⚠ No standard configuration header found${NC}"
+    fi
+    
+    # Check for required keys
+    local required_keys=("random_seed" "simulation_timestep" "neuron_count" "region_count")
+    local missing_keys=0
+    
+    for key in "${required_keys[@]}"; do
+        if ! grep -q "^[[:space:]]*$key[[:space:]]*=" "$config_file"; then
+            echo -e "${RED}✗ Missing required key: $key${NC}"
+            missing_keys=$((missing_keys + 1))
+        fi
+    done
+    
+    if [ $missing_keys -eq  puisse ]; then
+        echo -e "${GREEN}✓ All required keys present${NC}"
+    fi
+    
+    # Check file syntax
+    if grep -q "=" "$config_file"; then
+        echo -e "${GREEN}✓ Configuration syntax appears valid${NC}"
+    else
+        echo -e "${YELLOW}⚠ No configuration assignments found${NC}"
+    fi
+    
+    # Count key-value pairs
+    local key_count=$(grep -c "^[[:space:]]*[a-zA-Z0-9_]*[[:space:]]*=" "$config_file" 2>/dev/null || echo 0)
+    echo "Found ${BLUE}$key_count${NC} configuration parameters"
+    
+    echo ""
+    echo -e "${GREEN}Configuration validation complete${NC}"
+}
+
+echo_create_config() {
+    local name="$1"
+    local type="${2:-phase6}"
+    local config_file="configs/${name}.cfg"
+    
+    if [ -f "$config_file" ]; then
+        echo -e "${YELLOW}Warning: Configuration file already exists: $config_file${NC}"
+        read -p "Overwrite? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Cancelled"
+            return
+        fi
+    fi
+    
+    echo -e "${BLUE}Creating configuration: $config_file${NC}"
+    echo ""
+    
+    # Select template
+    case "$type" in
+        "phase2")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Phase 2 Template
+# Basic neural computation with LIF neurons and STDP plasticity
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds (Phase 2: Real neural computation)
+simulation_timestep = 0.001
+
+# Number of neurons in the brain (Phase 2: ~37k synapses for 500 neurons)
+neuron_count = 1000
+
+# Number of brain regions (Phase 2: Small number for faster test)
+region_count = 2
+
+# Connection probability for random connectivity
+connection_probability = 0.15
+
+# Plasticity settings (Phase 2: Real STDP and Hebbian plasticity)
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Development settings (Phase 2: Basic structural plasticity)
+development_synaptogenesis_rate = 0.0001
+development_pruning_rate = 0.00001
+
+# Neuromodulation settings (Phase 2: Reward and novelty)
+dopamine_baseline = 0.1
+dopamine_norepinephrine_ratio = 1.0
+EOF
+            ;;
+        "phase3")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Phase 3 Template
+# World interaction with reward and developmental stages
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds (Phase 2: Real neural computation)
+simulation_timestep = 0.001
+
+# Number of neurons in the brain (Phase 6: Large-scale neural populations)
+neuron_count = 5000
+
+# Number of brain regions (Phase 6: Multiple interconnected regions)
+region_count = 4
+
+# Connection probability for random connectivity
+connection_probability = 0.12
+
+# Plasticity settings (Phase 2: Real STDP and Hebbian plasticity)
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Development settings (Phase 6: Developmental stages)
+development_synaptogenesis_rate = 0.0001
+development_pruning_rate = 0.00001
+development_stage = "critical_period"
+development_plasticity_rate = 0.8
+
+# Neuromodulation settings (Phase 6: Full neuromodulation system)
+dopamine_baseline = 0.1
+dopamine_norepinephrine_ratio = 1.0
+dopamine_plasticity_factor = 1.0
+norepinephrine_focus = 1.0
+serotonin_overall = 0.5
+serotonin_mood = 1.0
+serotonin_sleep = 0.1
+acetylcholine_attention = 1.0
+acetylcholine_memory = 0.8
+
+# Reward settings (Phase 6: Reward prediction error and dopamine)
+reward_discount_factor = 0.99
+reward_prediction_error_decay = 0.1
+
+# Memory systems (Phase 6: Working, episodic, and associative memory)
+working_memory_capacity = 500
+episodic_memory_max_episodes = 5000
+associative_memory_capacity = 2000
+
+# Environment settings (Phase 3: World interaction)
+environment_name = GridWorld
+environment_width = 20
+environment_height = 20
+
+# Logging settings (Phase 5: Advanced logging system)
+log_level = INFO
+log_to_file = true
+log_filename = nlm_${name}.log
+log_rotation_size = 10485760
+log_retention_days = 7
+
+# Simulation settings (Phase 6: Advanced simulation control)
+max_simulation_steps = 50000
+simulation_time_limit = 0.0
+enable_checkpoints = true
+checkpoint_interval = 5000
+checkpoint_dir = ./checkpoints_${name}
+EOF
+            ;;
+        "phase6")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Phase 6 Template
+# Full integration with memory, prediction, cognition, and neuromodulation
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds (Phase 2: Real neural computation)
+simulation_timestep = 0.001
+
+# Number of neurons in the brain (Phase 6: Large-scale neural populations)
+neuron_count = 10000
+
+# Number of brain regions (Phase 6: Multiple interconnected regions)
+region_count = 6
+
+# Connection probability for random connectivity
+connection_probability = 0.1
+
+# Plasticity settings (Phase 2: Real STDP and Hebbian plasticity)
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Structural plasticity settings (Phase 2: Synaptogenesis and pruning)
+development_synaptogenesis_rate = 0.0001
+development_pruning_rate = 0.00001
+
+# Neuromodulation settings (Phase 6: Integrated neuromodulation systems)
+dopamine_baseline = 0.1
+dopamine_norepinephrine_ratio = 1.0
+dopamine_plasticity_factor = 1.0
+norepinephrine_focus = 1.0
+serotonin_overall = 0.5
+serotonin_mood = 1.0
+serotonin_sleep = 0.1
+acetylcholine_attention = 1.0
+acetylcholine_memory = 0.8
+
+# Reward settings (Phase 6: Reward prediction error and dopamine)
+reward_discount_factor = 0.99
+reward_prediction_error_decay = 0.1
+
+# Memory systems (Phase 6: Working, episodic, and associative memory)
+working_memory_capacity = 1000
+episodic_memory_max_episodes = 10000
+associative_memory_capacity = 5000
+
+# Prediction system (Phase 6: Neural prediction capabilities)
+prediction_horizon = 10
+prediction_update_rate = 0.5
+
+# Development system (Phase 6: Developmental stages)
+development_stage = "critical_period"
+development_plasticity_rate = 0.8
+
+# Attention system (Phase 6: Competitive attentional selection)
+attentional_inhibition_strength = 0.5
+attentional_excitation_strength = 1.5
+attentional_salience_decay = 0.1
+
+# Environment settings (Phase 3: World interaction)
+environment_name = GridWorld
+environment_width = 20
+environment_height = 20
+
+# Logging settings (Phase 5: Advanced logging system)
+log_level = INFO
+log_to_file = true
+log_filename = nlm_${name}.log
+log_rotation_size = 10485760
+log_retention_days = 7
+
+# Simulation settings (Phase 6: Advanced simulation control)
+max_simulation_steps = 100000
+simulation_time_limit = 0.0
+enable_checkpoints = true
+checkpoint_interval = 10000
+checkpoint_dir = ./checkpoints_${name}
+
+# Visualization settings (Phase 6: Visualization capabilities)
+visualization_enabled = false
+visualization_update_rate = 30.0
+visualization_backend = "opengl"
+
+# Performance settings (Phase 5: Performance optimizations)
+enable_simd = true
+enable_parallel_processing = false
+max_threads = 4
+memory_pool_size = 1048576
+EOF
+            ;;
+        "debug")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Debug Template
+# High-verbosity debug configuration for development and troubleshooting
+
+# Random seed for reproducible experiments
+random_seed = 12345
+
+# Simulation timestep in seconds (Phase 2: Real neural computation)
+simulation_timestep = 0.001
+
+# Number of neurons in the brain (Phase 2: Smaller for faster debugging)
+neuron_count = 100
+
+# Number of brain regions (Phase 2: Single region for simpler debugging)
+region_count = 1
+
+# Connection probability for random connectivity (dense)
+connection_probability = 0.3
+
+# Plasticity settings (Phase 2: Real STDP and Hebbian plasticity)
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Development settings (Phase 2: Basic structural plasticity)
+development_synaptogenesis_rate = 0.0001
+development_pruning_rate = 0.00001
+
+# Neuromodulation settings (Phase .Intn: All neuromodulators at maximum)
+dopamine_baseline = 1.0
+dopamine_norepinephrine_ratio = 1.0
+dopamine_plasticity_factor = 2.0
+norepinephrine_focus = 1.0
+serotonin_overall = 1.0
+serotonin_mood = 1.0
+serotonin_sleep = 1.0
+acetylcholine_attention = 1.0
+acetylcholine_memory = 1.0
+
+# Reward settings (Phase 6: Reward prediction error and dopamine)
+reward_discount_factor = 0.99
+reward_prediction_error_decay = 0.1
+
+# Memory systems (Phase 6: Large capacity for debugging)
+working_memory_capacity = 1000
+episodic_memory_max_episodes = 5000
+associative_memory_capacity = 2000
+
+# Prediction system (Phase 6: Neural prediction capabilities)
+prediction_horizon = 10
+prediction_update_rate = 0.5
+
+# Development system (Phase 6: Developmental stages)
+development_stage = "initial"
+development_plasticity_rate = 1.0
+
+# Attention system (Phase 6: Competitive attentional selection)
+attentional_inhibition_strength = 0.5
+attentional_excitation_strength = 1.5
+attentional_salience_decay = 0.1
+
+# Environment settings (Phase 3: World interaction)
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+
+# Logging settings (Phase 5: Maximum verbosity)
+log_level = DEBUG
+log_to_file = true
+log_filename = nlm_${name}_debug.log
+log_rotation_size = 10485760
+log_retention_days = 7
+
+# Simulation settings (Phase 6: Many steps for debugging)
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
+enable_checkpoints = true
+checkpoint_interval = 1000
+checkpoint_dir = ./checkpoints_${name}_debug
+
+# Visualization settings (Phase 6: Disabled for debugging)
+visualization_enabled = false
+visualization_update_rate = 30.0
+visualization_backend = "opengl"
+
+# Performance settings (Phase 5: No optimizations for debugging)
+enable_simd = false
+enable_parallel_processing = false
+max_threads = 1
+memory_pool_size = 1048576
+EOF
+            ;;
+        "minimal")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Minimal Template
+# Minimal configuration for testing and quick experiments
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds (Phase 2: Default timestep)
+simulation_timestep = 0.001
+
+# Number of neurons in the brain (Phase 2: Very small for testing)
+neuron_count = 20
+
+# Number of brain regions (Phase 2: Single region for simplicity)
+region_count = 1
+
+# Connection probability for random connectivity
+connection_probability = 0.2
+
+# Plasticity settings (Phase 2: Default plasticity)
+plasticity_learning_rate = 0 parm
+EOF
+            ;;
+        "research")
+            cat > "$config_file" << 'EOF'
+# NLM Configuration File - Research Template
+# Research-oriented configuration with extended parameters
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds (Phase 2: Fine-grained time steps)
+simulation_timestep = 0.0001
+
+# Number of neurons in the brain (Phase 6: Large-scale neural populations)
+neuron_count = 50000
+
+# Number of brain regions (Phase 6: Many interconnected regions)
+region_count = 8
+
+# Connection probability for random connectivity (sparse)
+connection_probability = 0.08
+
+# Plasticity settings (Phase 2: Real STDP and Hebbian plasticity)
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Structural plasticity settings (Phase 2: Synaptogenesis and pruning)
+development_synaptogenesis_rate = 0.00001
+development_pruning_rate = 0.000001
+
+# Neuromodulation settings (Phase 6: Full neuromodulation system)
+dopamine_baseline = 0.1
+dopamine_norepinephrine_ratio = 1.0
+dopamine_plasticity_factor = 1.0
+norepinephrine_focus = 1.0
+serotonin_overall = 0.5
+serotonin_mood = 1.0
+serotonin_sleep = 0.1
+acetylcholine_attention = 1.0
+acetylcholine_memory = 0.8
+
+# Reward settings (Phase 6: Reward prediction error and dopamine)
+reward_discount_factor = 0.99
+reward_prediction_error_decay = 0.1
+
+# Memory systems (Phase 6: Large capacity for research)
+working_memory_capacity = 5000
+episodic_memory_max_episodes = 50000
+associative_memory_capacity = 20000
+
+# Prediction system (Phase  אותג: Neural prediction capabilities)
+prediction_horizon = 20
+prediction_update_rate = 0.3
+
+# Development system (Phase 6: Developmental stages)
+development_stage = "critical_period"
+development_plasticity_rate = 0.8
+
+# Attention system (Phase 6: Competitive attentional selection)
+attentional_inhibition_strength = 0.5
+attentional_excitation_strength = 1.5
+attentional_salience_decay = 0.1
+
+# Environment settings (Phase 3: World interaction)
+environment_name = GridWorld
+environment_width = 30
+environment_height = 30
+
+# Logging settings (Phase 5: File-only logging for research)
+log_level = INFO
+log_to_file = true
+log_filename = nlm_${name}_research.log
+log_rotation_size = 1024*1024*1024  # 1GB
+log_retention_days = 30
+
+# Simulation settings (Phase 6: Extended simulation for research)
+max_simulation_steps = 1000000
+simulation_time_limit = 0.0
+enable_checkpoints = true
+checkpoint_interval = 100000
+checkpoint_dir = ./checkpoints_${name}_research
+
+# Visualization settings (Phase 6: Disabled for research)
+visualization_enabled = false
+visualization_update_rate = 30.0
+visualization_backend = "opengl"
+
+# Performance settings (Phase 5: Optimized for research)
+enable_simd = true
+enable_parallel_processing = true
+max_threads = 8
+memory_pool_size = 1024*1024*1024  # 1GB
+EOF
+            ;;
+        *)
+            echo -e "${RED}Unknown configuration type: $type${NC}"
+            echo "Available types: phase2, phase3, phase6, debug, minimal, research"
+            return 1
+            ;;
+    esac
+    
+    echo ""
+    echo -e "${GREEN}Configuration created: $config_file${NC}"
+}
+
+echo_set_config() {
+    local config_file="$1"
+    local key="$2"
+    local value="$3"
+    
+    if [ ! -f "$config_file" ]; then
+        echo -e "${RED}Error: Configuration file not found: $config_file${NC}"
+        return 1
+    fi
+    
+    # Check if key already exists
+    if grep -q "^[[:space:]]*$key[[:space:]]*=" "$config_file"; then
+        # Replace existing line
+        sed -i "s/^[[:space:]]*$key[[:space:]]*=[[:space:]].*\$/$key = $value/" "$config_file"
+    else
+        # Append new key-value pair
+        echo "$key = $value" >> "$config_file"
+    fi
+    
+    echo -e "${GREEN}Set configuration key '$key' = '$value' in $config_file${NC}"
+}
+
+echo_export_config() {
+    local config_file="$1"
+    local format="${2:-text}"
+    
+    if [ ! -f "$config_file" ]; then
+        echo -e "${RED}Error: Configuration file not found: $config_file${NC}"
+        return 1
+    fi
+    
+    case "$format" in
+        "text"|"txt")
+            cat "$config_file"
+            ;;\n        "json")
+            # Simple JSON conversion (limited)
+            echo "{"
+            local line_num=0
+            while IFS= read -r line; do
+                # Simple key-value parsing (not robust for all cases)
+                if [[ $line =~ ^([a-zA-Z0-9_]+)[[:space:]]*=[[:space:]]*(.+)$ ]]; then
+                    key="${BASH_REMATCH[1]}"
+                    value="${BASH_REMATCH[2]}"
+                    if [ $line_num -gt 0 ]; then
+                        echo ","
+                    fi
+                    # Escape special characters
+                    key=$(echo "$key" | sed 's/"/\\"/g')
+                    value=$(echo "$value" | sed 's/"/\\"/g')
+                    echo -n "  \"$key\": \"$value\""
+                    line_num=$((line_num + 1))
+                fi
+            done < "$config_file"
+            echo
+            echo "}"
+            ;;
+        "yaml")
+            echo -e "${RED}YAML export not yet implemented${NC}"
+            ;;
+        "ini")
+            echo -e "${RED}INI export not yet implemented${NC}"
+            ;;
+        *)
+            echo -e "${YELLOW}Unknown format '$format'. Available: text, json${NC}"
+            ;;
+    esac
+}
+
+# Main command handling
+case "$1" in
+    "help")
+        echo_help
+        ;;
+    "list-configs")
+        echo_list_configs
+        ;;
+    "validate")
+        if [ -z "$2" ]; then
+            echo -e "${RED}Error: Missing config file for validate command${NC}"
+            echo -e "${YELLOW}Usage: nlm-config validate <file>${NC}"
+            exit 1
+        fi
+        echo_validate_config "$2"
+        ;;
+    "create")
+        if [ -z "$2" ]; then
+            echo -e "${RED}Error: Missing config name for create command${NC}"
+            echo -e "${YELLOW}Usage: nlm-config create <name> [type]${NC}"
+            exit 1
+        fi
+        echo_create_config "$2" "$3"
+        ;;
+    "set")
+        if [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+            echo -e "${RED}Error: Missing arguments for set command${NC}"
+            echo -e "${YELLOW}Usage: nlm-config set <file> <key> <value>${NC}"
+            exit 1
+        fi
+        echo_set_config "$2" "$3" "$4"
+        ;;
+    "export")
+        if [ -z "$2" ]; then
+            echo -e "${RED}Error: Missing config file for export command${NC}"
+            echo -e "${YELLOW}Usage: nlm-config export <file> [format]${NC}"
+            exit 1
+        fi
+        echo_export_config "$2" "$3"
+        ;;
+    "run")
+        if [ -z "$2" ]; then
+            echo -e "${RED}Error: Missing config file for run command${NC}"
+            echo -e "${YELLOW}Usage: nlm-config run <file> [options]${NC}"
+            exit 1
+        fi
+        
+        # Simulate running the NLM with this configuration
+        local config_file="$2"
+        shift 2
+        
+        echo -e "${BLUE}Simulating NLM run with: $config_file${NC}"
+        echo ""
+        echo "Configuration options:"
+        for opt in "$@"; do
+            case "$opt" in
+                "--verbose"|"-v")
+                    echo "  - Verbose output: enabled"
+                    ;;
+                "--debug"|"-d")
+                    echo "  - Debug mode: enabled"
+                    ;;
+                "--steps"*)
+                    echo "  - Simulation steps: ${opt#--steps=}"
+                    ;;
+                "--output"*)
+                    echo "  - Output file: ${opt#--output=}"
+                    ;;
+                *)
+                    echo "  - Unknown option: $opt"
+                    ;;
+            esac
+        done
+        
+        echo ""
+        echo -e "${GREEN}Simulation would run with configuration from: $config_file${NC}"
+        echo -e "${YELLOW}Note: This is a simulation of the configuration manager.${NC}"
+        echo -e "${YELLOW}To actually run the NLM, use: ./nlm --config=$config_file [options]${NC}"
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $1${NC}"
+        echo -e "${YELLOW}Available commands: help, list-configs, validate, create, set, export, run${NC}"
+        echo_help
+        exit 1
+        ;;
+esac

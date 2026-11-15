@@ -28,24 +28,37 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printHelp() {
+    printBanner();
+    std::cout << std::endl;
+    std::cout << "Usage: ./nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Core Options:" << std::endl;
+    std::cout << "  --config=<file>      Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --help, -h           Display this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Execution Options:" << std::endl;
+    std::cout << "  --verbose, -v        Enable verbose output" << std::endl;
+    std::cout << "  --debug, -d          Enable debug mode (extended logging)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Output Options:" << std::endl;
+    std::cout << "  --output-mode=<mode>  Output mode: console, file, or both (default: console)" << std::endl;
+    std::cout << "  --output-file=<file>  Output log file (default: nlm.log)" << std::endl;
+    std数年 std::cout << std::endl;
+    std::cout << "Configuration Options:" << std::endl;
+    std::cout << "  The configuration file can define all simulation parameters including:" << std::endl;
+    std::cout << "    - random_seed, simulation_timestep, neuron_count, region_count" << std::endl;
+    std::cout << "    - Plasticity settings (stdp_ltp_weight, stdp_ltd_weight, etc.)" << std::endl;
+    std::cout << "    - Neuromodulation settings (dopamine_baseline, etc.)" << std::endl;
+    std::cout << "    - Memory system parameters (working_memory_capacity, episodic_memory_max_episodes)" << std::endl;
+    std::cout << "    - Development parameters (development_synaptogenesis_rate, etc.)" << std::endl;
+    std::cout << "    - Environment and simulation settings" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm                          Run with default configuration" << std::endl;
+    std::cout << "  ./nlm --config=my_config.cfg     Use custom configuration" << std::endl;
+    std::cout << "  ./nlm --verbose --debug         Run with extended logging" << std::endl;
+    std::cout << "  ./nlm --output-mode=file --output-file=simulation.log    Log to file only" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -329,8 +342,14 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Enhanced configuration loading with multiple options
     std::string configFile = "configs/default.cfg";
+    bool verboseMode = false;
+    bool debugMode = false;
+    std::string outputMode = "console";  // console, file, both
+    std::string outputFile = "nlm.log";
+    
+    // Parse enhanced command line options
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -339,6 +358,25 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            debugMode = true;
+        } else if (arg.substr(0, 12) == "--output-mode") {
+            if (arg.find('=') != std::string::npos) {
+                outputMode = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                outputMode = argv[++i];
+            }
+        } else if (arg.substr(0, 13) == "--output-file") {
+            if (arg.find('=') != std::string::npos) {
+                outputFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
         }
     }
     
@@ -383,13 +421,43 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    // Validate configuration before initialization
+    bool configValid = true;
+    if (!config->getOr<int64_t>("random_seed", 42)) {
+        NLM_LOG_WARNING("Missing or invalid random_seed in config, using default");
+    }
+    if (!config->getOr<double>("simulation_timestep", 0.001)) {
+        NLM_LOG_ERROR("Invalid simulation_timestep in config");
+        configValid = false;
+    }
+    if (!config->getOr<int64_t>("neuron_count", 1000) || config->getOr<int64_t>("neuron_count", 1000) <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count in config");
+        configValid = false;
+    }
+    
+    if (!configValid) {
+        NLM_LOG_ERROR("Invalid configuration, using defaults");
+        // Set safe defaults
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    }
+    
+    // Initialize brain with enhanced error handling
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Brain initialization failed!");
+        NLM_LOG_ERROR("This typically indicates:");
+        NLM_LOG_ERROR("  - Memory allocation failure");
+        NLM_LOG_ERROR("  - Invalid configuration parameters");
+        NLM_LOG_ERROR("  - Corrupted configuration file");
+        NLM_LOG_ERROR("  - System resource limits exceeded");
+        NLM_LOG_ERROR("\nSuggestions:");
+        NLM_LOG_ERROR("  - Check configuration file: " + configFile);
+        NLM_LOG_ERROR("  - Increase system memory if needed");
+        NLM_LOG_ERROR("  - Use simpler configuration with fewer neurons/regions");
+        NLM_LOG_ERROR("  - Verify all required system libraries are available");
         return 1;
     }
     
