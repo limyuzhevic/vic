@@ -151,7 +151,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     // 0.1 s updates it would be a 0.2 rad/step spiral. Any
     // non-turn action therefore stops rotation.
     switch (cmd) {
-        case MotorCommand::MoveForward: {
+case MotorCommand::MoveForward: {
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
             float dx = std::cos(agent_.orientation) * moveSpeed;
@@ -164,10 +164,10 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = -0.05f;  // Higher cost for movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = -0.1f;  // Higher cost for hitting wall
                 result.success = false;
             }
             break;
@@ -186,10 +186,10 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = -0.08f;  // Higher cost for backward movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -0.1f;
                 result.success = false;
             }
             break;
@@ -198,14 +198,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.02f;  // Higher cost for turning
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.02f;  // Higher cost for turning
             result.success = true;
             break;
             
@@ -218,6 +218,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
 
         case MotorCommand::LookRight:
+            // Pan sensor (no movement)
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
             result.reward = 0.0f;

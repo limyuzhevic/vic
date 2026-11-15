@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <nlohmann/json.hpp>  // JSON parser library
 
 namespace nlm {
 
@@ -66,12 +67,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +96,55 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Convert config to JSON
+    nlohmann::json toJson() const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Load from JSON
+    static std::shared_ptr<Config> fromJson(const nlohmann::json& json);
+    
+    // Configuration validation
+    
+    // Validate a configuration key
+    static bool validateKey(const std::string& key, std::string& errorMessage);
+    
+    // Validate a configuration value for a specific key
+    static bool validateValue(const std::string& key, const ConfigValue& value, std::string& errorMessage);
+    
+    // Check if configuration value is within acceptable range
+    static bool isValidRange(const std::string& key, const ConfigValue& value);
+    
+    // Get validation warning for a specific key/value combination
+    static std::string getValidationWarning(const std::string& key, const ConfigValue& value);
+    
+    // Validate all current configuration entries
+    std::vector<std::string> validateAll() const;
+    
+    // Get configuration parameter descriptions
+    static std::string getParameterDescription(const std::string& key);
+    
+    // Get all valid parameter keys
+    static std::vector<std::string> getValidParameterKeys();
+    
+    // Check if key is a valid configuration parameter
+    static bool isValidParameterKey(const std::string& key);
+    
+    // Get parameter type for validation
+    static std::string getParameterType(const std::string& key);
+    
+    // Validate parameter-specific constraints
+    static bool validateParameterConstraints(const std::string& key, const ConfigValue& value);
+    
+    // Get warning if parameter value is suspicious but still valid
+    static std::string getSuspicionWarning(const std::string& key, const ConfigValue& value);
+    
+    // Validate and log warnings for all parameters
+    void validateAndWarn() const;
+    
+    // Clear all validation warnings
+    void clearValidationWarnings();
+    
+    // Get all validation warnings
+    std::vector<std::string> getAllValidationWarnings() const;
 };
 
 } // namespace nlm

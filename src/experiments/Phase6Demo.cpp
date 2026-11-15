@@ -1,19 +1,12 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
-
-using namespace nlm;
+#include <fstream>
+#include <filesystem>
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the integrated artificial brain with enhanced reporting..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
@@ -21,7 +14,7 @@ int main(int argc, char* argv[]) {
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
-    // First, run the quick integration verification
+    // Run the quick integration verification first
     std::cout << "--- Integration Verification ---" << std::endl;
     bool integrationOK = experiment.verifyIntegration();
     
@@ -64,10 +57,13 @@ int main(int argc, char* argv[]) {
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Total reward (average per step): " << result.totalReward << std::endl;
+    std::cout << "Total accumulated reward: " << result.totalReward * config.maxSteps << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
@@ -80,6 +76,34 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    // Enhanced metrics reporting
+    std::cout << "\n=== ENHANCED METRICS ===" << std::endl;
+    if (result.totalReward > 0.0f) {
+        std::cout << "✓ POSITIVE LEARNING: Agent is learning from experience (total reward > 0)" << std::endl;
+    } else if (result.totalReward < -0.1f) {
+        std::cout << "⚠ NEGATIVE REINFORCEMENT: Agent is experiencing net negative consequences" << std::endl;
+    } else {
+        std::cout << "ℹ NEUTRAL LEARNING: Agent rewards are near zero (may need more exploration)" << std::endl;
+    }
+    
+    std::cout << "Firing rate analysis: ";
+    if (result.avgFiringRate > 100.0f) {
+        std::cout << "HIGH (" << result.avgFiringRate << " Hz) - high activity level" << std::endl;
+    } else if (result.avgFiringRate > 30.0f) {
+        std::cout << "MODERATE (" << result.avgFiringRate << " Hz) - moderate activity level" << std::endl;
+    } else {
+        std::cout << "LOW (" << result.avgFiringRate << " Hz) - low activity level" << std::endl;
+    }
+    
+    std::cout << "Neuromodulation analysis: ";
+    if (result.dopamineLevel > 0.1f) {
+        std::cout << "STRONG (" << result.dopamineLevel << ") - high reward prediction error" << std::endl;
+    } else if (result.dopamineLevel < -0.1f) {
+        std::cout << "STRONG (" << result.dopamineLevel << ") - high punishment prediction error" << std::endl;
+    } else {
+        std::cout << "STABLE (" << result.dopamineLevel << ") - stable prediction error" << std::endl;
+    }
     
     return 0;
 }
