@@ -1,0 +1,117 @@
+# Build directories
+build/
+
+# Compiled object files
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.pyenv
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# PEP 582; used by PyCharm
+.pyre/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+
+# CMake
+cmake-build-*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Log files
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+
+# Editor
+*.orig
+*.diff
+*.patch
+
+# Memory dumps
+*.dmp
+
+# Benchmark
+benchmark
+
+# Configuration files
+*.cfg
+*.ini
+*.json
+*.yaml
+*.yml
+
+# Localization
+*.mo
+
+# Python package
+*.egg-info/
+
+# Deployment scripts
+*.sh
+
+# Test results
+*test_results*
+
+# NLM specific
+/tmp/nlm_test_checkpoint.bin
+*.bin
+
+# Documentation artifacts
+*.html
+*.pdf
+*.md
+*.rst

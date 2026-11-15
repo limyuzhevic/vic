@@ -535,8 +535,41 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+### Integration with Other Systems
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+#### MATLAB/Octave Integration
+
+Use the MEX interface for MATLAB integration:
+
+```matlab
+% Load NLM MEX files
+load('nlm_mex.dll')  % Windows
+load('./libnlm.so', 'nlm_brain', 'nlm_neuron')  % Linux
+
+% Create NLM brain
+config = nlm_config_create();
+nlm_config_set(config, 'neuron_count', 1000);
+brain = nlm_brain_create(config);
+nlm_brain_initialize(brain);
+
+% Run simulation
+for step = 1:100
+    nlm_brain_step(brain, step);
+end
+
+% Get statistics
+neuron_count = nlm_brain_get_neuron_count(brain);
+firing_rate = nlm_brain_get_firing_rate(brain);
+```
+
+#### ROS Integration
+
+Use the ROS 2 package for robot control:
+
+```bash
+# Install ROS 2 NLM package
+apt install ros-humble-nlm
+
+# Create NLM node in ROS 2
+ros2 run nlm_example brain_node --neurons  corri
+```

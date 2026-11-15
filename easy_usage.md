@@ -42,33 +42,40 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 4: Advanced Configuration and Custom Neurons
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create custom configuration with advanced settings
+config = pynlm.createDefaultConfig()
+
+# Configure advanced parameters
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.2)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.005)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("prediction.horizon", 5)
+config.set("working_memory.capacity", 500)
+config.set("development.enable", True)
+config.set("development.critical_period", True)
+
+# Create brain with custom configuration
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
+# Create agent with advanced capabilities
 agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+print(f"Advanced brain created with {brain.getTotalNeuronCount()} neurons")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
 ```
 
 ---

@@ -146,7 +146,10 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
-void testSTDPSoftBounds();
+void testSTDPPotentiation();
+void testSTDPDepression();
+void testSTDPEmptySpikes();
+void testSTDPWeightBounds();
 
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
