@@ -12,6 +12,12 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/sensory/VisionProcessor.hpp"
+#include "../src/sensory/AudioProcessor.hpp"
+#include "../src/sensory/InternalSignalsProcessor.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
@@ -115,6 +121,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Look", ActionType::Look)
         .value("LookUp", ActionType::LookUp)
         .value("LookDown", ActionType::LookDown)
+        .value("LookLeft", ActionType::LookLeft)  // MISSING VALUE
+        .value("LookRight", ActionType::LookRight)  // MISSING VALUE
         .value("Interact", ActionType::Interact)
         .value("Eat", ActionType::Eat)
         .value("Drink", ActionType::Drink)
@@ -128,8 +136,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("MoveBackward", MotorCommand::MoveBackward)
         .value("TurnLeft", MotorCommand::TurnLeft)
         .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
+        .value("LookLeft", MotorCommand::LookLeft)  // MISSING VALUE
+        .value("LookRight", MotorCommand::LookRight)  // MISSING VALUE
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
         .export_values();
@@ -204,7 +212,39 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+    // VISION PROCESSOR - MISSING BINDING
+    py::class_<VisionProcessor>(m, "VisionProcessor", R"pbdoc(Vision processing system)pbdoc")
+        .def(py::init<>())
+        .def("process", &VisionProcessor::process, py::arg("input"),
+             "Process vision input")
+        .def("getFeatures", &VisionProcessor::getFeatures,
+             py::return_value_policy::reference_internal,
+             "Get feature representation")
+        .def("getFeatureDimensions", &VisionProcessor::getFeatureDimensions,
+             "Get feature dimensionality");
+
+    // AUDIO PROCESSOR - MISSING BINDING
+    py::class_<AudioProcessor>(m, "AudioProcessor", R"pbdoc(Audio processing system)pbdoc")
+        .def(py::init<>())
+        .def("process", &AudioProcessor::process, py::arg("input"),
+             "Process audio input")
+        .def("getFeatures", &AudioProcessor::getFeatures,
+             py::return_value_policy::reference_internal,
+             "Get feature representation")
+        .def("getFeatureDimensions", &AudioProcessor::getFeatureDimensions,
+             "Get feature dimensionality");
+
+    // INTERNAL SIGNALS PROCESSOR - MISSING BINDING
+    py::class_<InternalSignalsProcessor>(m, "InternalSignalsProcessor", R"pbdoc(Internal signals processing system)pbdoc")
+        .def(py::init<>())
+        .def("process", &InternalSignalsProcessor::process, py::arg("signals"),
+             "Process internal signals")
+        .def("getProcessedSignals", &InternalSignalsProcessor::getProcessedSignals,
+             py::return_value_policy::reference_internal,
+             "Get processed representation")
+        .def("getHomeostaticSignals", &InternalSignalsProcessor::getHomeostaticSignals,
+             py::return_value_policy::reference_internal,
+             "Get homeostasis signals");
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
         .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
@@ -314,6 +354,71 @@ PYBIND11_MODULE(pynlm, m) {
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
+        // Get spike system - CRITICAL MISSING BINDING
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system interface")
+        // Get plasticity systems - CRITICAL MISSING BINDINGS
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        // Get memory systems - CRITICAL MISSING BINDINGS
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        // Get prediction system - CRITICAL MISSING BINDING
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        // Get cognition systems - CRITICAL MISSING BINDINGS
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        // Get development system - CRITICAL MISSING BINDING
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        // Get neuromodulation systems - CRITICAL MISSING BINDINGS
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator")
+        // Get random generator - CRITICAL MISSING BINDING
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random number generator")
+        // Get learned preference - MISSING BINDING
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+             "Get learned preference trait")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+             py::arg("preference"),
+             "Set learned preference trait")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
@@ -374,6 +479,10 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        // Motor group activities - CRITICAL MISSING BINDING
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             "Get motor group activities for diagnostics")
+        // Key AgentBrain methods - CRITICAL MISSING BINDINGS
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
@@ -390,8 +499,32 @@ PYBIND11_MODULE(pynlm, m) {
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+        // Phase 5-6 diagnostic methods - CRITICAL MISSING BINDINGS
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get thought trace (Phase 5)")
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait")
+        .def("getReflexBonusCount", &AgentBrain::getReflexBonusCount)
+        .def("getReflexSuppressCount", &AgentBrain::getReflexSuppressCount)
+        .def("getWtaPulseCount", &AgentBrain::getWtaPulseCount)
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount)
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount)
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount)
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount)
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount)
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount)
+        .def("getConceptCount", &AgentBrain::getConceptCount)
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence)
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount)
+        // encodeText - CRITICAL MISSING BINDING
+        .def("encodeText", &AgentBrain::encodeText, py::arg("text"),
+             "Encode text into neuron patterns (Phase 6)")
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get internal firing rates (Phase 6)")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+             "Observe other agent (Phase 6)")
+        // Brain access methods - MISSING BINDINGS
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
@@ -406,21 +539,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    m.def("createDefaultConfig", []() -> std::shared_ptr<const Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
+    m.def("createBrain", [](const std::shared_ptr<const Config>& config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(std::const_pointer_cast<Config>(config));
     }, py::arg("config"), "Create a new brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("createAgentBrain", [](const std::shared_ptr<Brain>& brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
