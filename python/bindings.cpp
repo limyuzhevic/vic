@@ -2,9 +2,18 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <unordered_map>
+#include <chrono>
+#include <thread>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <cmath>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -407,6 +416,330 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // ========== ADVANCED PYTHON API FUNCTIONS ==========
+    
+    // Quick start preset configurations
+    m.def("createDefaultConfigForSimulation", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Phase 6 default configuration
+        config->set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+        config->set("replay_interval", 100, nlm::ConfigSource::Default);
+        config->set("consolidation_interval", 1000, nlm::ConfigSource::Default);
+        
+        // Enable all major systems
+        config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, nlm::ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+        
+        // Sensory-motor setup
+        config->set("sensory.input_size", 24, nlm::ConfigSource::Default);
+        config->set("motor.output_size", 8, nlm::ConfigSource::Default);
+        
+        return config;
+    }, "Create a complete default configuration for Phase 6 simulation");
+    
+    // Quick agent setup with world
+    m.def("createAgentSimulation", [](const std::string& worldType = "simple") {
+        // Create complete agent simulation with world
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        
+        agent->initialize(world);
+        
+        // Enable all subsystems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("worldType") = "simple", 
+       "Create a complete agent simulation with brain, agent, and world");
+    
+    // Run simulation with progress callback
+    m.def("runSimulationWithCallback", [](
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        size_t numSteps,
+        std::function<void(size_t, float)> progressCallback = nullptr
+    ) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid simulation components");
+        }
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            
+            // Run brain simulation
+            brain->step(static_cast<nlm::SimulationStep>(step));
+            
+            // Get motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation based on sensory internal signals
+            auto internalSignals = percept->getInternal();
+            float reward = internalSignals.empty() ? 0.0f : internalSignals[0];
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Report progress
+            if (progressCallback) {
+                float progress = static_cast<float>(step) / static_cast<float>(numSteps);
+                progressCallback(step, progress);
+            }
+            
+            // Occasionally log for debugging
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                         << brain->getFiringNeuronCount() << " firing neurons, "
+                         << agent->getCuriosityLevel() << " curiosity" << std::endl;
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), brain->getAverageFiringRate());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("progressCallback") = nullptr,
+       "Run a complete simulation with progress callbacks");
+    
+    // Configuration validation and auto-correction
+    m.def("validateAndFixConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<Config> {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        auto fixedConfig = std::make_shared<Config>(*config);  // Copy
+        
+        // Validate and fix common configuration issues
+        if (fixedConfig->has("neuron_count") && 
+            fixedConfig->getOr<int64_t>("neuron_count", 0) < 10) {
+            fixedConfig->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+        }
+        
+        if (fixedConfig->has("region_count") && 
+            fixedConfig->getOr<int64_t>("region_count", 0) < 1) {
+            fixedConfig->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+        }
+        
+        if (fixedConfig->has("connection_probability") && 
+            (fixedConfig->getOr<float>("connection_probability", 0.0f) <= 0.0f || 
+             fixedConfig->getOr<float>("connection_probability", 0.0f) > 1.0f)) {
+            fixedConfig->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+        }
+        
+        if (!fixedConfig->has("random_seed")) {
+            fixedConfig->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+        }
+        
+        return fixedConfig;
+    }, py::arg("config"), "Validate and fix common configuration issues");
+    
+    // Configuration presets
+    m.def("getPresetConfiguration", [](const std::string& presetName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "minimal") {
+            config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.05f, nlm::ConfigSource::Default);
+            
+        } else if (presetName == "balanced") {
+            config->set("neuron_count", static_cast<int64_t>(500), nlm::ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+            config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+            
+        } else if (presetName == "high_learning") {
+            config->set("neuron_count", static_cast<int64_t>(2000), nlm::ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(4), nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+            config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+            config->set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+            config->set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+            
+        } else if (presetName == "phase6_full") {
+            // Full Phase 6 integration configuration
+            config->set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+            config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+            config->set("replay_interval", 100, nlm::ConfigSource::Default);
+            config->set("consolidation_interval", 1000, nlm::ConfigSource::Default);
+            
+            config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+            config->set("plasticity.stdp.learning_rate", 0.001f, nlm::ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+            config->set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+            
+            config->set("neuromod.dopamine.scale", 1.0f, nlm::ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+            config->set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+            
+            config->set("sensory.input_size", 24, nlm::ConfigSource::Default);
+            config->set("motor.output_size", 8, nlm::ConfigSource::Default);
+            
+        } else {
+            throw std::runtime_error("Unknown preset name: " + presetName + ". Available: minimal, balanced, high_learning, phase6_full");
+        }
+        
+        return config;
+    }, py::arg("presetName"), "Get a preset configuration for common scenarios");
+    
+    // Enhanced Brain methods for Python users
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
+             py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        // Python-specific helper methods
+        .def("simulateSteps", [](std::shared_ptr<Brain> self, size_t numSteps) {
+            for (size_t step = 0; step < numSteps; ++step) {
+                self->step(static_cast<nlm::SimulationStep>(step));
+            }
+            return self->getTotalSpikeCount();
+        }, py::arg("numSteps"), "Run multiple simulation steps")
+        .def("simulateWithTime", [](std::shared_ptr<Brain> self, size_t numSteps, double timestep) {
+            for (size_t step = 0; step < numSteps; ++step) {
+                self->step(static_cast<nlm::SimulationStep>(step), 
+                          static_cast<nlm::Timestamp>(step) * timestep);
+            }
+            return self->getTotalSpikeCount();
+        }, py::arg("numSteps"), py::arg("timestep") = 0.001, "Simulate steps with time tracking")
+        .def("getNetworkStats", [](std::shared_ptr<Brain> self) {
+            std::map<std::string, double> stats;
+            stats["total_neurons"] = static_cast<double>(self->getTotalNeuronCount());
+            stats["total_synapses"] = static_cast<double>(self->getTotalSynapseCount());
+            stats["firing_neurons"] = static_cast<double>(self->getFiringNeuronCount());
+            stats["avg_firing_rate"] = static_cast<double>(self->getAverageFiringRate());
+            stats["e_i_ratio"] = static_cast<double>(self->getExcitationInhibitionRatio());
+            stats["total_spikes"] = static_cast<double>(self->getTotalSpikeCount());
+            return stats;
+        }, "Get comprehensive network statistics as a dictionary")
+        .def("runSensoryTest", [](std::shared_ptr<Brain> self) {
+            // Create a simple sensory input for testing
+            auto sensory = std::make_shared<Vision>(24, 24, 3);
+            std::vector<float> testData(24*24*3, 0.5f);
+            sensory->setData(testData);
+            self->receiveSensoryInput(*sensory);
+            self->step(0);
+            return self->getFiringNeuronCount();
+        }, "Run a simple sensory test and return firing neuron count")
+        .def("createCopy", [](std::shared_ptr<Brain> self) {
+            // Create a new brain with the same configuration
+            auto config = self->getConfig();
+            auto newBrain = std::make_shared<Brain>(config);
+            newBrain->initialize();
+            return newBrain;
+        }, "Create a copy of the brain with the same configuration");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
