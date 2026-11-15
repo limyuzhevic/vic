@@ -54,7 +54,9 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Implement real prediction training
+    // For now, just track the observation for learning
+    // This would update prediction weights based on experience
 }
 
 } // namespace nlm
