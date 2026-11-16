@@ -138,6 +138,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        // Configure dopamine baseline from config
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+        dopamine->setBaseline(dopamineBaseline);
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -145,7 +148,7 @@ struct Brain::Impl {
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float tau = config->getOr<float>("stdp_time_constant", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity

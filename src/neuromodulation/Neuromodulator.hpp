@@ -48,6 +48,10 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Baseline configuration
+    void setBaseline(float baseline);
+    float getBaseline() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

@@ -1,5 +1,6 @@
 #include "Neuromodulator.hpp"
 #include <algorithm>
+#include <mutex>
 
 namespace nlm {
 
@@ -9,6 +10,7 @@ struct Dopamine::Impl {
     float peak;
     float decayRate;
     float releaseRate;
+    std::mutex mutex;
     
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
@@ -47,10 +49,15 @@ void Dopamine::signalReward(float reward) {
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void Dopamine::setBaseline(float baseline) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->baseline = baseline;
 }
 
-} // namespace nlm
+float Dopamine::getBaseline() const {
+    return pImpl->baseline;
+}
+
+Dopamine::~Dopamine() {
+    delete pImpl;
+}

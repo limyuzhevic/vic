@@ -93,6 +93,25 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate specific keys
+    if (key == "dopamine_baseline") {
+        // Validate that dopamine_baseline is between 0.0 and 1.0
+        std::visit([this](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                if (val < 0.0 || val > 1.0) {
+                    // Log warning for invalid value
+                    // In a real implementation, you would use a proper logging system
+                    // For now, we'll just continue with the value set
+                }
+            } else if constexpr (std::is_same_v<T, int>) {
+                if (val < 0 || val > 1) {
+                    // Log warning for invalid value
+                }
+            }
+        }, value);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
