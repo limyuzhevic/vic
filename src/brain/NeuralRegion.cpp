@@ -236,9 +236,9 @@ void NeuralRegion::reset() {
 }
 
 void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
-                                               float connectionProbability,
-                                               float meanWeight,
-                                               float weightVariance) {
+                                                float connectionProbability,
+                                                float meanWeight,
+                                                float weightVariance) {
     // Efficient random connectivity initialization
     // Creates synapses based on neuron types:
     // - Excitatory neurons -> all neurons (excitatory synapses)
@@ -285,6 +285,21 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                 synType = SynapseType::Excitatory;
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
             }
+            
+            // Add synapse
+            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+            
+            // Initialize synapse properly without overriding weight
+            if (Synapse* syn = getSynapse(synId)) {
+                syn->setType(synType);
+                // Initialize other synapse properties but keep the weight
+                syn->initializeRandom(rng);
+                syn->setWeight(weight);  // Restore weight after initializeRandom
+                syn->enablePlasticity(true, true, false);
+            }
+        }
+    }
+}
             
             // Add synapse
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);

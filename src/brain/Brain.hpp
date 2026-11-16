@@ -205,6 +205,19 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== DEBUG AND ANALYSIS METHODS ==========
+    
+    void debugNetwork() const;
+    void debugConnections() const;
+    void debugPlasticity() const;
+    void debugNeuromodulation() const;
+    
+    // Performance monitoring
+    void logPerformanceMetrics() const;
+    
+    // Stress test with current injection
+    void stressTest(float currentAmplitude, size_t steps);
+    
 private:
     struct Impl;
     Impl* pImpl;

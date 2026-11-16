@@ -261,17 +261,17 @@ void Synapse::reset() {
 void Synapse::initializeRandom(RandomGenerator& rng) {
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        // Excitatory synapses: smaller weights to reduce runaway excitation
+        pImpl->weight = rng.uniformReal(0.01f, 0.2f);
         // Excitatory synapses have moderate initial efficacy
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+        pImpl->weight = -rng.uniformReal(0.01f, 0.2f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
         // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+        pImpl->weight = rng.uniformReal(-0.05f, 0.05f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
