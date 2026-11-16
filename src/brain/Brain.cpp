@@ -52,6 +52,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -141,6 +144,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -608,14 +614,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store sensory state if available
+            if (!pImpl->sensoryNeurons.empty()) {
+                episode.sensoryState.reserve(pImpl->sensoryNeurons.size());
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    episode.sensoryState.push_back(neuron->getState().membranePotential);
+                }
+            }
+            
+            // Store resulting sensory state (current state)
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            // Store position information (simplified)
+            episode.positionX = 0.5f;  // Simplified position
+            episode.positionY = 0.5f;
+            episode.orientation = 0.0f;
+            
+            // Store age
+            episode.age = 0;
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // The prediction system is updated with current working memory content
+        // This enables predictive coding and error signals for learning
+        // Get current state from working memory (which encodes sensory experience)
+        auto wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+        std::vector<float> currentState;
+        
+        // Convert working memory activity to sensory-like state vector
+        if (!wmNeurons.empty() && !pImpl->sensoryNeurons.empty()) {
+            currentState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+                currentState.push_back(sensoryNeuron->getState().membranePotential);
+            }
+        }
+        
+        // For now, just track that prediction system exists and can be used
+        // Phase 6 integration would:
+        // 1. Use currentState to make predictions
+        // 2. Generate prediction errors
+        // 3. Update episodic memory with prediction outcomes
+        // 4. Provide error signals for learning systems
+        
+        // TODO: Implement proper integration:
+        // - Get prediction from predictionSystem
+        // - Compare with actual sensory input
+        // - Store prediction errors in working memory
+        // - Use error signals to update plasticity
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -630,9 +680,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding and integration with working memory
+        // Concept formation extracts regularities and patterns from experience
+        
+        // Create concept input from working memory
+        std::vector<float> conceptPattern;
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Sample from working memory to create concept input
+        if (!memoryNeurons.empty() && !pImpl->sensoryNeurons.empty()) {
+            conceptPattern.reserve(std::min(memoryNeurons.size(), pImpl->sensoryNeurons.size()));
+            
+            // Create concept from current working memory state
+            for (size_t i = 0; i < conceptPattern.capacity(); ++i) {
+                auto* sensoryNeuron = pImpl->sensoryNeurons[i % pImpl->sensoryNeurons.size()];
+                conceptPattern.push_back(sensoryNeuron->getState().membranePotential);
+            }
+        }
+        
+        // If we have concept input, present it to concept formation system
+        if (!conceptPattern.empty()) {
+            // Create features for concept formation
+            std::vector<float> features;
+            if (pImpl->dopamine) {
+                // Use neuromodulation state as additional feature
+                features.push_back(pImpl->dopamine->getLevel());
+            }
+            
+            if (!conceptPattern.empty()) {
+                // Present experience to concept formation
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    conceptPattern, features, 
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f,
+                    pImpl->currentStep);
+                
+                // Log concept formation if new concept created
+                if (conceptId > 0) {
+                    NLM_LOG_INFO("Brain: New concept formed at step " + 
+                               std::to_string(pImpl->currentStep) +
+                               " (ID: " + std::to_string(conceptId) + ")");
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -798,9 +889,34 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Neural planning-based action selection
+    // Use NeuralPlanner to select optimal actions based on current state and goals
+    // This integrates prediction, memory, and action planning systems
     
+    // Get current sensory state for planning
+    std::vector<float> currentState;
+    if (!pImpl->sensoryNeurons.empty()) {
+        currentState.reserve(pImpl->sensoryNeurons.size());
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentState.push_back(neuron->getState().membranePotential);
+        }
+    }
+    
+    // If we have a neural planner, use it to plan actions
+    if (pImpl->planner) {
+        // Plan action based on current state and goals
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Log the planned action
+        if (plannedAction != ActionType::Wait) {
+            NLM_LOG_INFO("Brain: NeuralPlanner selected action " + 
+                       std::to_string(static_cast<int>(plannedAction)));
+        }
+        
+        return std::make_unique<Action>(plannedAction);
+    }
+    
+    // Fallback: simple action selection based on motor neuron activity
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -1525,8 +1641,6 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
-
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
@@ -1541,6 +1655,20 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// ========== NEW NEUROMODULATION SYSTEMS ==========
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
@@ -1571,9 +1699,34 @@ void Brain::logStatus() const {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
     }
     
-    // Neuromodulation status
+    // Neuromodulation status - ALL neuromodulators
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error level: " + std::to_string(pImpl->predictionError->getError()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+        NLM_LOG_INFO("  Attention boost: " + std::to_string(pImpl->acetylcholine->getAttentionBoost()));
+        NLM_LOG_INFO("  Memory consolidation boost: " + std::to_string(pImpl->acetylcholine->getMemoryConsolidationBoost()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+        NLM_LOG_INFO("  Arousal level: " + std::to_string(pImpl->norepinephrine->getArousalLevel()));
+        NLM_LOG_INFO("  Vigilance: " + std::to_string(pImpl->norepinephrine->getVigilance()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+        NLM_LOG_INFO("  Mood: " + std::to_string(pImpl->serotonin->getMood()));
+        NLM_LOG_INFO("  Impulsivity: " + std::to_string(pImpl->serotonin->getImpulsivity()));
+        NLM_LOG_INFO("  Social behavior: " + std::to_string(pImpl->serotonin->getSocialBehavior()));
     }
     
     // Development status

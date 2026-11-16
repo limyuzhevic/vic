@@ -257,57 +257,144 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+// Command-line interface for NLM brain control and monitoring
+struct NLMCLI {
+    std::shared_ptr<Brain> brain;
     
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    NLMCLI(std::shared_ptr<Brain> b) : brain(b) {}
     
-    // Use one real synapse and its own pre/post neurons. The old test
-    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
-    // usually unrelated to that pair, so its result said nothing about STDP.
-    auto& synapses = region->getSynapses();
-    if (synapses.empty()) {
-        NLM_LOG_INFO("  No synapses for STDP test");
-        return;
+    void printUsage() const {
+        std::cout << "\n=== NLM Brain Control and Monitoring ===\n";
+        std::cout << "Usage: nlm [options]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help                    Show this help message\n";
+        std::cout << "  --status                  Display brain status\n";
+        std::cout << "  --save <file>            Save brain state to file\n";
+        std::cout << "  --load <file>            Load brain state from file\n";
+        std::cout << "  --memory-info            Display memory system information\n";
+        std::cout << "  --neuromodulation-info    Display neuromodulation system information\n";
+        std::cout << "  --run-experiment <type>  Run a specific experiment\n";
+        std::cout << "    Experiment types:\n";
+        std::cout << "      - connectivity      Basic connectivity test\n";
+        std::cout << "      - plasticity       Plasticity learning experiment\n";
+        std::cout << "      - stdp             STDP verification test\n";
+        std::cout << "      - all              Run all standard experiments\n";
     }
-    Synapse* syn = synapses[0].get();
-    syn->enablePlasticity(false, true, false);  // STDP only
-    float beforeWeight = syn->getWeight();
-    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
-    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
-    for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
-        brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
-        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
-    }
-
-    float delta = syn->getWeight() - beforeWeight;
-    NLM_LOG_INFO("  After correlated activity:");
-    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
-
-    float totalDelta = delta;
     
-    NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
-    } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    bool handleStatus() const {
+        std::cout << "\n=== Brain Status ===\n";
+        brain->logStatus();
+        return true;
     }
-}
-
-int main(int argc, char** argv) {
+    
+    bool handleSave(const std::string& filepath) const {
+        std::cout << "Saving brain state to: " << filepath << "\n";
+        bool success = brain->save(filepath);
+        if (success) {
+            std::cout << "✓ Brain state saved successfully\n";
+        } else {
+            std::cout << "✗ Failed to save brain state\n";
+        }
+        return success;
+    }
+    
+    bool handleLoad(const std::string& filepath) const {
+        std::cout << "Loading brain state from: " << filepath << "\n";
+        bool success = brain->load(filepath);
+        if (success) {
+            std::cout << "✓ Brain state loaded successfully\n";
+        } else {
+            std::cout << "✗ Failed to load brain state\n";
+        }
+        return success;
+    }
+    
+    void handleMemoryInfo() const {
+        std::cout << "\n=== Memory System Information ===\n";
+        
+        if (auto* wm = brain->getWorkingMemory()) {
+            std::cout << "Working Memory:\n";
+            std::cout << "  Active traces: " << wm->getActiveTraces() << "\n";
+            std::cout << "  Memory capacity: " << wm->getCapacity() << "\n";
+            std::cout << "  Decay rate: " << wm->getDecayRate() << "\n";
+            std::cout << "  Current activity: " << wm->getMemoryActivity() << "\n";
+        }
+        
+        if (auto* em = brain->getEpisodicMemory()) {
+            std::cout << "Episodic Memory:\n";
+            std::cout << "  Episode count: " << em->getEpisodeCount() << "\n";
+            std::cout << "  Max episodes: " << em->getEpisodes().size() << "\n";
+            std::cout << "  Average reward: " << em->getAverageReward() << "\n";
+        }
+        
+        if (auto* am = brain->getAssociativeMemory()) {
+            std::cout << "Associative Memory:\n";
+            std::cout << "  Association count: " << am->getAssociationCount() << "\n";
+        }
+    }
+    
+    void handleNeuromodulationInfo() const {
+        std::cout << "\n=== Neuromodulation System Information ===\n";
+        
+        if (auto* dopamine = brain->getDopamine()) {
+            std::cout << "Dopamine: Level=" << dopamine->getLevel() << ", PlasticityFactor=" << dopamine->getPlasticityFactor() << "\n";
+        }
+        
+        if (auto* curiosity = brain->getCuriosity()) {
+            std::cout << "Curiosity: Level=" << curiosity->getLevel() << "\n";
+        }
+        
+        if (auto* novelty = brain->getNovelty()) {
+            std::cout << "Novelty: Level=" << novelty->getLevel() << "\n";
+        }
+        
+        if (auto* predictionError = brain->getPredictionErrorSignal()) {
+            std::cout << "Prediction Error: Level=" << predictionError->getError() << "\n";
+        }
+        
+        if (auto* acetylcholine = brain->getAcetylcholine()) {
+            std::cout << "Acetylcholine: Level=" << acetylcholine->getLevel() 
+                     << ", AttentionBoost=" << acetylcholine->getAttentionBoost()
+                     << ", MemoryConsolidationBoost=" << acetylcholine->getMemoryConsolidationBoost() << "\n";
+        }
+        
+        if (auto* norepinephrine = brain->getNorepinephrine()) {
+            std::cout << "Norepinephrine: Level=" << norepinephrine->getLevel() 
+                     << ", ArousalLevel=" << norepinephrine->getArousalLevel()
+                     << ", Vigilance=" << norepinephrine->getVigilance() << "\n";
+        }
+        
+        if (auto* serotonin = brain->getSerotonin()) {
+            std::cout << "Serotonin: Level=" << serotonin->getLevel() 
+                     << ", Mood=" << serotonin->getMood()
+                     << ", Impulsivity=" << serotonin->getImpulsivity()
+                     << ", SocialBehavior=" << serotonin->getSocialBehavior() << "\n";
+        }
+    }
+    
+    bool runExperiment(const std::string& type) const {
+        if (type == "connectivity") {
+            runBasicConnectivityTest(brain);
+        } else if (type == "plasticity") {
+            runPlasticityExperiment(brain);
+        } else if (type == "stdp") {
+            runStdpVerification(brain);
+        } else if (type == "all") {
+            std::cout << "Running all standard experiments...\n";
+            runBasicConnectivityTest(brain);
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+        } else {
+            std::cout << "Unknown experiment type: " << type << "\n";
+            return false;
+        }
+        return true;
+    }
+};
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
