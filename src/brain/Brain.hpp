@@ -30,6 +30,21 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class SpikeSystem;
+class CheckpointManager;
+
+// Brain orchestration classes
+class BrainStepOrchestrator;
+class IntegratedSystemManager;
+class MemorySystemManager;
+class NeuromodulationManager;
+class PlasticityManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -172,8 +187,6 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -185,6 +198,17 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== ADVANCED NEUROMODULATION (Phase 6) ==========
+    
+    // Serotonin - mood, impulsivity, social behavior, memory consolidation
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal, vigilance, learning rate
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention, memory consolidation, working memory
+    Acetylcholine* getAcetylcholine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
