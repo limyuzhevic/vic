@@ -100,6 +100,16 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         }
     }
     
+    // FIX: Always add index to activeTraces_ if neuron is stored (regardless of activation level)
+    // A stored neuron IS an active trace by definition - this fixes the bug where getActiveTraces()
+    // always returned 0 despite having stored neurons.
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        if (std::find(activeTraces_.begin(), activeTraces_.end(), idx) == activeTraces_.end()) {
+            activeTraces_.push_back(idx);
+        }
+    }
+    
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
