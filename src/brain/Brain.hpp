@@ -14,22 +14,26 @@
 namespace nlm {
 
 // Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class Config;
+    class RandomGenerator;
+    class SimulationClock;
+    class Logger;
+    class NeuralWorkingMemory;
+    class NeuralEpisodicMemory;
+    class NeuralAssociativeMemory;
+    class PredictionSystem;
+    class NeuralPlanner;
+    class ConceptFormation;
+    class AttentionalSelection;
+    class DevelopmentSystem;
+    class Dopamine;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
+    class Serotonin;
+    class Norepinephrine;
+    class Acetylcholine;
+    class Histamine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -127,6 +131,10 @@ public:
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
+    // Get all neurons from all regions
+    std::vector<Neuron*> getAllNeurons();
+    const std::vector<Neuron*> getAllNeurons() const;
+    
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
                                   float weight = 0.0f, Delay delay = 1);
@@ -176,6 +184,18 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Serotonin - mood regulation
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and attention
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - learning and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Histamine - wakefulness and cognition
+    Histamine* getHistamine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

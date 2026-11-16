@@ -16,8 +16,32 @@ PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+    // PLACEHOLDER: For Phase 6 integration, provide minimal prediction
+    // For now, just return a copy of current state with slight modification
+    // This provides a basic prediction mechanism for integration
+    
+    // Create a simple prediction based on current state
+    auto predicted = currentState.clone();
+    
+    // Add some noise to simulate prediction uncertainty
+    const auto& currentData = currentState.getData();
+    auto& predictedData = predicted->getData();
+    
+    if (!currentData.empty() && currentData.size() == predictedData.size()) {
+        for (size_t i = 0; i < currentData.size(); ++i) {
+            // Simple prediction: small decay and random component
+            // This simulates the brain predicting future states
+            float prediction = currentData[i] * 0.8f;  // Decay
+            prediction += (pImpl->confidence * 0.2f) * (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f;  // Noise
+            predictedData[i] = prediction;
+        }
+    }
+    
+    // Update timestamp to reflect future prediction
+    double currentTime = currentState.getTimestamp();
+    predicted->setTimestamp(currentTime + 0.1);  // Predict 0.1 time units ahead
+    
+    return predicted;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {

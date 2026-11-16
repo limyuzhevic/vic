@@ -52,6 +52,10 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Histamine> histamine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -141,6 +145,10 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        histamine = std::make_unique<Histamine>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1541,6 +1549,40 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// ========== ADDITIONAL NEUROMODULATION SYSTEMS ==========
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+const Serotonin* Brain::getSerotonin() const {
+    return pImpl->serotonin.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+const Norepinephrine* Brain::getNorepinephrine() const {
+    return pImpl->norepinephrine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+const Acetylcholine* Brain::getAcetylcholine() const {
+    return pImpl->acetylcholine.get();
+}
+
+Histamine* Brain::getHistamine() {
+    return pImpl->histamine.get();
+}
+
+const Histamine* Brain::getHistamine() const {
+    return pImpl->histamine.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
