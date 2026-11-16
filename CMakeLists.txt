@@ -192,13 +192,34 @@ option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
+    # The module is shared, so the static libs it links need PIC.	ec)
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
+    
+    # Configure Python module source files
+    set(NLM_PYTHON_BINDINGS_SRC
+        python/bindings.cpp
+    )
+    
+    pybind11_add_module(pynlm ${NLM_PYTHON_BINDINGS_SRC})
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    # Add version export for Python module
+    target_compile_definitions(pynlm PRIVATE NLM_PYTHON_BINDINGS_VERSION="${NLM_VERSION}")
+    
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib/python
+        ARCHIVE DESTINATION lib/python
+        RUNTIME DESTINATION bin
+    )
+    
+    # Install Python package structure
+    file(COPY python/ DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pynlm
+        FILES_MATCHING PATTERN "*.py"
+        PATTERN "*.pyi"
+        PATTERN "*.txt"
+    )
 endif()
 
 # Testing

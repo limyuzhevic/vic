@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // Include JSON parser
+#include <limits>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, size_t> keyIndex;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,40 +23,96 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Try to load as JSON first
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        pImpl->keyIndex.clear();
+        
+        // Parse JSON and populate entries
+        for (auto& [key, value] : jsonData.items()) {
+            // Convert JSON value to ConfigValue
+            ConfigValue configValue;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (value.is_number_integer()) {
+                int64_t intVal = value.get<int64_t>();
+                if (intVal <= std::numeric_limits<int>::max() && 
+                    intVal >= std::numeric_limits<int>::min()) {
+                    configValue = static_cast<int>(intVal);
+                } else {
+                    configValue = intVal;
+                }
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_array()) {
+                // Try to infer array type
+                std::vector<int> intArray;
+                std::vector<double> doubleArray;
+                std::vector<std::string> stringArray;
+                
+                bool isInt = true;
+                bool isDouble = true;
+                bool isString = true;
+                
+                for (const auto& item : value) {
+                    if (item.is_number_integer()) {
+                        intArray.push_back(item.get<int>());
+                        if (!isDouble) isDouble = false;
+                        if (!isString) isString = false;
+                    } else if (item.is_number_float()) {
+                        doubleArray.push_back(item.get<double>());
+                        if (!isInt) isInt = false;
+                        if (!isString) isString = false;
+                    } else if (item.is_string()) {
+                        stringArray.push_back(item.get<std::string>());
+                        if (!isInt) isInt = false;
+                        if (!isDouble) isDouble = false;
+                    } else {
+                        isInt = false;
+                        isDouble = false;
+                        isString = false;
+                        break;
+                    }
+                }
+                
+                if (isInt && !intArray.empty()) {
+                    configValue = intArray;
+                } else if (isDouble && !doubleArray.empty()) {
+                    configValue = doubleArray;
+                } else if (isString && !stringArray.empty()) {
+                    configValue = stringArray;
+                } else {
+                    // Fallback to empty array
+                    configValue = std::vector<double>();
+                }
+            } else {
+                // Unknown type, skip or convert to string
+                configValue = value.dump();
             }
             
-            set(key, value, ConfigSource::File);
+            // Add entry with appropriate description
+            std::string description = "Configuration key loaded from JSON";
+            pImpl->entries.emplace_back(key, configValue, ConfigSource::File, description);
+            pImpl->keyIndex[key] = pImpl->entries.size() - 1;
         }
+        
+        return true;
+    } catch (const nlohmann::json::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON config file: " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +146,32 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to string for output
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i) file << ", ";
+                    file << val[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << val << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << val << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << val << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (val ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -101,6 +186,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->source = source;
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        pImpl->keyIndex[key] = pImpl->entries.size() - 1;
     }
 }
 
@@ -125,16 +211,22 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->keyIndex.find(key) != pImpl->keyIndex.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = pImpl->keyIndex.find(key);
+    if (it != pImpl->keyIndex.end()) {
+        size_t index = it->second;
+        pImpl->entries.erase(pImpl->entries.begin() + index);
+        pImpl->keyIndex.erase(it);
+        
+        // Update keyIndex for all remaining entries
+        size_t newIndex = 0;
+        for (auto& entry : pImpl->entries) {
+            pImpl->keyIndex[entry.key] = newIndex++;
+        }
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -148,6 +240,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->keyIndex.clear();
 }
 
 std::string Config::summary() const {
@@ -190,6 +283,7 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// Template implementations for get() and getOr()
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),

@@ -55,6 +55,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
@@ -63,6 +64,7 @@ LogLevel ConsoleLogger::getLevel() const {
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
@@ -71,10 +73,15 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        NLM_LOG_ERROR("Failed to open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
@@ -84,9 +91,9 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
         case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
+        case LogLevel::Warning: return "WARNING";  // Fixed: Consistent naming
         case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
+        case LogLevel::Critical: return "CRITICAL";  // Fixed: Consistent naming
         default: return "UNKNOWN";
     }
 }
