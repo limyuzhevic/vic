@@ -226,9 +226,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
+    if (pImpl->state.adaptationVariable > pImpl->state.adaptationBaseline) {
+        V -= pImpl->state.adaptationVariable * pImpl->state.adaptationRate;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Add global inhibition to control runaway excitation
+    // This is a placeholder for global inhibitory feedback
+    // that would normally be implemented at the brain level
+    if (pImpl->state.adaptationVariable > 1.0f) {
+        V *= 0.8f;  // Reduce membrane potential by 20%
     }
     
     // Clamp membrane potential to prevent instability
@@ -244,7 +251,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -274,6 +281,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
+
+void Neuron::setAdaptationRate(float rate) {
+    pImpl->state.adaptationRate = rate;
+}
+
+void Neuron::setAdaptationBaseline(float baseline) {
+    pImpl->state.adaptationBaseline = baseline;
+}
+
+float Neuron::getAdaptationRate() const {
+    return pImpl->state.adaptationRate;
+}
+
+float Neuron::getAdaptationBaseline() const {
+    return pImpl->state.adaptationBaseline;
 }
 
 void Neuron::step(Timestamp currentTime) {

@@ -9,7 +9,6 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
-    , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -21,6 +20,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , lastWinnerGroup_(-1)
+    , consecutiveWinnerCount_(0)
+    , lastWinnerMargin_(0.0f)
+    , hasLastDecoded_(false)
+    , lastDecoded_(MotorCommand::Wait)
+    , selfModelReady_(false)
+    , socialReady_(false)
+    , hasThoughtOutcome_(false)
+    , thoughtPercept_("")
+    , thoughtReward_(0.0f)
+    , reflexBonusCount_(0)
+    , reflexSuppressCount_(0)
+    , wtaPulseCount_(0)
+    , plannerOverrideCount_(0)
+    , plannerAgreementCount_(0)
+    , plannerDecisionCount_(0)
+    , conceptBiasCount_(0)
+    , selfBiasCount_(0)
+    , socialBiasCount_(0)
+    , planningDepth_(5)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -885,11 +904,16 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     
     return defaultCmd;
 }
-
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
+    // Signal reward to dopamine system
+    if (auto* dopamine = brain_->getDopamine()) {
+        dopamine->signalRewardPredictionError(reward - predictedReward);
+    }
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -906,6 +930,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
     }
+    
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -942,40 +967,73 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Update novelty and curiosity based on prediction error
+    if (!lastVision_.empty()) {
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < lastVision_.size(); ++i) {
+            totalDiff += std::abs(lastVision_[i] - predictedVision_[i]);
+        }
+        noveltyLevel_ = totalDiff / std::max<size_t>(lastVision_.size(), 1);
+        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Adapt the prediction toward the current scene.
+        constexpr float kPredictionAlpha = 0.05f;
+        for (size_t i = 0; i < lastVision_.size(); ++i) {
+            predictedVision_[i] += kPredictionAlpha * (lastVision_[i] - predictedVision_[i]);
+        }
+    }
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Update curiosity based on novelty. Phase 4: curiosity is a short
+    // trace, not an instantaneous value — a single novel step used to
+    // vanish immediately, and a small but sustained novelty (the normal
+    // case while moving) never accumulated. Phase 5: the trace term
+    // rises 0.3 -> 0.6, because with 0.3 a steady novelty of 0.05
+    // settled curiosity at ~0.14 and late-episode exploration died
+    // (late novelty 0.005-0.13 in Phase 4). With 0.6 the same steady
+    // novelty of 0.05 settles curiosity at ~0.17 and late-episode
+    // exploration continues a little longer, which is desirable for
+    // Phase 6's sandbox run (late novelty 0.02-0.06).
+    curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
+                    + 0.6f * curiosityLevel_;
+    curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (const auto& syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-
-            if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
-                syn->addToWeight(delta);
+    // Apply reward-modulated weight changes to synapses with eligibility traces
+    // Note: this should be done by the brain's plasticity system, not here
+    // for now this is kept for backward compatibility
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                if (std::abs(eligibility) > 0.001f) {
+                    // Get current dopamine level
+                    float dopamineLevel = 0.0f;
+                    if (auto* dopamine = brain_->getDopamine()) {
+                        dopamineLevel = dopamine->getLevel();
+                    }
+                    
+                    // Reward-modulated weight change. Phase 4: the old
+                    // rule used delta = eligibility * dopamine with no
+                    // learning rate, and eligibility traces accumulate
+                    // STDP deltas to ~4, so a single +10 reward (dopamine
+                    // clamped to 1) drove every eligible synapse straight
+                    // to its clamp — one event saturated the network. A
+                    // 0.05 learning rate and a +-0.1 per-event cap keep a
+                    // reward event meaningful without erasing all prior
+                    // selectivity in one step (standard R-STDP scaling).
+                    float delta = eligibility * dopamineLevel * plasticityModifier_ * 0.05f;
+                    delta = std::clamp(delta, -0.1f, 0.1f);
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
             }
         }
     }
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    float plasticityFactor = 0.5f + 0.5f * predictionError_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -1026,7 +1084,11 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    if (!brain_) return 0.0f;
+    if (auto* dopamine = brain_->getDopamine()) {
+        return dopamine->getLevel();
+    }
+    return 0.0f;
 }
 
 float AgentBrain::getCuriosityLevel() const {
@@ -1071,7 +1133,6 @@ float AgentBrain::getLearnedPreference() const {
 }
 
 void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;

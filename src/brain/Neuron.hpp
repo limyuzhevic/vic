@@ -46,6 +46,8 @@ struct NeuronState {
         // threshold system with no gentle middle ground).
         , refractoryPeriod(9)
         , adaptationVariable(0.0f)
+        , adaptationRate(0.01f)
+        , adaptationBaseline(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
 
