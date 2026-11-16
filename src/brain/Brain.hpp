@@ -192,22 +192,146 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
 
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    // ========== ADVANCED COMMANDS FOR POWER USERS ==========
     
-    // Logging
-    void logStatus() const;
+    // Configuration and Parameter Management
+    template<typename T>
+    T getAdvancedConfig(const std::string& key) const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    template<typename T>
+    void setAdvancedConfig(const std::string& key, const T& value);
+    
+    // Performance Monitoring
+    void startPerformanceMonitoring();
+    void stopPerformanceMonitoring();
+    std::unordered_map<std::string, double> getPerformanceMetrics();
+    
+    // Memory Analysis
+    std::vector<NeuronId> getMemoryNeurons() const;
+    std::vector<float> getMemoryActivations() const;
+    float getWorkingMemoryLoad() const;
+    std::vector<std::string> analyzeMemoryPatterns() const;
+    
+    // Learning and Adaptation Control
+    void setLearningRate(float rate);
+    void setPlasticityThreshold(float threshold);
+    void enableAdvancedLearning(bool enable);
+    
+    // Neuromodulation Control
+    void setDopamineLevel(float level);
+    void setCuriosityLevel(float level);
+    void setNoveltySensitivity(float sensitivity);
+    
+    // Export and Import
+    bool exportBrainState(const std::string& filepath) const;
+    bool importBrainState(const std::string& filepath);
+    
+    // Scriptability and Automation
+    std::string exportBrainAsJSON() const;
+    bool importBrainFromJSON(const std::string& jsonData);
+    
+    // Advanced Visualization and Analysis
+    std::string generateNetworkTopologyReport() const;
+    std::vector<std::string> analyzeBehaviorPatterns() const;
+    float getNetworkEfficiency() const;
+    
+    // Real-time Monitoring
+    void enableRealTimeMonitoring(bool enable);
+    bool isRealTimeMonitoringEnabled() const;
+    std::unordered_map<std::string, double> getSystemDiagnostics() const;
+    
+    // Batch Operations for Performance
+    void batchProcessNeurons(std::function<void(Neuron*)> processor);
+    void batchProcessSynapses(std::function<void(Synapse*)> processor);
+    
+    // Custom Learning Scenarios
+    void loadCustomScenario(const std::string& scenarioName);
+    void saveCustomScenario(const std::string& scenarioName);
+    std::vector<std::string> getAvailableScenarios() const;
+    
+    // Advanced Error Correction and Recovery
+    void enableErrorCorrection(bool enable);
+    bool isErrorCorrectionEnabled() const;
+    void applyErrorCorrection();
+    
+    // Performance Optimization
+    void optimizeForPerformance();
+    void enableMemoryOptimization(bool enable);
+    void enableSpeedOptimization(bool enable);
+    
+    // Debug and Diagnostic Tools
+    void enableDebugMode(bool enable);
+    bool isDebugModeEnabled() const;
+    std::string getDebugInformation() const;
+    
+    // System Health Monitoring
+    bool checkSystemHealth() const;
+    std::string getHealthReport() const;
+    
+    // Advanced Checkpoint Management
+    void setCheckpointInterval(size_t steps);
+    void setCheckpointCompressionLevel(CompressionLevel level);
+    void enableAutoCheckpoint(bool enable);
+    
+    // Custom Plasticity Rules
+    void addCustomPlasticityRule(const std::string& ruleName, std::function<float(const Synapse*, const SpikeEvent&)> rule);
+    void removeCustomPlasticityRule(const std::string& ruleName);
+    
+    // Advanced Sequence Learning
+    void enableSequenceLearning(bool enable);
+    void setSequenceLearningWindow(size_t windowSize);
+    std::vector<std::vector<NeuronId>> getLearnedSequences() const;
+    
+    // Custom Reward Functions
+    void setCustomRewardFunction(std::function<float(const Action*, const SensoryInput&)> rewardFunc);
+    void resetCustomRewardFunction();
+    
+    // Advanced Environment Interaction
+    void enableEnvironmentAdaptation(bool enable);
+    void setEnvironmentParameters(const std::unordered_map<std::string, float>& params);
+    
+    // Performance Profiling
+    void startPerformanceProfiling();
+    void stopPerformanceProfiling();
+    std::string getPerformanceProfile() const;
+    
+    // Memory Management
+    void forceMemoryCleanup();
+    void setMemoryLimit(size_t bytes);
+    size_t getMemoryUsage() const;
+    
+    // Advanced Network Configuration
+    void setNetworkTopology(const std::string& topology);
+    void addCustomConnection(const std::string& type, std::function<void(Brain*)> connectionBuilder);
+    std::string getCurrentNetworkTopology() const;
+    
+    // Custom Development Patterns
+    void setDevelopmentPattern(const std::string& pattern);
+    std::string getDevelopmentPattern() const;
+    void enableDevelopment(bool enable);
+    
+    // Advanced Visualization Export
+    std::string exportForVisualization(const std::string& format = "graphml") const;
+    std::string exportNeuralActivityData(const std::string& filepath) const;
+    
+    // Batch Learning
+    void batchLearnSkills(const std::vector<std::pair<std::string, std::vector<NeuronId>>>& skills);
+    void batchAssociatePatterns(const std::vector<std::tuple<NeuronId, NeuronId, float>>& associations);
+    
+    // Advanced Error Handling
+    void setErrorHandlingPolicy(const std::string& policy);
+    void enableGracefulDegradation(bool enable);
+    
+    // Custom Monitoring
+    void addMonitoringHook(std::function<void(const std::string&)> hook);
+    void removeMonitoringHook(const std::string& hookName);
+    
+    // Performance Tuning
+    void tuneForLatency();
+    void tuneForThroughput();
+    void tuneForMemory();
+    
+    // Advanced Analysis
+    std::vector<std::string> detectAnomalies() const;
+    float calculateSystemStability() const;
+    std::string analyzeComputationalComplexity() const;
