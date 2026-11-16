@@ -6,6 +6,16 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
+
+// Optional JSON/YAML parser includes
+#ifdef NLM_USE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef NLM_USE_YAML_CPP
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -56,17 +66,29 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file in JSON format
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Save to file in YAML format
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Save to file (legacy format, still supported)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>

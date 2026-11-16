@@ -1,10 +1,5 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -142,10 +137,12 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON or YAML file. Returns False if file cannot be loaded.")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("json_string"),
+             "Load configuration from a JSON string. Returns False if JSON is invalid.")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("yaml_string"),
+             "Load configuration from a YAML string. Returns False if YAML is invalid.")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -157,7 +154,11 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("args"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a legacy key=value file. Returns False if file cannot be written.")
+        .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"),
+             "Save configuration to a JSON file. Returns False if file cannot be written.")
+        .def("saveToYAML", &Config::saveToYAML, py::arg("filepath"),
+             "Save configuration to a YAML file. Returns False if file cannot be written.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -168,6 +169,201 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        // Pythonic convenience methods with error handling
+        .def("set", static_cast<void (Config::*)(const std::string&, const std::string&)>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a string configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, int)>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set an integer configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, double)>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a float/double configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, bool)>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a boolean configuration value")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Try to get as string first, then int, then double, then bool
+            auto strVal = self.get<std::string>(key);
+            if (strVal.has_value()) return py::cast(strVal.value());
+            auto intVal = self.get<int64_t>(key);
+            if (intVal.has_value()) return py::cast(intVal.value());
+            auto doubleVal = self.get<double>(key);
+            if (doubleVal.has_value()) return py::cast(doubleVal.value());
+            auto boolVal = self.get<bool>(key);
+            if (boolVal.has_value()) return py::cast(boolVal.value());
+            return py::none();
+        }, py::arg("key"), "Get configuration value (auto-detection). Returns None if key doesn't exist")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue = 0) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get integer configuration value with default")
+        .def("getFloat", [](const Config& self, const std::string& key, double defaultValue = 0.0) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0, "Get float configuration value with default")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue = false) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get boolean configuration value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue = "") {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = "", "Get string configuration value with default")
+        .def("remove", &Config::remove, py::arg("key"), "Remove a configuration key")
+        .def("createDefault", []() {
+            return std::make_shared<Config>();
+        }, "Create a default configuration object")
+        .def("loadFromDict", [](Config& self, const py::dict& dict) {
+            try {
+                for (auto item : dict) {
+                    std::string key = py::cast<std::string>(item.first);
+                    ConfigValue configValue;
+                    // Convert Python object to ConfigValue
+                    py::object value = item.second;
+                    if (value.is(py::bool_())) {
+                        configValue = py::cast<bool>(value);
+                    } else if (value.is(py::int_())) {
+                        configValue = py::cast<int64_t>(value);
+                    } else if (value.is(py::float_())) {
+                        configValue = py::cast<double>(value);
+                    } else if (value.is(py::str())) {
+                        configValue = py::cast<std::string>(value);
+                    } else if (value.is(py::list())) {
+                        py::list pyList = value.cast<py::list>();
+                        if (!pyList.empty()) {
+                            if (pyList[0].is(py::int_())) {
+                                std::vector<int> intList;
+                                for (auto item : pyList) {
+                                    intList.push_back(py::cast<int>(item));
+                                }
+                                configValue = intList;
+                            } else if (pyList[0].is(py::float_())) {
+                                std::vector<double> doubleList;
+                                for (auto item : pyList) {
+                                    doubleList.push_back(py::cast<double>(item));
+                                }
+                                configValue = doubleList;
+                            } else if (pyList[0].is(py::str())) {
+                                std::vector<std::string> stringList;
+                                for (auto item : pyList) {
+                                    stringList.push_back(py::cast<std::string>(item));
+                                }
+                                configValue = stringList;
+                            }
+                        }
+                    }
+                    self.set(key, configValue, ConfigSource::Runtime);
+                }
+                return self;
+            } catch (const std::exception& e) {
+                throw py::value_error("Error loading from dictionary: " + std::string(e.what()));
+            }
+        }, py::arg("dict"), "Load configuration from a Python dictionary. Returns self for chaining.")
+        .def("toDict", [](const Config& self) {
+            try {
+                py::dict result;
+                auto keys = self.getKeys();
+                for (const auto& key : keys) {
+                    // Try to get the value and add to dict
+                    auto strVal = self.get<std::string>(key);
+                    if (strVal.has_value()) {
+                        result[key.c_str()] = strVal.value();
+                        continue;
+                    }
+                    auto intVal = self.get<int64_t>(key);
+                    if (intVal.has_value()) {
+                        result[key.c_str()] = intVal.value();
+                        continue;
+                    }
+                    auto doubleVal = self.get<double>(key);
+                    if (doubleVal.has_value()) {
+                        result[key.c_str()] = doubleVal.value();
+                        continue;
+                    }
+                    auto boolVal = self.get<bool>(key);
+                    if (boolVal.has_value()) {
+                        result[key.c_str()] = boolVal.value();
+                        continue;
+                    }
+                }
+                return result;
+            } catch (const std::exception& e) {
+                throw py::value_error("Error converting to dictionary: " + std::string(e.what()));
+            }
+        }, "Convert configuration to Python dictionary")
+        .def("merge", [](Config& self, const py::dict& dict) {
+            try {
+                for (auto item : dict) {
+                    std::string key = py::cast<std::string>(item.first);
+                    ConfigValue configValue;
+                    // Convert Python object to ConfigValue
+                    py::object value = item.second;
+                    if (value.is(py::bool_())) {
+                        configValue = py::cast<bool>(value);
+                    } else if (value.is(py::int_())) {
+                        configValue = py::cast<int64_t>(value);
+                    } else if (value.is(py::float_())) {
+                        configValue = py::cast<double>(value);
+                    } else if (value.is(py::str())) {
+                        configValue = py::cast<std::string>(value);
+                    } else if (value.is(py::list())) {
+                        py::list pyList = value.cast<py::list>();
+                        if (!pyList.empty()) {
+                            if (pyList[0].is(py::int_())) {
+                                std::vector<int> intList;
+                                for (auto item : pyList) {
+                                    intList.push_back(py::cast<int>(item));
+                                }
+                                configValue = intList;
+                            } else if (pyList[0].is(py::float_())) {
+                                std::vector<double> doubleList;
+                                for (auto item : pyList) {
+                                    doubleList.push_back(py::cast<double>(item));
+                                }
+                                configValue = doubleList;
+                            } else if (pyList[0].is(py::str())) {
+                                std::vector<std::string> stringList;
+                                for (auto item : pyList) {
+                                    stringList.push_back(py::cast<std::string>(item));
+                                }
+                                configValue = stringList;
+                            }
+                        }
+                    }
+                    self.set(key, configValue, ConfigSource::Runtime);
+                }
+                return self;
+            } catch (const std::exception& e) {
+                throw py::value_error("Error merging dictionary: " + std::string(e.what()));
+            }
+        }, py::arg("dict"), "Merge configuration from a Python dictionary. Returns self for chaining.")
+        .def("copy", [](const Config& self) {
+            try {
+                auto copy = std::make_shared<Config>();
+                auto keys = self.getKeys();
+                for (const auto& key : keys) {
+                    auto strVal = self.get<std::string>(key);
+                    if (strVal.has_value()) {
+                        copy->set(key, strVal.value(), ConfigSource::Runtime);
+                        continue;
+                    }
+                    auto intVal = self.get<int64_t>(key);
+                    if (intVal.has_value()) {
+                        copy->set(key, intVal.value(), ConfigSource::Runtime);
+                        continue;
+                    }
+                    auto doubleVal = self.get<double>(key);
+                    if (doubleVal.has_value()) {
+                        copy->set(key, doubleVal.value(), ConfigSource::Runtime);
+                        continue;
+                    }
+                    auto boolVal = self.get<bool>(key);
+                    if (boolVal.has_value()) {
+                        copy->set(key, boolVal.value(), ConfigSource::Runtime);
+                        continue;
+                    }
+                }
+                return copy;
+            } catch (const std::exception& e) {
+                throw py::value_error("Error copying configuration: " + std::string(e.what()));
+            }
+        }, "Create a copy of the configuration")
+        .def("__copy__", [](const Config& self) {
+            return self.copy();
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -424,10 +620,150 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python-specific utilities and helpers
+    m.def("load_config_from_file", &Config::loadFromFile, py::arg("filepath"), py::arg("config"),
+          "Utility function to load configuration from a file into an existing Config object");
+
+    m.def("save_config_to_file", &Config::saveToFile, py::arg("filepath"), py::arg("config"),
+          "Utility function to save configuration from a Config object to a file");
+
+    m.def("create_brain_from_config_file", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a configuration file");
+
+    m.def("create_brain_from_dict", [](const py::dict& dict) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        for (auto item : dict) {
+            std::string key = py::cast<std::string>(item.first);
+            ConfigValue configValue;
+            py::object value = item.second;
+            if (value.is(py::bool_())) {
+                configValue = py::cast<bool>(value);
+            } else if (value.is(py::int_())) {
+                configValue = py::cast<int64_t>(value);
+            } else if (value.is(py::float_())) {
+                configValue = py::cast<double>(value);
+            } else if (value.is(py::str())) {
+                configValue = py::cast<std::string>(value);
+            }
+            config->set(key, configValue, ConfigSource::Runtime);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("dict"), "Create a brain from a Python dictionary configuration");
+
+    // Configuration validation utilities
+    m.def("validate_config", [](const Config& config, const py::dict& schema) {
+        py::list errors;
+        for (auto item : schema) {
+            std::string key = py::cast<std::string>(item.first);
+            py::str type = item.second;
+            
+            if (!config.has(key)) {
+                errors.append("Missing required key: " + key);
+                continue;
+            }
+            
+            auto value = config.get<std::string>(key);
+            if (!value.has_value()) {
+                errors.append("Key has invalid type: " + key);
+            }
+        }
+        return errors;
+    }, py::arg("config"), py::arg("schema"), "Validate configuration against a schema dictionary");
+
+    // Configuration merging utilities
+    m.def("merge_configs", [](const Config& base, const Config& override) {
+        auto merged = std::make_shared<Config>();
+        auto baseKeys = base.getKeys();
+        auto overrideKeys = override.getKeys();
+        
+        for (const auto& key : baseKeys) {
+            auto value = base.get<std::string>(key);
+            if (value.has_value()) {
+                merged->set(key, value.value(), ConfigSource::Runtime);
+            }
+        }
+        
+        for (const auto& key : overrideKeys) {
+            auto value = override.get<std::string>(key);
+            if (value.has_value()) {
+                merged->set(key, value.value(), ConfigSource::Runtime);
+            }
+        }
+        
+        return merged;
+    }, py::arg("base"), py::arg("override"), "Merge two configuration objects, with override taking precedence");
+
+    // Simulation utilities
+    m.def("run_simulation_step", [](Brain& brain, int step) {
+        brain.step(step);
+        return brain.getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("step"), "Run a single simulation step and return spike count");
+
+    m.def("run_simulation_steps", [](Brain& brain, int startStep, int numSteps) {
+        for (int step = startStep; step < startStep + numSteps; ++step) {
+            brain.step(step);
+        }
+        return brain.getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("startStep"), py::arg("numSteps"), "Run multiple simulation steps and return spike count");
+
+    // Visualization utilities
+    m.def("get_spike_stats", [](const Brain& brain) {
+        py::dict stats;
+        stats["total_spikes"] = brain.getTotalSpikeCount();
+        stats["active_neurons"] = brain.getActiveNeuronCount();
+        stats["firing_neurons"] = brain.getFiringNeuronCount();
+        stats["average_firing_rate"] = brain.getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+        return stats;
+    }, "Get spike statistics as a Python dictionary");
+
+    m.def("get_region_stats", [](const Brain& brain) {
+        py::dict stats;
+        auto regionIds = brain.getRegionIds();
+        for (const auto& rid : regionIds) {
+            auto* region = brain.getRegion(rid);
+            if (region) {
+                py::dict regionStats;
+                regionStats["neuron_count"] = region->getNeuronCount();
+                regionStats["synapse_count"] = region->getSynapseCount();
+                stats[std::to_string(rid.index())] = regionStats;
+            }
+        }
+        return stats;
+    }, "Get region statistics as a Python dictionary");
+
+    // Debug and logging utilities
+    m.def("log_brain_status", &Brain::logStatus,
+          "Log brain status to console (Python-friendly wrapper)");
+
+    // Version and info
+    m.attr("version") = "0.1.0";
+    m.attr("author") = "NLM Authors";
+    m.attr("description") = "Python bindings for NLM (Neural Learning Machine) simulation framework";
+    m.attr("python_api_version") = "1.0";
+
+    // Example configuration
+    m.def("get_example_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", 42, ConfigSource::Default);
+        return config;
+    }, "Get an example configuration for getting started");
 
 } // namespace nlm
