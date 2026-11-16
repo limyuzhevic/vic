@@ -179,6 +179,9 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
+# Advanced CLI Tools (Phase 7)
+add_subdirectory(src/tools)
+
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
 # but the root CMakeLists never built the module — pip install
@@ -210,4 +213,9 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install advanced CLI tools
+install(DIRECTORY src/tools/ DESTINATION bin
+    FILES_MATCHING PATTERN "*.cpp" PATTERN "*.hpp"
 )

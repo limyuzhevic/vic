@@ -269,6 +269,17 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+### Advanced Tools (CLI)
+
+| Tool | Description | Key Command |
+|------|-------------|-------------|
+| `nlm-config` | Configuration management | `nlm-config create --brain.name=MyBrain` |
+| `nlm-batch` | Batch simulation runs | `nlm-batch --config scenarios.txt` |
+| `nlm-analysis` | Results analysis | `nlm-analysis --input results/` |
+| `nlm-visualize` | Activity visualization | `nlm-visualize --input checkpoint.bin` |
+| `nlm-checkpoint` | State management | `nlm-checkpoint save checkpoint.bin` |
+| `nlm-profile` | Performance profiling | `nlm-profile --config config.txt` |
+
 ---
 
 ## Troubleshooting
@@ -287,11 +298,133 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+## Advanced Tools
+
+For more advanced usage, NLM provides several command-line tools to help with:
+
+### Brain Configuration
+```bash
+# Create a new brain configuration
+nlm-config create --brain.name=MyBrain --brain.region_count=2
+
+# Load configuration from file
+nlm-config load config.txt
+
+# List configuration keys
+nlm-config list
+```
+
+### Batch Simulations
+```bash
+# Run multiple simulations with different parameters
+nlm-batch --config scenarios.txt --output results/
+
+# Run a single simulation with specific settings
+nlm-batch --config single_scenario.nml
+```
+
+### Analysis
+```bash
+# Analyze simulation results
+nlm-analysis --input results/ --report analysis.txt
+
+# Compare multiple simulation runs
+nlm-analysis --compare run1/ run2/ --output comparison.txt
+```
+
+### Checkpoint Management
+```bash
+# Save brain state
+nlm-checkpoint save checkpoint.bin --input brain_state
+
+# Load brain state
+nlm-checkpoint load checkpoint.bin --output brain_state
+
+# List saved checkpoints
+nlm-checkpoint list
+```
+
+### Performance Profiling
+```bash
+# Profile simulation performance
+nlm-profile --config config.txt --output profile.json
+
+# Compare performance across runs
+nlm-profile --compare run1/ run2/ --output comparison.txt
+```
+
+### Example Advanced Usage
+
+Here's a complete example showing how to use the advanced tools together:
+
+```bash
+# 1. Create and save a configuration for batch processing
+cat > experiment_config.nml << EOF
+brain:
+  name: "LearningExperiment"
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.15
+  simulation:
+    timestep: 0.001
+    max_steps: 5000
+  learning:
+    enable_stdp: true
+    enable_hebbian: true
+    enable_reward: true
+EOF
+
+# 2. Create multiple configurations for batch processing
+nlm-config create --brain.name="Exp1_1000" --brain.neuron_count=1000 \
+    --brain.region_count=1 --simulation.timestep=0.001 \
+    --simulation.max_steps=5000 --learning.enable_stdp=true \
+    --learning.enable_hebbian=true --output exp1_config.nml
+
+nlm-config create --brain.name="Exp2_2000" --brain.neuron_count=2000 \
+    --brain.region_count=2 --simulation.timestep=0.002 \
+    --simulation.max_steps=10000 --learning.enable_stdp=true \
+    --learning.enable_hebbian=true --output exp2_config.nml
+
+# 3. Run batch simulations
+nlm-batch --config batch_scenarios.txt --output results/experiment1/ \
+    --parallel 4 --dry-run
+
+nlm-batch --config batch_scenarios.txt --output results/experiment2/ \
+    --parallel 4
+
+# 4. Save checkpoints during simulation
+nlm-checkpoint save results/experiment1/checkpoint_1000.bin \
+    --input results/experiment1/sim_state_1000
+
+nlm-checkpoint save results/experiment1/checkpoint_5000.bin \
+    --input results/experiment1/sim_state_5000
+
+# 5. Analyze results
+nlm-analysis --input results/experiment1/ --report analysis1.txt \
+    --metrics:learning_rate --threshold:0.01
+
+nlm-analysis --compare results/experiment1/ results/experiment2/ \
+    --output comparison.txt
+
+# 6. Profile performance
+nlm-profile --config results/experiment1/config.nml \
+    --output performance_report.json --detailed
+
+# 7. View visualizations
+nlm-visualize --input results/experiment1/checkpoint_1000.bin \
+    --output visualization1.html --type:timeline
+
+nlm-visualize --input results/experiment1/checkpoint_5000.bin \
+    --output visualization2.html --type:network
+```
+
+### Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced CLI tools for more powerful control
+5. Read the advanced tool documentation in the `docs/` directory
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM at both beginner and advanced levels.
