@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Extended with Comprehensive Integration Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,6 +38,13 @@ namespace test_brain {
     void runAll();
 }
 
+// Include unit tests namespace
+namespace nlm {
+namespace unit_tests {
+    void runAllUnitTests();
+}
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -45,15 +53,26 @@ int main() {
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
-    bool allPassed = true;
+    std::cout << "Running Unit Tests (Extended Integration Tests):" << std::endl;
+    try {
+        nlm::unit_tests::runAllUnitTests();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cout << "  FAILED: Unknown exception" << std::endl;
+        return 1;
+    }
     
-    std::cout << "Running Types tests..." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Running Core Types tests..." << std::endl;
     try {
         test_types::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Config tests..." << std::endl;
@@ -62,7 +81,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Random tests..." << std::endl;
@@ -71,7 +90,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Clock tests..." << std::endl;
@@ -80,7 +99,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Neuron tests..." << std::endl;
@@ -89,7 +108,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Synapse tests..." << std::endl;
@@ -98,7 +117,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running STDP tests..." << std::endl;
@@ -107,7 +126,7 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << "Running Brain tests..." << std::endl;
@@ -116,15 +135,11 @@ int main() {
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+        return 1;
     }
     
     std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
-    }
+    std::cout << "=== All Tests PASSED ===" << std::endl;
+    std::cout << "NLM test suite completed successfully." << std::endl;
+    return 0;
 }
