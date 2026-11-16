@@ -401,9 +401,74 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    // Write the checkpoint header with magic, version, and metadata
+    if (!stream_) {
+        return false;
+    }
+    
+    // Create header with current metadata
+    CheckpointHeader tempHeader = header_;
+    tempHeader.totalSize = bytesWritten_ + neuronPayload_.size() + synapsePayload_.size() + 
+                          delayedSpikePayload_.size() + sizeof(SectionHeader) +  // End section
+                          sizeof(SectionHeader) * (extraPayloads_.size()); // Extra sections
+    
+    // Calculate checksum
+    uint64_t checksum = ChecksumCalculator::crc32(nullptr, 0);
+    checksum = ChecksumCalculator::combine(checksum, tempHeader.totalSize);
+    tempHeader.checksum = checksum;
+    
+    // Write header
+    stream_.write(reinterpret_cast<const char*>(&tempHeader), sizeof(tempHeader));
+    if (!stream_) {
+        return false;
+    }
+    
+    bytesWritten_ = sizeof(tempHeader);
+    NLM_LOG_INFO("Checkpoint header written");
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_) {
+        return false;
+    }
+    
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) {
+        return false;
+    }
+    
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_) {
+        return false;
+    }
+    
+    // Calculate current position
+    auto currentPos = stream_.tellp();
+    
+    // Calculate padding needed
+    size_t current = static_cast<size_t>(currentPos);
+    size_t padding = (alignment - (current % alignment)) % alignment;
+    
+    if (padding == 0) {
+        return true;  // No padding needed
+    }
+    
+    // Write padding bytes
+    std::vector<uint8_t> paddingBytes(padding, 0);
+    stream_.write(paddingBytes.data(), paddingBytes.size());
+    if (!stream_) {
+        return false;
+    }
+    
+    bytesWritten_ += padding;
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

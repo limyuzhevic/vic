@@ -307,10 +307,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+void printUsage(const char* programName) {
+    std::cout << "NLM (熙然) - Neural Learning Machine\n";
+    std::cout << "Phase 2: Real Neural Computation\n\n\nUsage:\n";
+    std::cout << "  " << programName << " [--config <file>] [--neuron_count <N>] [--region_count <R>] [--seed <S>] [--help]\n\n\nOptions:\n\n  --config <file>      Load configuration from file (default: configs/default.cfg)\n  --neuron_count <N>   Set number of neurons (default: 500)\n  --region_count <R>   Set number of regions (default: 1)\n  --seed <S>           Set random seed (default: 42)\n  --help               Show this help message\n\n\nExamples:\n\n  " << programName << " --help\n\n  " << programName << " --neuron_count 100 --region_count 2\n\n  " << programName << " --config my_config.cfg\n\n\n\nFor more demo phases, run:\n\n  ./nlm_phase3_demo    # Phase 3: World interaction\n  ./nlm_phase4_demo    # Phase 4: Cognition\n  ./nlm_phase5_demo    # Phase 5: Performance optimizations\n  ./nlm_phase6_demo    # Phase 6: Full integration test\n\n\nPhase 6 demo options:\n  ./nlm_phase6_demo --help\n\n\nFor more information, see README.md or the docs/ directory.\n\n\n\n
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

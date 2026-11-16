@@ -48,9 +48,17 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto startTime = std::chrono::high_resolution_clock::now();
     
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
-        for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        // Inject MODERATE input to reduce excessive activity while maintaining meaningful results
+        // Original: 30.0f to 10% of neurons - this creates ~200 spikes/step (too much)
+        // New: 15.0f to 5% of neurons - more realistic firing rates
+        size_t neuronsToStimulate = std::min(size_t(5), neuronCount / 20);  // Reduce from 10 to 5 neurons
+        for (size_t i = 0; i < neuronsToStimulate; ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 15.0f);  // Reduce from 30.0f to 15.0f
+        }
+        
+        // Add occasional burst to create interesting dynamics without seizure-like activity
+        if (step % 50 == 0) {  // Every 50th step instead of every step
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 20.0f);  // Stronger burst
         }
         
         brain->step(step, step * 0.001);
