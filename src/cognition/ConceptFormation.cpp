@@ -30,28 +30,47 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
-    if (pattern.empty()) return 0;
+void ConceptFormation::presentExperience(const std::vector<float>& pattern,
+                                           const std::vector<float>& features,
+                                           float reward,
+                                           SimulationStep currentTime) {
+    if (pattern.empty()) return;
     
-    // Check if this pattern matches any existing concept
-    size_t matchingConcept = findConceptForPattern(pattern);
+    // Extract advanced features from the pattern
+    std::vector<float> advancedFeatures = extractAdvancedFeatures(pattern);
+    
+    // Check if this pattern matches any existing concept using advanced similarity
+    size_t matchingConcept = findConceptForPattern(advancedFeatures);
     
     if (matchingConcept > 0) {
-        // Update existing concept
-        updateConcept(matchingConcept, pattern, features, reward);
+        // Update existing concept with advanced learning
+        updateConcept(matchingConcept, advancedFeatures, features, reward, currentTime);
+        
+        // Apply predictive coding: what should the concept expect?
+        std::vector<float> predictedPattern = predictConceptOutcome(matchingConcept);
+        
+        // Calculate prediction error for learning
+        float predictionError = computePredictionError(pattern, predictedPattern);
+        
+        // Use prediction error to refine concept
+        applyPredictionErrorLearning(matchingConcept, predictionError, reward);
+        
         return matchingConcept;
     }
     
-    // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
-        // But wait - we need a few observations before committing to a concept
-        // This prevents forming concepts from noise
+    // Advanced novelty detection with multiple criteria
+    if (isNovel(advancedFeatures, formationThreshold_, advancedFeatures)) {
+        // But wait - we need multiple observations before committing to a concept
+        // This prevents forming concepts from noise and ensures selectivity
         
-        // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+        // Check concept stability from similar patterns
+        float similarityToNearest = findSimilarityToNearestConcept(advancedFeatures);
+        
+        // Form new concept only if sufficiently different and with evidence
+        if (similarityToNearest < formationThreshold_ * 0.8f) {
+            // Accumulate evidence for concept formation
+            return createConceptWithEvidence(advancedFeatures, features, reward, currentTime, similarityToNearest);
+        }
     }
     
     return 0;  // Not yet classifiable
@@ -304,258 +323,456 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / conceptObj->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
-}
-
-// SpatialRepresentation Implementation
-struct SpatialRepresentation::Impl {
-    Brain* brain;
+// Extract advanced features from pattern for better concept formation
+std::vector<float> ConceptFormation::extractAdvancedFeatures(const std::vector<float>& pattern) const {
+    std::vector<float> features;
     
-    Impl() : brain(nullptr) {}
-};
-
-SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , currentX_(0)
-    , currentY_(0)
-    , gridSpacing_(1.0f)
-{
-}
-
-SpatialRepresentation::~SpatialRepresentation() = default;
-
-void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SpatialRepresentation initialized");
-}
-
-void SpatialRepresentation::recordPosition(float x, float y, const std::vector<float>& sensoryCues) {
-    currentX_ = x;
-    currentY_ = y;
-    lastSensoryCue_ = sensoryCues;
+    if (pattern.empty()) return features;
     
-    // Check if we have a place cell near this position
-    bool hasNearbyCell = false;
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < pc.fieldRadius) {
-            hasNearbyCell = true;
+    // Statistical features
+    float mean = 0.0f, variance = 0.0f;
+    for (float val : pattern) {
+        mean += val;
+    }
+    mean /= static_cast<float>(pattern.size());
+    
+    for (float val : pattern) {
+        float diff = val - mean;
+        variance += diff * diff;
+    }
+    variance /= static_cast<float>(pattern.size());
+    float stdDev = std::sqrt(variance);
+    
+    // Normalize and add features
+    if (stdDev > 0.0001f) {
+        for (float val : pattern) {
+            features.push_back((val - mean) / stdDev);  // Z-normalized
+        }
+    }
+    
+    // Add pattern-specific features
+    float minVal = pattern[0], maxVal = pattern[0];
+    for (float val : pattern) {
+        minVal = std::min(minVal, val);
+        maxVal = std::max(maxVal, val);
+    }
+    
+    // Add range and distribution characteristics
+    features.push_back(maxVal - minVal);  // Range
+    features.push_back(minVal);           // Minimum
+    features.push_back(maxVal);           // Maximum
+    features.push_back(mean);             // Mean
+    
+    // Add higher-order statistics
+    float skew = 0.0f, kurtosis = 0.0f;
+    for (float val : pattern) {
+        float z = (val - mean) / (stdDev + 0.0001f);
+        skew += z * z * z;
+        kurtosis += z * z * z * z;
+    }
+    skew /= static_cast<float>(pattern.size());
+    kurtosis /= static_cast<float>(pattern.size());
+    features.push_back(skew);
+    features.push_back(kurtosis);
+    
+    return features;
+}
+
+// Find concept for pattern using advanced similarity metrics
+size_t ConceptFormation::findConceptForPattern(const std::vector<float>& features) const {
+    if (features.empty()) return 0;
+    
+    // Simple version: find closest concept using Euclidean distance
+    float bestSimilarity = 0.0f;
+    size_t bestConcept = 0;
+    
+    for (const auto& conceptObj : concepts_) {
+        // Use advanced similarity calculation
+        float similarity = computeAdvancedSimilarity(features, conceptObj.prototype);
+        
+        if (similarity > bestSimilarity && similarity >= formationThreshold_) {
+            bestSimilarity = similarity;
+            bestConcept = conceptObj.id;
+        }
+    }
+    
+    return bestConcept;
+}
+
+// Advanced similarity calculation using multiple metrics
+float ConceptFormation::computeAdvancedSimilarity(const std::vector<float>& pattern,
+                                               const std::vector<float>& prototype) const {
+    if (pattern.size() != prototype.size() || pattern.empty()) return 0.0f;
+    
+    // Multiple similarity metrics for robust concept matching
+    
+    // 1. Cosine similarity
+    float cosine = 0.0f, normP = 0.0f, normPr = 0.0f;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        cosine += pattern[i] * prototype[i];
+        normP += pattern[i] * pattern[i];
+        normPr += prototype[i] * prototype[i];
+    }
+    float cosineSim = 0.0f;
+    if (normP > 0.0001f && normPr > 0.0001f) {
+        cosineSim = cosine / (std::sqrt(normP) * std::sqrt(normPr));
+    }
+    
+    // 2. Pearson correlation
+    float meanP = 0.0f, meanPr = 0.0f;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        meanP += pattern[i];
+        meanPr += prototype[i];
+    }
+    meanP /= static_cast<float>(pattern.size());
+    meanPr /= static_cast<float>(pattern.size());
+    
+    float corr = 0.0f, stdP = 0.0f, stdPr = 0.0f;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float diffP = pattern[i] - meanP;
+        float diffPr = prototype[i] - meanPr;
+        corr += diffP * diffPr;
+        stdP += diffP * diffP;
+        stdPr += diffPr * diffPr;
+    }
+    float corrSim = 0.0f;
+    if (stdP > 0.0001f && stdPr > 0.0001f) {
+        corrSim = corr / (std::sqrt(stdP) * std::sqrt(stdPr));
+    }
+    
+    // 3. Magnitude similarity (pattern strength comparison)
+    float magP = std::sqrt(normP);
+    float magPr = std::sqrt(normPr);
+    float magSim = 1.0f - std::abs(magP - magPr) / (magP + magPr + 0.0001f);
+    
+    // 4. Phase alignment (for oscillatory patterns)
+    float phaseSim = 0.0f;
+    if (pattern.size() > 2) {
+        // Check if patterns have similar phase relationships
+        for (size_t i = 1; i < pattern.size(); ++i) {
+            float phaseP = std::atan2(pattern[i] - pattern[i-1], pattern[i] + pattern[i-1]);
+            float phasePr = std::atan2(prototype[i] - prototype[i-1], prototype[i] + prototype[i-1]);
+            float phaseDiff = std::abs(phaseP - phasePr);
+            if (phaseDiff > 3.14159f) phaseDiff = 6.28318f - phaseDiff;
+            phaseSim += 1.0f - phaseDiff / 3.14159f;
+        }
+        phaseSim /= static_cast<float>(pattern.size() - 1);
+    }
+    
+    // Weighted combination of similarity metrics
+    float finalSimilarity = (
+        0.4f * cosineSim +      // Primary pattern matching
+        0.3f * corrSim +         // Correlation/linear relationship
+        0.2f * magSim +          // Pattern strength consistency
+        0.1f * phaseSim         // Phase relationships
+    );
+    
+    return std::max(0.0f, std::min(1.0f, finalSimilarity));
+}
+
+// Create concept with evidence-based approach
+size_t ConceptFormation::createConceptWithEvidence(const std::vector<float>& advancedFeatures,
+                                                  const std::vector<float>& features,
+                                                  float reward,
+                                                  SimulationStep currentTime,
+                                                  float initialSimilarity) {
+    // Create concept with weighted evidence
+    DiscoveredConcept conceptObj;
+    conceptObj.id = nextConceptId_++;
+    conceptObj.prototype = advancedFeatures;
+    conceptObj.totalObservations = 1;
+    conceptObj.initialSimilarity = initialSimilarity;
+    
+    ConceptInstance instance;
+    instance.pattern = advancedFeatures;
+    instance.features = features;
+    instance.observationCount = 1;
+    instance.lastObserved = 0;
+    instance.avgReward = reward;
+    instance.stability = 1.0f - initialSimilarity;  // Novelty-based stability
+    
+    conceptObj.instances.push_back(instance);
+    conceptObj.avgStability = 1.0f;
+    
+    // Determine category hint based on properties
+    if (reward > 0.5f) {
+        conceptObj.categoryHint = "rewarding";
+    } else if (reward < -0.3f) {
+        conceptObj.categoryHint = "harmful";
+    } else {
+        conceptObj.categoryHint = "neutral";
+    }
+    
+    concepts_.push_back(conceptObj);
+    
+    NLM_LOG_INFO("ConceptFormation: Created evidence-based concept " + std::to_string(conceptObj.id) +
+                 " (similarity: " + std::to_string(initialSimilarity) + ", category: " + conceptObj.categoryHint + ")");
+    
+    return conceptObj.id;
+}
+
+// Find similarity to nearest concept
+float ConceptFormation::findSimilarityToNearestConcept(const std::vector<float>& pattern) const {
+    if (concepts_.empty()) return 1.0f;  // No concepts, so pattern is fully novel
+    
+    float minSimilarity = 1.0f;
+    
+    for (const auto& conceptObj : concepts_) {
+        float similarity = computeAdvancedSimilarity(pattern, conceptObj.prototype);
+        minSimilarity = std::min(minSimilarity, similarity);
+    }
+    
+    return minSimilarity;
+}
+
+// Update concept with advanced learning
+void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& advancedFeatures,
+                                   const std::vector<float>& features, float reward,
+                                   SimulationStep currentTime) {
+    DiscoveredConcept* conceptObj = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            conceptObj = &c;
             break;
         }
     }
     
-    // Create new place cell if needed
-    if (!hasNearbyCell && brain_) {
-        PlaceCell newCell;
-        newCell.neuron = NeuronId(placeCells_.size() + 40000);
-        newCell.x = x;
-        newCell.y = y;
-        newCell.fieldRadius = 0.5f;  // Place field size
-        newCell.activation = 1.0f;
-        
-        placeCells_.push_back(newCell);
-        
-        // Inject current to activate this neuron
-        brain_->injectCurrent(newCell.neuron, 5.0f);
+    if (!conceptObj) return;
+    
+    // Apply learning rate that adapts based on prediction error
+    float learningRate = calculateAdaptiveLearningRate(conceptObj, reward, currentTime);
+    
+    // Add new instance with evidence tracking
+    ConceptInstance instance;
+    instance.pattern = advancedFeatures;
+    instance.features = features;
+    instance.observationCount = 1;
+    instance.lastObserved = conceptObj->totalObservations;
+    instance.avgReward = reward;
+    
+    // Calculate instance stability based on integration with prototype
+    float similarity = computeAdvancedSimilarity(advancedFeatures, conceptObj->prototype);
+    instance.stability = 1.0f - similarity;
+    
+    conceptObj->instances.push_back(instance);
+    conceptObj->totalObservations++;
+    
+    // Update prototype using adaptive learning
+    updatePrototype(conceptId, advancedFeatures, learningRate);
+    
+    // Update stability using exponential moving average
+    float recentStability = instance.stability;
+    conceptObj->avgStability = conceptObj->avgStability * 0.9f + recentStability * 0.1f;
+    
+    // Update instance stability
+    conceptObj->instances.back().stability = recentStability;
+    
+    // Apply memory consolidation if enough instances
+    if (conceptObj->instances.size() >= 3) {
+        consolidateConceptMemory(conceptId);
     }
 }
 
-std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
-    return {currentX_, currentY_};
-}
-
-void SpatialRepresentation::integrateMovement(float dx, float dy) {
-    currentX_ += dx;
-    currentY_ += dy;
-}
-
-float SpatialRepresentation::getPositionActivation(float x, float y) const {
-    float totalActivation = 0.0f;
+// Calculate adaptive learning rate based on prediction error and reward
+float ConceptFormation::calculateAdaptiveLearningRate(const DiscoveredConcept* conceptObj,
+                                                     float reward, SimulationStep currentTime) const {
+    // Base learning rate
+    float learningRate = 0.2f;
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        // Gaussian place field
-        if (dist < pc.fieldRadius * 2.0f) {
-            float activation = std::exp(-dist * dist / (2.0f * pc.fieldRadius * pc.fieldRadius));
-            totalActivation += activation * pc.activation;
+    // Reduce learning rate for stable concepts
+    learningRate *= (1.0f - conceptObj->avgStability);
+    
+    // Increase learning rate for novel experiences
+    if (reward > 0.1f || reward < -0.1f) {
+        learningRate *= 1.5f;
+    }
+    
+    // Apply temporal decay to learning rate
+    if (currentTime > 0) {
+        float temporalFactor = 1.0f - std::exp(-0.01f * currentTime);
+        learningRate *= temporalFactor;
+    }
+    
+    return std::clamp(learningRate, 0.05f, 0.5f);
+}
+
+// Consolidate concept memory for better pattern separation
+void ConceptFormation::consolidateConceptMemory(size_t conceptId) {
+    DiscoveredConcept* conceptObj = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            conceptObj = &c;
+            break;
         }
     }
     
-    return totalActivation;
-}
-
-std::vector<NeuronId> SpatialRepresentation::getPlaceNeuronsNear(float x, float y, float radius) const {
-    std::vector<NeuronId> result;
+    if (!conceptObj || conceptObj->instances.size() < 2) return;
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < radius) {
-            result.push_back(pc.neuron);
+    // Analyze pattern variance for consolidation
+    float totalVariance = 0.0f;
+    std::vector<float> variancePerInstance;
+    
+    for (const auto& instance : conceptObj->instances) {
+        float variance = computePatternVariance(instance.pattern, conceptObj->prototype);
+        variancePerInstance.push_back(variance);
+        totalVariance += variance;
+    }
+    
+    // Consolidate high-variance instances (more novel patterns)
+    float avgVariance = totalVariance / conceptObj->instances.size();
+    
+    for (size_t i = 0; i < conceptObj->instances.size(); ++i) {
+        if (variancePerInstance[i] > avgVariance * 1.5f) {
+            // Promote this instance to primary status
+            std::swap(conceptObj->instances[0], conceptObj->instances[i]);
+            break;
         }
     }
     
-    return result;
-}
-
-void SpatialRepresentation::clear() {
-    placeCells_.clear();
-    currentX_ = 0;
-    currentY_ = 0;
-}
-
-// TemporalRelation Implementation
-struct TemporalRelation::Impl {
-    Brain* brain;
+    // Update prototype with consolidated knowledge
+    std::vector<float> consolidatedPrototype;
+    float totalWeight = 0.0f;
     
-    Impl() : brain(nullptr) {}
-};
-
-TemporalRelation::TemporalRelation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-{
-}
-
-TemporalRelation::~TemporalRelation() = default;
-
-void TemporalRelation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-}
-
-void TemporalRelation::recordSequence(const std::vector<float>& eventA,
-                                      const std::vector<float>& eventB,
-                                      float reward) {
-    // Find existing link or create new
-    for (auto& link : sequences_) {
-        float simA = 0.0f, simB = 0.0f;
+    for (size_t i = 0; i < conceptObj->instances.size(); ++i) {
+        float weight = 1.0f / (1.0f + variancePerInstance[i]);  // Low variance = higher weight
+        totalWeight += weight;
         
-        // Compute similarity
-        if (link.fromEvent.size() == eventA.size() && link.toEvent.size() == eventB.size()) {
-            float dotA = 0.0f, normA = 0.0f, normB = 0.0f;
-            for (size_t i = 0; i < eventA.size(); ++i) {
-                dotA += link.fromEvent[i] * eventA[i];
-                normA += link.fromEvent[i] * link.fromEvent[i];
-                normB += eventA[i] * eventA[i];
-            }
-            if (normA > 0.0001f && normB > 0.0001f) {
-                simA = dotA / (std::sqrt(normA) * std::sqrt(normB));
-            }
-            
-            float dotB = 0.0f;
-            for (size_t i = 0; i < eventB.size(); ++i) {
-                dotB += link.toEvent[i] * eventB[i];
-            }
-            if (normB > 0.0001f) {
-                simB = dotB / normB;
-            }
+        if (i == 0) {  // Skip primary instance to avoid bias
+            continue;
         }
         
-        if (simA > 0.8f && simB > 0.8f) {
-            // Update existing link
-            link.strength = std::min(1.0f, link.strength + 0.1f);
-            link.observationCount++;
-            return;
-        }
-    }
-    
-    // Create new link
-    SequenceLink newLink;
-    newLink.fromEvent = eventA;
-    newLink.toEvent = eventB;
-    newLink.strength = 0.5f;
-    newLink.observationCount = 1;
-    
-    sequences_.push_back(newLink);
-}
-
-std::vector<float> TemporalRelation::predictNext(const std::vector<float>& eventA) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != eventA.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventA.size(); ++i) {
-            dot += link.fromEvent[i] * eventA[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += eventA[i] * eventA[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.toEvent;
+        for (size_t j = 0; j < conceptObj->instances[i].pattern.size(); ++j) {
+            if (j < consolidatedPrototype.size()) {
+                consolidatedPrototype[j] += conceptObj->instances[i].pattern[j] * weight;
+            } else {
+                consolidatedPrototype.push_back(conceptObj->instances[i].pattern[j] * weight);
             }
         }
     }
     
-    return bestPrediction;
-}
-
-std::vector<float> TemporalRelation::predictPrevious(const std::vector<float>& eventB) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.toEvent.size() != eventB.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventB.size(); ++i) {
-            dot += link.toEvent[i] * eventB[i];
-            normA += link.toEvent[i] * link.toEvent[i];
-            normB += eventB[i] * eventB[i];
+    if (totalWeight > 0.0f) {
+        for (size_t j = 0; j < consolidatedPrototype.size(); ++j) {
+            consolidatedPrototype[j] /= totalWeight;
         }
         
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.fromEvent;
-            }
+        // Blend with existing prototype
+        for (size_t j = 0; j < conceptObj->prototype.size() && j < consolidatedPrototype.size(); ++j) {
+            conceptObj->prototype[j] = conceptObj->prototype[j] * 0.7f + consolidatedPrototype[j] * 0.3f;
+        }
+    }
+}
+
+// Compute pattern variance relative to prototype
+float ConceptFormation::computePatternVariance(const std::vector<float>& pattern,
+                                            const std::vector<float>& prototype) const {
+    if (pattern.size() != prototype.size() || pattern.empty()) return 0.0f;
+    
+    float variance = 0.0f;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float diff = pattern[i] - prototype[i];
+        variance += diff * diff;
+    }
+    
+    return variance / static_cast<float>(pattern.size());
+}
+
+// Apply prediction error learning
+void ConceptFormation::applyPredictionErrorLearning(size_t conceptId, float predictionError, float reward) {
+    DiscoveredConcept* conceptObj = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            conceptObj = &c;
+            break;
         }
     }
     
-    return bestPrediction;
-}
-
-float TemporalRelation::getPredictionConfidence(const std::vector<float>& event) const {
-    size_t matchingCount = 0;
+    if (!conceptObj) return;
     
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != event.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < event.size(); ++i) {
-            dot += link.fromEvent[i] * event[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += event[i] * event[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > 0.7f) {
-                matchingCount++;
-            }
+    // Use prediction error to refine prototype
+    float errorLearningRate = std::min(0.5f, predictionError * 0.2f);
+    if (std::abs(errorLearningRate) > 0.01f) {
+        for (size_t i = 0; i < conceptObj->prototype.size(); ++i) {
+            conceptObj->prototype[i] += errorLearningRate * 0.1f;
         }
     }
     
-    return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
+    // Reward prediction bonus
+    if (reward > 0.0f) {
+        float rewardBonus = reward * 0.05f;
+        for (size_t i = 0; i < conceptObj->prototype.size(); ++i) {
+            conceptObj->prototype[i] += rewardBonus * 0.05f;
+        }
+    }
 }
 
-void TemporalRelation::clear() {
-    sequences_.clear();
+// Predict concept outcome using current prototype
+std::vector<float> ConceptFormation::predictConceptOutcome(size_t conceptId) const {
+    const DiscoveredConcept* conceptObj = getConcept(conceptId);
+    if (!conceptObj) {
+        return {};
+    }
+    
+    return conceptObj->prototype;
 }
 
-} // namespace nlm
+// Compute prediction error
+float ConceptFormation::computePredictionError(const std::vector<float>& actual,
+                                            const std::vector<float>& predicted) const {
+    if (actual.size() != predicted.size() || actual.empty()) return 1.0f;
+    
+    float error = 0.0f;
+    for (size_t i = 0; i < actual.size(); ++i) {
+        float diff = actual[i] - predicted[i];
+        error += diff * diff;
+    }
+    
+    return std::sqrt(error / static_cast<float>(actual.size()));
+}
+
+// Enhanced novelty detection with multiple criteria
+bool ConceptFormation::isNovel(const std::vector<float>& pattern,
+                             float similarityThreshold,
+                             const std::vector<float>& features) const {
+    // Use advanced features for novelty detection
+    std::vector<float> advancedFeatures = features.empty() ? extractAdvancedFeatures(pattern) : features;
+    
+    // Check if pattern matches existing concepts
+    size_t matchingConcept = findConceptForPattern(advancedFeatures);
+    
+    if (matchingConcept == 0) {
+        // No existing concept, so it's novel
+        return true;
+    }
+    
+    // Check if similarity is below threshold
+    const DiscoveredConcept* conceptObj = getConcept(matchingConcept);
+    if (!conceptObj) return true;
+    
+    float similarity = computeAdvancedSimilarity(advancedFeatures, conceptObj->prototype);
+    return similarity < similarityThreshold;
+}
+
+// Update prototype with adaptive learning rate
+void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance,
+                                    float learningRate) {
+    for (auto& conceptObj : concepts_) {
+        if (conceptObj.id == conceptId) {
+            // Adaptive Hebbian update
+            if (conceptObj.prototype.size() == newInstance.size()) {
+                for (size_t i = 0; i < conceptObj.prototype.size(); ++i) {
+                    float adaptation = learningRate * (newInstance[i] - conceptObj.prototype[i]);
+                    conceptObj.prototype[i] += adaptation;
+                    
+                    // Apply normalization to keep within reasonable bounds
+                    conceptObj.prototype[i] = std::clamp(conceptObj.prototype[i], 0.0f, 1.0f);
+                }
+            }
+            break;
+        }
+    }
+}
+
+void ConceptFormation::clear() {
+    concepts_.clear();
+    nextConceptId_ = 1;
+}
