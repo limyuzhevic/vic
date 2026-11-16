@@ -168,7 +168,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Pythonic convenience methods
+        .def("getValue", [](Config& self, const std::string& key) {
+            if (!self.has(key)) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            auto valueOpt = self.getValue(key);
+            if (!valueOpt) {
+                throw py::value_error("Configuration value is null for key: " + key);
+            }
+            return valueOpt.value();
+        }, py::arg("key"), "Get configuration value by key")
+        .def("setValue", [](Config& self, const std::string& key, const std::string& value) {
+            self.setValue(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue = "") {
+            if (!self.has(key)) return defaultValue;
+            auto valueOpt = self.getValue(key);
+            if (!valueOpt) return defaultValue;
+            return valueOpt.value();
+        }, py::arg("key"), py::arg("defaultValue") = "", "Get string configuration value")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue = 0) {
+            if (!self.has(key)) return defaultValue;
+            auto valueOpt = self.getValue(key);
+            if (!valueOpt) return defaultValue;
+            return valueOpt.value();
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get int configuration value")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue = 0.0f) {
+            if (!self.has(key)) return defaultValue;
+            auto valueOpt = self.getValue(key);
+            if (!valueOpt) return defaultValue;
+            return valueOpt.value();
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f, "Get float configuration value")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            if (!self.has(key)) return defaultValue;
+            auto valueOpt = self.getValue(key);
+            if (!valueOpt) return defaultValue;
+            return valueOpt.value();
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get bool configuration value");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -187,7 +225,16 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Pythonic convenience method: create Vision with 3-channel RGB
+        .def("createRgb", [](size_t width, size_t height) {
+            return Vision(width, height, 3);
+        }, py::arg("width"), py::arg("height"),
+            "Create RGB Vision with default channels=3")
+        .def("createGrayscale", [](size_t width, size_t height) {
+            return Vision(width, height, 1);
+        }, py::arg("width"), py::arg("height"),
+            "Create grayscale Vision with 1 channel");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +244,59 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Pythonic convenience method: create Audio from vector
+        .def("createFromSamples", [](size_t sampleRate, const std::vector<float>& samples) {
+            Audio audio(sampleRate, samples.size());
+            audio.setData(samples);
+            return audio;
+        }, py::arg("sampleRate"), py::arg("samples"),
+            "Create Audio from sample rate and sample data vector");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        // Pythonic convenience method: add multiple signals
+        .def("addSignals", [](InternalSignals& self, const std::vector<float>& values) {
+            for (float v : values) self.addSignal(v);
+        }, py::arg("values"),
+            "Add multiple signals at once");
+
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Pythonic convenience methods for percept creation
+        .def("createEmpty", []() {
+            return SensoryPercept();
+        }, "Create empty SensoryPercept")
+        .def("createFromVision", [](const Vision& vision) {
+            SensoryPercept percept;
+            percept.setVision(vision);
+            return percept;
+        }, py::arg("vision"),
+            "Create SensoryPercept from Vision data")
+        .def("createFromVisionTouch", [](const Vision& vision, const std::vector<float>& touch) {
+            SensoryPercept percept;
+            percept.setVision(vision);
+            percept.setTouch(touch);
+            return percept;
+        }, py::arg("vision"), py::arg("touch"),
+            "Create SensoryPercept from Vision and touch data");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -213,7 +307,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Pythonic convenience methods
+        .def("createMove", [](ActionType type) {
+            return Action(type);
+        }, py::arg("type"), "Create Action with given type")
+        .def("createWithParams", [](ActionType type, const std::vector<float>& params) {
+            return Action(type, params);
+        }, py::arg("type"), py::arg("params"), "Create Action with type and parameters")
+        .def("setParamsFromList", [](Action& self, const std::vector<float>& params) {
+            self.setParameters(params);
+        }, py::arg("params"), "Set action parameters from list")
+        .def("addParameter", [](Action& self, float param) {
+            auto params = self.getParameters();
+            params.push_back(param);
+            self.setParameters(params);
+        }, py::arg("param"), "Add a parameter to the action");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -241,7 +350,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset)
+        // Pythonic convenience methods
+        .def("setPosition", [](AgentBody& self, float x, float y) {
+            self.x = x;
+            self.y = y;
+        }, py::arg("x"), py::arg("y"), "Set position coordinates")
+        .def("setVelocity", [](AgentBody& self, float vx, float vy) {
+            self.velocityX = vx;
+            self.velocityY = vy;
+            self.isMoving = (vx != 0.0f || vy != 0.0f);
+        }, py::arg("vx"), py::arg("vy"), "Set velocity vector")
+        .def("moveTo", [](AgentBody& self, float x, float y, float dt) {
+            // Simple kinematic movement
+            float angle = self.orientation * M_PI / 180.0f;
+            self.x += self.velocityX * dt;
+            self.y += self.velocityY * dt;
+            // Update position
+        }, py::arg("x"), py::arg("y"), py::arg("dt"), "Move to position (simplified)");
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
@@ -249,7 +375,25 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        // Pythonic convenience methods
+        .def("createSuccess", [](float reward, const std::string& message) {
+            return ActionResult(reward, true, message);
+        }, py::arg("reward"), py::arg("message") = "",
+            "Create successful ActionResult")
+        .def("createFailure", [](float reward, const std::string& message) {
+            return ActionResult(reward, false, message);
+        }, py::arg("reward"), py::arg("message") = "",
+            "Create failed ActionResult")
+        .def("isPositiveReward", [](const ActionResult& result) {
+            return result.reward > 0.0f;
+        }, "Check if result has positive reward")
+        .def("isNegativeReward", [](const ActionResult& result) {
+            return result.reward < 0.0f;
+        }, "Check if result has negative reward")
+        .def("isNeutralReward", [](const ActionResult& result) {
+            return std::abs(result.reward) < 0.001f;
+        }, "Check if result has neutral reward");
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
@@ -293,7 +437,34 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Pythonic convenience methods
+        .def("createVisionPercept", [](SimpleWorld& self) {
+            return self.getSensoryPercept().getVision();
+        }, "Create default vision percept")
+        .def("createEmptyPercept", [](SimpleWorld& self) {
+            return self.getSensoryPercept();
+        }, "Create empty sensory percept")
+        .def("addResource", [](SimpleWorld& self, float x, float y) {
+            WorldObject obj(x, y, WorldObjectType::Resource, 10.0f, 0.3f);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), "Add resource at position")
+        .def("addHazard", [](SimpleWorld& self, float x, float y) {
+            WorldObject obj(x, y, WorldObjectType::Hazard, -5.0f, 0.3f);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), "Add hazard at position")
+        .def("addWall", [](SimpleWorld& self, float x, float y, float width = 1.0f, float height = 1.0f) {
+            WorldObject obj(x, y, WorldObjectType::Wall, 0.0f, std::max(width, height));
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("width") = 1.0f, py::arg("height") = 1.0f,
+           "Add wall at position")
+        .def("removeObjectAt", [](SimpleWorld& self, float x, float y) {
+            self.removeObject(x, y);
+        }, py::arg("x"), py::arg("y"), "Remove object at position")
+        .def("checkCollision", [](SimpleWorld& self, float x, float y, float radius) {
+            return self.isValidPosition(x, y);
+        }, py::arg("x"), py::arg("y"), py::arg("radius"),
+           "Check if position is valid (collides with walls/objects)");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
