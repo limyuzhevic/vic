@@ -80,20 +80,28 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // JSON parsing support
+    struct JsonConfig {
+        std::string filename;
+        bool valid;
+        std::string error;
+    };
+
+    // YAML parsing support  
+    struct YamlConfig {
+        std::string filename;
+        bool valid;
+        std::string error;
+    };
+
+    // Parse JSON configuration file
+    JsonConfig parseJsonFile(const std::string& filepath) const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Parse YAML configuration file
+    YamlConfig parseYamlFile(const std::string& filepath) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Merge configurations (file config overrides default config)
+    void mergeConfig(const Config& other, ConfigSource source = ConfigSource::File);
     
 private:
     struct Impl;

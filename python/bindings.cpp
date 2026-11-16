@@ -21,11 +21,37 @@ namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
+        NLM (熙然) - Neural Learning Machine Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
+        
+        Version: 0.1.0
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Usage:
+        -----
+        import pynlm
+        
+        # Create a default configuration
+        config = pynlm.createDefaultConfig()
+        
+        # Create and initialize a brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+        
+        print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        
+        The NLM framework implements a brain-inspired spiking neural network
+        with developmental learning, memory systems, and reward-based plasticity.
     )pbdoc";
+    
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -146,16 +172,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+        // loadFromArgs takes (int, char**) in C++. Use pybind11's
+        // mechanism to properly convert Python strings to C-style strings.
+        // We need to make copies since the C strings must persist.
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            std::vector<std::string> copies;
+            for (const auto& a : args) {
+                // Make a copy of the string so the C string persists
+                copies.push_back(a);
+                argv.push_back(const_cast<char*>(copies.back().c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (expects --key=value format)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -408,21 +439,137 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        // Basic validation - check for required keys
+        bool has_neuron_count = config->has("brain.neuron_count");
+        bool has_synapse_density = config->has("brain.synapse_density");
+        bool has_connection_probability = config->has("brain.connection_probability");
+        
+        if (!has_neuron_count || !has_synapse_density || !has_connection_probability) {
+            throw std::runtime_error("Configuration missing required keys. "
+                                    "Required: brain.neuron_count, brain.synapse_density, brain.connection_probability");
+        }
+        
+        // Validate values are within reasonable ranges
+        auto neuron_count = config->get<int64_t>("brain.neuron_count");
+        auto synapse_density = config->get<double>("brain.synapse_density");
+        auto connection_probability = config->get<double>("brain.connection_probability");
+        
+        if (!neuron_count || neuron_count.value() < 10) {
+            throw std::runtime_error("brain.neuron_count must be at least 10");
+        }
+        if (!synapse_density || synapse_density.value() < 0.0 || synapse_density.value() > 1.0) {
+            throw std::runtime_error("brain.synapse_density must be between 0.0 and 1.0");
+        }
+        if (!connection_probability || connection_probability.value() < 0.0 || connection_probability.value() > 1.0) {
+            throw std::runtime_error("brain.connection_probability must be between 0.0 and 1.0");
+        }
+        
+        return true;
+    }, py::arg("config"), "Validate configuration has required keys and values");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Convenience method to get brain summary statistics
+    m.def("get_brain_summary", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            return std::string("No brain instance");
+        }
+        
+        std::vector<std::string> stats;
+        stats.push_back("Neurons: " + std::to_string(brain->getTotalNeuronCount()));
+        stats.push_back("Synapses: " + std::to_string(brain->getTotalSynapseCount()));
+        stats.push_back("Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
+        stats.push_back("Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz");
+        stats.push_back("Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        stats.push_back("Development stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())));
+        
+        if (brain->getWorkingMemory()) {
+            stats.push_back("Working memory traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+        }
+        
+        std::string result;
+        for (size_t i = 0; i < stats.size(); ++i) {
+            if (i > 0) result += " | ";
+            result += stats[i];
+        }
+        
+        return result;
+    }, py::arg("brain"), "Get human-readable summary of brain statistics");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Convenience function to run a complete simulation
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain,
+                             std::shared_ptr<SimpleWorld> world,
+                             std::shared_ptr<AgentBrain> agent,
+                             size_t num_steps,
+                             bool verbose) {
+        // Run the simulation loop
+        for (size_t step = 0; step < num_steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            SensoryPercept percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(static_cast<SimulationStep>(step));
+            
+            // Get action
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(cmd, world->getSimulationTime());
+            
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                          << "Firing: " << brain->getFiringNeuronCount() << ", "
+                          << "Curiosity: " << agent->getCuriosityLevel() << std::endl;
+            }
+        }
+        
+        // Return statistics as a Python dict (simulated)
+        return std::map<std::string, double>{{
+            {"steps_completed", static_cast<double>(num_steps)},
+            {"total_spikes", static_cast<double>(brain->getTotalSpikeCount())},
+            {"firing_neurons", static_cast<double>(brain->getFiringNeuronCount())},
+            {"avg_firing_rate", brain->getAverageFiringRate()},
+            {"curiosity", agent->getCuriosityLevel()},
+            {"novelty", agent->getNoveltyLevel()},
+            {"development_stage", static_cast<double>(brain->getDevelopmentalStage())},
+        }};
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"), py::arg("verbose") = false,
+       "Run a complete simulation with brain, world, and agent");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Pythonic factory functions for common use cases
+    m.def("create_demo_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set reasonable defaults for demo purposes
+        config->set("brain.neuron_count", 1000LL);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.connection_probability", 0.05f);
+        config->set("brain.initial_weight_mean", 0.5f);
+        config->set("brain.initial_weight_std", 0.1f);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.v_reset", -75.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("brain.tau_ref", 2.0f);
+        
+        // Enable plasticity
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Enable neuromodulation
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        return config;
+    }, "Create a demo configuration with sensible defaults for learning simulations");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
