@@ -197,6 +197,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
+            // Refractory period just completed, set to Resting for next step
             pImpl->state.firingState = FiringState::Resting;
         }
         // Keep the firing-rate metric decaying even while refractory, so it
@@ -235,8 +236,6 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
     // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
@@ -267,7 +266,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step

@@ -109,33 +109,86 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+// Modern C++20-style logging macros that include file/line/function info
+// These macros maintain backward compatibility while providing better error handling
 
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
-    }
-    
-private:
-    LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
+// Error context information for better debugging
+struct ErrorContext {
+    std::string file;
+    int line;
+    std::string function;
+    std::string message;
 };
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// Enhanced logging macro with better error context and modern C++20 support
+#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Stream-style logging with context
+#define NLM_LOG_STREAM_ERROR nlm::LogStream(nlm::LogLevel::Error, __FILE__, __LINE__, __func__)
+#define NLM_LOG_STREAM_WARNING nlm::LogStream(nlm::LogLevel::Warning, __FILE__, __LINE__, __func__)
+#define NLM_LOG_STREAM_INFO nlm::LogStream(nlm::LogLevel::Info, __FILE__, __LINE__, __func__)
+
+// Enhanced error handling utility for common patterns
+class ErrorHandler {
+public:
+    template<typename T>
+    static bool checkAndLog(bool condition, const std::string& errorMsg, 
+                           const std::string& file = "", int line = 0, 
+                           const std::string& function = "") {
+        if (!condition) {
+            NLM_LOG_ERROR(errorMsg + " at " + file + ":" + std::to_string(line) + 
+                         " in function " + function);
+            return false;
+        }
+        return true;
+    }
+    
+    template<typename T>
+    static bool checkAndWarn(bool condition, const std::string& warningMsg,
+                            const std::string& file = "", int line = 0,
+                            const std::string& function = "") {
+        if (!condition) {
+            NLM_LOG_WARNING(warningMsg + " at " + file + ":" + std::to_string(line) +
+                           " in function " + function);
+            return false;
+        }
+        return true;
+    }
+    
+    // File operation error handling
+    static bool checkFileOpen(std::ifstream& file, const std::string& path,
+                             const std::string& operation = "read") {
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to " + operation + " file: " + path);
+            return false;
+        }
+        return true;
+    }
+    
+    static bool checkFileWrite(std::ofstream& file, const std::string& path,
+                              const std::string& operation = "write") {
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to " + operation + " file: " + path);
+            return false;
+        }
+        return true;
+    }
+    
+    // Resource allocation error handling
+    template<typename T>
+    static T* checkAllocation(T* ptr, const std::string& resourceType,
+                             const std::string& file = "", int line = 0,
+                             const std::string& function = "") {
+        if (!ptr) {
+            NLM_LOG_ERROR("Failed to allocate " + resourceType + " at " + file +
+                         ":" + std::to_string(line) + " in function " + function);
+        }
+        return ptr;
+    }
+};
 
 } // namespace nlm

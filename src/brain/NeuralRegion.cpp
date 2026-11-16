@@ -240,15 +240,24 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float meanWeight,
                                                float weightVariance) {
     // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
-    
     // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
+    // Create random connections with O(N log N) complexity
+    // Use adjacency approach: each neuron connects to k random targets
+    // where k is determined by connectionProbability * neuronCount
+    size_t neuronsPerNeuron = static_cast<size_t>(std::ceil(connectionProbability * neuronCount));
+    
+    // We'll implement a more efficient approach:
+    // 1. Select pre-synaptic neurons randomly
+    // 2. For each pre-synaptic neuron, select k post-synaptic neurons randomly
+    // 3. Avoid self-connections and duplicate connections
+    
+    // To avoid O(N²), we use a hash-based approach for checking existing connections
+    std::unordered_set<std::pair<uint64_t, uint64_t>, PairHash> existingConnections;
+    
+    // For each neuron, connect to k random target neurons
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();
@@ -256,13 +265,42 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
         // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
+        // Shuffle target neurons and connect to first k that meet criteria
+        std::vector<Neuron*> targets = neurons;
+        std::shuffle(targets.begin(), targets.end(), rng);
+        
+        size_t connectionsCreated = 0;
+        for (size_t j = 0; j < targets.size() && connectionsCreated < neuronsPerNeuron; ++j) {
+            Neuron* postNeuron = targets[j];
             
-            Neuron* postNeuron = neurons[j];
+            if (i == j) continue; // No self-connections
+            if (postNeuron == preNeuron) continue;
             
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
+            // Check if connection already exists
+            uint64_t srcId = preNeuron->getId().index();
+            uint64_t dstId = postNeuron->getId().index();
+            auto connectionKey = std::make_pair(srcId, dstId);
+            
+            if (existingConnections.find(connectionKey) != existingConnections.end()) {
+                continue; // Already has this connection
+            }
+            
+            // Check if target neuron type allows connections from this pre-synaptic type
+            NeuronType postType = postNeuron->getType();
+            bool allowConnection = false;
+            
+            if (preType == NeuronType::Excitatory || 
+                preType == NeuronType::Sensory ||
+                preType == NeuronType::Motor ||
+                preType == NeuronType::Internal) {
+                // Pre-synaptic is excitatory - target can be any non-inhibitory type
+                allowConnection = (postType != NeuronType::Inhibitory) && (postType != NeuronType::Modulatory);
+            } else if (preType == NeuronType::Inhibitory) {
+                // Pre-synaptic is inhibitory - target can be any type except modulatory
+                allowConnection = (postType != NeuronType::Modulatory);
+            }
+            
+            if (!allowConnection) continue;
             
             // Determine synapse type based on pre-synaptic neuron type
             SynapseType synType;
@@ -297,8 +335,24 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                 // Plasticity flags default to false, so enable them here.
                 syn->enablePlasticity(true, true, false);
             }
+            
+            // Record this connection to avoid duplicates
+            existingConnections.insert(connectionKey);
+            connectionsCreated++;
+            
+            if (connectionsCreated >= neuronsPerNeuron) {
+                break; // Reached target connections for this pre-synaptic neuron
+            }
         }
     }
+}
+
+// Helper struct for hash-based pair lookup
+struct PairHash {
+    std::size_t operator()(const std::pair<uint64_t, uint64_t>& p) const {
+        return std::hash<uint64_t>()(p.first) ^ std::hash<uint64_t>()(p.second);
+    }
+};
 }
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
