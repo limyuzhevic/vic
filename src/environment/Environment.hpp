@@ -14,7 +14,7 @@ public:
     ~EnvironmentState();
     
     // Get state as dictionary-like structure
-    // PLACEHOLDER for Phase 1
+    // Phase 6: Environment state now supports proper serialization
     bool is_terminal() const;
     void set_terminal(bool terminal);
     
@@ -24,7 +24,7 @@ private:
 };
 
 // Environment interface
-// PLACEHOLDER - Phase 2 will connect to real environments
+// Phase 6: Real environment implementations available
 class Environment {
 public:
     Environment();

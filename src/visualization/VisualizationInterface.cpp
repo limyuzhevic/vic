@@ -14,18 +14,18 @@ VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
+    // TODO PHASE 8: Initialize real visualization (e.g., with GLFW, SDL, or custom)
+    // Phase 6: Visualization interface exists but may be inactive
     pImpl->active = false;
     return true;
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Phase 6: Visualization updates if active
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Phase 6: Visualization rendering if active
 }
 
 void VisualizationInterface::close() {
@@ -45,19 +45,19 @@ double VisualizationInterface::getUpdateRate() const {
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    // TODO PHASE 8: Implement network visualization
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    // TODO PHASE 8: Implement activity visualization
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    // TODO PHASE 8: Implement spike raster plot
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    // TODO PHASE 8: Implement weight matrix visualization
 }
 
 } // namespace nlm

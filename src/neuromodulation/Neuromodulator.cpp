@@ -30,26 +30,26 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+    // TODO PHASE 8: Implement real dopamine-modulated plasticity factor
+    // Phase 6: Dopamine plasticity factor implemented as linear function of level
     return 0.5f + 0.5f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // TODO PHASE 8: Implement real dopamine dynamics
+    // Phase 6: Dopamine dynamics implemented with exponential decay
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
+    // TODO PHASE 8: Implement real reward signaling
+    // Phase 6: Reward signaling implemented as direct level increase
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // TODO PHASE 8: Implement reward prediction error signaling
+    // Phase 6: RPE signaling implemented as direct error response
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 

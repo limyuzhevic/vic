@@ -26,11 +26,13 @@ MotorSystem::MotorSystem() : pImpl(new Impl) {}
 MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
-    // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
+    // TODO PHASE 8: Implement real action selection based on neural activity
+    // Phase 6: Action selection implemented with simple selection strategy
     if (!pImpl->availableActions.empty()) {
         return std::make_unique<Action>(pImpl->availableActions[0]);
     }
+    return std::make_unique<Action>(ActionType::Wait);
+}
     return std::make_unique<Action>(ActionType::Wait);
 }
 

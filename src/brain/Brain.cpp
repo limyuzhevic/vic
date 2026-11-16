@@ -215,7 +215,7 @@ bool Brain::initialize() {
     }
     
     // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
+    size_t neuronsPerRegion = std::max<size_t>(1, neuronCount / regionCount);
     size_t nextNeuronIndex = 1;  // globally unique IDs across regions (see setNextNeuronIndex)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -226,21 +226,16 @@ bool Brain::initialize() {
             // initializeRandomConnectivity), so any input caused runaway
             // excitation and every weight saturated. Split the internal
             // population 80/20 into excitatory and inhibitory neurons.
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            size_t internalCount = neuronsPerRegion / 2;
+            auto sensoryPopId = region->addPopulation(std::max<size_t>(1, neuronsPerRegion / 4), NeuronType::Sensory);
+            size_t internalCount = std::max<size_t>(1, neuronsPerRegion / 2);
             size_t internalExcitatory = internalCount * 4 / 5;
             auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
-            auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
+            auto inhibitoryPopId = region->addPopulation(std::max<size_t>(1, internalCount - internalExcitatory), NeuronType::Inhibitory);
             (void)internalPopId; (void)inhibitoryPopId;
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
+            auto motorPopId = region->addPopulation(std::max<size_t>(1, neuronsPerRegion / 4), NeuronType::Motor);
+            nextNeuronIndex += neuronsPerRegion;
+        }
+    }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
