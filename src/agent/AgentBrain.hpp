@@ -143,6 +143,23 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for text encoding
+    void normalizeText(std::string& text) const;
+    uint64_t hashNormalizedText(const std::string& text) const;
+    void splitmix64(uint64_t state, std::vector<size_t>& out) const;
+    
+    // Helper methods for neuron distribution
+    void distributeNeurons();
+    
+    // Helper methods for motor decoding
+    void applyWtaLateralInhibition();
+    void processVisionInput(const std::vector<float>& vision);
+    void processTextInput(const std::string& text);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void updateNoveltyAndCuriosity(const std::vector<float>& vision);
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

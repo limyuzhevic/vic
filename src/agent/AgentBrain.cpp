@@ -23,48 +23,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Internal) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        internalNeurons_.push_back(n);
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    distributeNeurons();
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -79,20 +38,25 @@ AgentBrain::~AgentBrain() = default;
 // tail vision neurons that vision itself never uses (vision is 16
 // rays, the vision group has 31 neurons), so text has its own
 // channel and cannot masquerade as a visual scene.
-std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
+void AgentBrain::normalizeText(std::string& text) const {
     std::string norm;
     for (char c : text) {
         if (c == ' ' || c == '\t' || c == '\n') continue;
         norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-    if (norm.empty()) return {};
+    text = norm;
+}
+
+uint64_t AgentBrain::hashNormalizedText(const std::string& text) const {
     uint64_t h = 1469598103934665603ULL;
-    for (char c : norm) {
+    for (char c : text) {
         h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
         h *= 1099511628211ULL;
     }
-    std::vector<size_t> out;
-    uint64_t state = h;
+    return h;
+}
+
+void AgentBrain::splitmix64(uint64_t state, std::vector<size_t>& out) const {
     while (out.size() < 4) {
         // splitmix64
         state += 0x9e3779b97f4a7c15ULL;
@@ -103,6 +67,17 @@ std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
         size_t idx = static_cast<size_t>(z % 15);
         if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
     }
+}
+
+std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
+    std::string norm(text);
+    normalizeText(norm);
+    
+    if (norm.empty()) return {};
+    
+    uint64_t h = hashNormalizedText(norm);
+    std::vector<size_t> out;
+    splitmix64(h, out);
     return out;
 }
 
@@ -229,10 +204,101 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             if (g == lastWinnerGroup_) continue;
             for (Neuron* n : *groups[g]) {
                 if (n) n->injectCurrent(-4.0f);
+}
+
+void AgentBrain::applyWtaLateralInhibition() {
+    if (lastWinnerGroup_ >= 0 && lastWinnerGroup_ != 4 &&
+        consecutiveWinnerCount_ < 3 &&
+        lastWinnerMargin_ > 5.0f && noveltyLevel_ < 0.3f) {
+        const std::vector<Neuron*>* groups[5] = {
+            &motorForward_, &motorBackward_, &motorTurnLeft_,
+            &motorTurnRight_, &motorInteract_};
+        for (int g = 0; g < 5; ++g) {
+            if (g == lastWinnerGroup_) continue;
+            for (Neuron* n : *groups[g]) {
+                if (n) n->injectCurrent(-4.0f);
             }
         }
         ++wtaPulseCount_;
     }
+}
+
+void AgentBrain::processVisionInput(const std::vector<float>& vision) {
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+        if (sensoryVision_[i]) {
+            // Inject current proportional to vision intensity
+            float current = vision[i] * 5.0f;  // Scale factor
+            sensoryVision_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processTextInput(const std::string& text) {
+    for (size_t idx : encodeText(text)) {
+        size_t neuronIdx = 16 + idx;
+        if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
+            sensoryVision_[neuronIdx]->injectCurrent(8.0f);
+        }
+    }
+}
+
+void AgentBrain::processTouchInput(const std::vector<float>& touch) {
+    maxTouch_ = 0.0f;
+    for (float t : touch) maxTouch_ = std::max(maxTouch_, t);
+    
+    // Forward touch: touch sensors 0, 1, 7 are the forward cone (-45..+45 degrees)
+    forwardTouch_ = 0.0f;
+    if (touch.size() >= 8) {
+        forwardTouch_ = std::max({touch[0], touch[1], touch[7]});
+    } else {
+        forwardTouch_ = maxTouch_;
+    }
+}
+
+void AgentBrain::processInternalInput(const std::vector<float>& internal) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
+        if (sensoryInternal_[i]) {
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            sensoryInternal_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processProprioceptionInput(const std::vector<float>& proprio) {
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+        if (sensoryProprioception_[i]) {
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::updateNoveltyAndCuriosity(const std::vector<float>& vision) {
+    if (!vision.empty()) {
+        if (predictedVision_.size() != vision.size()) {
+            predictedVision_.assign(vision.size(), 0.0f);
+        }
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < vision.size(); ++i) {
+            totalDiff += std::abs(vision[i] - predictedVision_[i]);
+        }
+        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Adapt the prediction toward the current scene.
+        constexpr float kPredictionAlpha = 0.05f;
+        for (size_t i = 0; i < vision.size(); ++i) {
+            predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
+        }
+    }
+
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
+                        + 0.6f * curiosityLevel_;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+}
+
+} // namespace nlm
 
     // Vision input (16 rays in SimpleWorld -> sensoryVision_ neurons).
     // NOTE (Phase 4, tried and reverted): encoding closeness
@@ -1107,4 +1173,51 @@ void AgentBrain::reset() {
     hasThoughtOutcome_ = false;
 }
 
+}
+
 } // namespace nlm
+
+void AgentBrain::distributeNeurons() {
+    if (!brain_) return;
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute motor neurons to different action groups
+                    size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                motorTurnLeft_.size() + motorTurnRight_.size() +
+                                motorInteract_.size() + motorWait_.size();
+                    
+                    switch (idx % 6) {
+                        case 0: motorForward_.push_back(n); break;
+                        case 1: motorBackward_.push_back(n); break;
+                        case 2: motorTurnLeft_.push_back(n); break;
+                        case 3: motorTurnRight_.push_back(n); break;
+                        case 4: motorInteract_.push_back(n); break;
+                        case 5: motorWait_.push_back(n); break;
+                    }
+                }
+            } else if (type == NeuronType::Internal) {
+                for (Neuron* n : pop->getNeurons()) {
+                    internalNeurons_.push_back(n);
+                }
+            } else if (type == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute sensory neurons
+                    size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                sensoryInternal_.size() + sensoryProprioception_.size();
+                    
+                    switch (idx % 4) {
+                        case 0: sensoryVision_.push_back(n); break;
+                        case 1: sensoryTouch_.push_back(n); break;
+                        case 2: sensoryInternal_.push_back(n); break;
+                        case 3: sensoryProprioception_.push_back(n); break;
+                    }
+                }
+            }
+        }
+    }
+}
