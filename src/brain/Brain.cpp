@@ -83,6 +83,7 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    float sleepDuration;  // Duration of current rest period
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -101,6 +102,7 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepDuration(0.0f)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -506,6 +508,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Apply other neuromodulators
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
@@ -609,13 +616,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Apply attention to the just-stored episode
+            if (pImpl->attention) {
+                pImpl->attention->processCompetition(episode.activeNeurons);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory input
+        // This requires sensory state encoding
+        
+        // Get sensory state from working memory if available
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Convert working memory to sensory pattern
+            auto neurons = pImpl->workingMemory->getMemoryNeurons();
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            
+            sensoryPattern.reserve(neurons.size());
+            for (size_t i = 0; i < std::min(neurons.size(), activations.size()); ++i) {
+                sensoryPattern.push_back(activations[i]);
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Update prediction system with current sensory pattern
+            pImpl->predictionSystem->update(sensoryPattern, currentStep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,16 +661,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation requires sensory state encoding and neural patterns
+        
+        // Get current sensory state from episodic memory if available
+        std::vector<float> sensoryPattern;
+        if (pImpl->episodicMemory && !pImpl->episodicMemory->getEpisodes().empty()) {
+            const auto& episodes = pImpl->episodicMemory->getEpisodes();
+            const auto& latestEpisode = episodes.back();
+            sensoryPattern = latestEpisode.sensoryState;
+        }
+        
+        if (!sensoryPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                sensoryPattern,
+                std::vector<float>(pImpl->regions.size(), 0.0f),  // placeholder features
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep
+            );
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 11: Apply neural planning ==========
+    if (pImpl->planner) {
+        // Neural planner would predict action sequences
+        // This requires sensory state and goal state
+        
+        // Get current sensory pattern
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            sensoryPattern = std::vector<float>(activations.begin(), 
+                                              activations.begin() + std::min(10u, activations.size()));
+        }
+        
+        if (!sensoryPattern.empty() && !pImpl->currentGoal_.empty()) {
+            // For now, just update planning based on current state
+            // In a full implementation, this would plan multi-step actions
+            pImpl->planner->setCurrentGoal(sensoryPattern);
+            
+            // Get planned action (if we had proper goal evaluation)
+            // ActionType plannedAction = pImpl->planner->planAction(sensoryPattern, 0.5f);
+        }
     }
-    
-    // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -1585,6 +1648,34 @@ void Brain::logStatus() const {
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+    
+    // Sleep/rest cycle integration
+    if (pImpl->isResting) {
+        // Rest phase: neural activity is suppressed
+        // Enhanced memory consolidation occurs during rest
+        
+        // Gradually increase sleep time
+        pImpl->sleepDuration += pImpl->timestep * 10.0f;  // 10x speed-up for sleep
+        
+        // Trigger memory consolidation
+        if (pImpl->stepsSinceLastEpisode > 100) {
+            if (pImpl->episodicMemory) {
+                // Consolidate recent memories
+                pImpl->episodicMemory->consolidate(0.5f);  // Higher consolidation during rest
+                
+                // Replay important memories during rest
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+                for (const auto* episode : episodesToReplay) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
+        }
+        
+        // Update development during rest
+        if (currentStep % 2000 == 0) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        }
     }
 }
 
