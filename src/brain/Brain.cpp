@@ -1108,6 +1108,18 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate file size before attempting to read
+        if (reader.getFileSize() > reader.getMaxFileSize()) {
+            NLM_LOG_ERROR("Checkpoint file too large: " + std::to_string(reader.getFileSize()) + " bytes");
+            return false;
+        }
+        
+        // Validate header structure
+        if (!reader.validateHeader()) {
+            NLM_LOG_ERROR("Invalid checkpoint file header");
+            return false;
+        }
+        
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
@@ -1161,19 +1173,49 @@ bool Brain::load(const std::string& filepath) {
                             state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            state.refractoryRemaining = neuronData.refractoryRemaining[idx];
+                            // Validate refractory remaining
+                            if (neuronData.refractoryRemaining[idx] <= neuronData.refractoryPeriod[idx] && 
+                                neuronData.refractoryRemaining[idx] >= 0) {
+                                state.refractoryRemaining = neuronData.refractoryRemaining[idx];
+                            } else {
+                                NLM_LOG_ERROR("Invalid refractory remaining value at index " + 
+                                            std::to_string(idx) + ", resetting to 0");
+                                state.refractoryRemaining = 0;
+                            }
                         }
                         if (idx < neuronData.refractoryPeriod.size()) {
-                            state.refractoryPeriod = neuronData.refractoryPeriod[idx];
+                            // Validate refractory period
+                            if (neuronData.refractoryPeriod[idx] > 0 && neuronData.refractoryPeriod[idx] <= 65535) {
+                                state.refractoryPeriod = neuronData.refractoryPeriod[idx];
+                            } else {
+                                NLM_LOG_ERROR("Invalid refractory period value at index " + 
+                                            std::to_string(idx) + ", setting to default");
+                                state.refractoryPeriod = 9; // Default from NeuronState
+                            }
                         }
                         if (idx < neuronData.lastSpikeTime.size()) {
-                            state.lastSpikeTime = neuronData.lastSpikeTime[idx];
+                            // Validate last spike time
+                            if (neuronData.lastSpikeTime[idx] >= -1.0f && neuronData.lastSpikeTime[idx] <= 1000000.0f) {
+                                state.lastSpikeTime = neuronData.lastSpikeTime[idx];
+                            } else {
+                                NLM_LOG_ERROR("Invalid last spike time at index " + 
+                                            std::to_string(idx) + ", setting to -1.0");
+                                state.lastSpikeTime = -1.0f;
+                            }
                         }
                         // Firing rate is the decode signal, so a
                         // reloaded brain must resume with the saved
                         // rates, not restart its EMA from zero.
                         if (idx < neuronData.firingRate.size()) {
-                            state.firingRate = neuronData.firingRate[idx];
+                            // Validate firing rate
+                            float firingRate = neuronData.firingRate[idx];
+                            if (firingRate >= 0.0f && firingRate <= 10000.0f) {
+                                state.firingRate = firingRate;
+                            } else {
+                                NLM_LOG_ERROR("Invalid firing rate at index " + 
+                                            std::to_string(idx) + ", setting to 0.0");
+                                state.firingRate = 0.0f;
+                            }
                         }
                     }
                     idx++;

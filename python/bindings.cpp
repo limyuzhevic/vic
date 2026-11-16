@@ -202,7 +202,17 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("addMultipleSignals", [](InternalSignals& self, const std::vector<float>& values) {
+            for (float v : values) self.addSignal(v);
+        }, py::arg("values"), "Add multiple signals at once")
+        .def("getSignalCount", &InternalSignals::getData, py::return_value_policy::reference_internal)
+        .def("getSum", [](const InternalSignals& self) {
+            float sum = 0.0f;
+            const auto& data = self.getData();
+            for (float v : data) sum += v;
+            return sum;
+        }, "Get sum of all signals");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -213,7 +223,25 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("addParameter", &Action::addParameter, py::arg("param"), "Add a parameter to the action")
+        .def("removeParameter", &Action::removeParameter, py::arg("index"), "Remove parameter at index")
+        .def("getParameterCount", &Action::getParameters, "Get number of parameters")
+        .def("isValid", &Action::getType, "Check if action type is valid")
+        .def("toDict", [](const Action& action) {
+            py::dict result;
+            result["type"] = action.getType();
+            result["parameters"] = action.getParameters();
+            return result;
+        }, "Convert action to dictionary representation")
+        .def("fromDict", [](Action& action, py::dict dict) {
+            if (dict.contains("type")) {
+                action.setType(py::cast<ActionType>(dict["type"]));
+            }
+            if (dict.contains("parameters")) {
+                action.setParameters(py::cast<std::vector<float>>(dict["parameters"]));
+            }
+        }, py::arg("dict"), "Load action from dictionary representation");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -428,6 +456,88 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Global configuration helper functions
+    m.def("createAdvancedConfig", [](const std::vector<std::pair<std::string, double>>& params) {
+        auto config = std::make_shared<Config>();
+        for (const auto& param : params) {
+            config->set(param.first, param.second, ConfigSource::Runtime);
+        }
+        return config;
+    }, py::arg("params"), "Create advanced configuration with multiple parameters");
+
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        py::dict stats;
+        stats["key_count"] = static_cast<int>(config->getKeys().size());
+        stats["sources"] = {"default", "file", "command_line", "runtime"};
+        stats["has_neuron_count"] = config->has("neuron_count");
+        stats["has_synapse_density"] = config->has("synapse_density");
+        stats["has_stdp_params"] = config->has("stdp_ltp_weight") && config->has("stdp_ltd_weight");
+        return stats;
+    }, "Get configuration statistics", py::arg("config"));
+
+    // Brain simulation control helpers
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, const std::shared_ptr<Config>& config,
+                                  size_t numSteps, bool recordProgress, bool useAllFeatures) {
+        brain->initialize();
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            if (recordProgress && step % 100 ==  IETF) {
+                printf("Step %zu: %zu spikes, %zu firing neurons\n",
+                       step, brain->getTotalSpikeCount(), brain->getFiringNeuronCount());
+            }
+        }
+        
+        // Return brain status as dictionary
+        py::dict result;
+        result["final_step"] = static_cast<int>(numSteps - 1);
+        result["total_spikes"] = static_cast<int>(brain->getTotalSpikeCount());
+        result["firing_neurons"] = static_cast<int>(brain->getFiringNeuronCount());
+        result["avg_firing_rate"] = brain->getAverageFiringRate();
+        result["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return result;
+    }, "Run a complete brain simulation", py::arg("brain"), py::arg("config"), py::arg("numSteps"), 
+             py::arg("recordProgress") = false, py::arg("useAllFeatures") = false);
+
+    // Convenience factory functions
+    m.def("createProductionBrain", [](int neuronCount, float connectionProb, bool enablePlasticity) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("connection_probability", connectionProb);
+        config->set("plasticity.stdp.enable", enablePlasticity);
+        config->set("plasticity.hebbian.enable", enablePlasticity);
+        config->set("plasticity.structural.enable", enablePlasticity);
+        
+        return std::make_shared<Brain>(config);
+    }, "Create production-ready brain with specific configuration");
+
+    m.def("createResearchBrain", [](int neuronCount, float connectionProb, bool enableAllFeatures) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("connection_probability", connectionProb);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enabled", true);
+        
+        return std::make_shared<Brain>(config);
+    }, "Create research brain with all features enabled");
+
+    m.def("getBrainSummary", [](const std::shared_ptr<Brain>& brain) {
+        std::ostringstream oss;
+        oss << "NLM Brain Summary:\n";
+        oss << "  Regions: " << brain->getRegionCount() << "\n";
+        oss << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Avg Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+        oss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        oss << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        return oss.str();
+    }, "Get comprehensive brain summary");
 
 } // namespace nlm

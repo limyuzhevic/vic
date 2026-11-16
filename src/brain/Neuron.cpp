@@ -241,39 +241,52 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
-    if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
-    }
-
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
+        // Validate firing rate calculation
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
         }
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+
+        // Check for spike with additional safety checks
+        if (V >= threshold) {
+            fired = true;
+            
+            // Validate spike firing rate contribution
+            if (dt > 0.0) {
+                pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            }
+            
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Validate spike recording
+            if (currentTime >= 0.0f) {
+                recordSpike(currentTime);
+            }
+            
+            // Reset membrane potential with validation
+            if (V_reset >= -100.0f && V_reset <= 50.0f) {
+                V = V_reset;
+            } else {
+                NLM_LOG_ERROR("Invalid reset potential, clamping: " + std::to_string(V_reset));
+                V = V_reset > 50.0f ? 50.0f : (V_reset < -100.0f ? -100.0f : V_reset);
+            }
+            
+            // Enter refractory period with validation
+            if (pImpl->state.refractoryPeriod > 0) {
+                pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+                pImpl->state.firingState = FiringState::Refractory;
+                
+                // Update adaptation for spike-frequency adaptation
+                pImpl->state.adaptationVariable += 1.0f;
+            }
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
         
-        // Record spike
-        recordSpike(currentTime);
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
         
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
-    
-    return fired;
+        return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {
