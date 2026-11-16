@@ -86,7 +86,24 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to string for serialization
+        std::visit([&file](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same<T, std::string>()) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same<T, std::vector<std::string>>() {
+                file << entry.key << " = [\"";
+                bool first = true;
+                for (const auto& item : value) {
+                    if (!first) file << ", \"";
+                    else first = false;
+                    file << item;
+                }
+                file << "\" ]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
