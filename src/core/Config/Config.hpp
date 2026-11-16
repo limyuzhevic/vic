@@ -56,14 +56,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from JSON file (modern configuration format)
+    bool loadFromJSON(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Save to JSON file (modern configuration format)
+    bool saveToJSON(const std::string& filepath) const;
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from mixed format (tries JSON first, falls back to simple format)
+    bool loadFromModern(const std::string& filepath);
+    
+    // Get configuration as JSON string
+    std::string toJSON() const;
+    
+    // Apply JSON patch to configuration
+    bool applyJSONPatch(const std::string& jsonPatch);
+    
+    // Get schema information for validation
+    std::string getConfigSchema() const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>

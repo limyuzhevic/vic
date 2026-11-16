@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -145,19 +146,32 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a simple text file")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+             "Load configuration from a JSON file (modern format)")
+        .def("loadFromModern", &Config::loadFromModern, py::arg("filepath"),
+             "Load configuration from modern format (tries JSON first)")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
-            argv.reserve(args.size());
+            argv.reserve(args.size() + 1); // +1 for null terminator
+            argv.push_back(nullptr);
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a simple text file")
+        .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"),
+             "Save configuration to a JSON file (modern format)")
+        .def("toJSON", &Config::toJSON,
+             "Export configuration as JSON string")
+        .def("applyJSONPatch", &Config::applyJSONPatch, py::arg("jsonPatch"),
+             "Apply JSON patch to configuration")
+        .def("getConfigSchema", &Config::getConfigSchema,
+             "Get configuration schema for validation")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -358,8 +372,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+         .def("logStatus", &Brain::logStatus,
+              "Log brain status")
+        // Convenience methods for Python
+        .def("getBrainInfo", [](const Brain& self) {
+            std::ostringstream oss;
+            oss << "Brain Statistics:\n";
+            oss << "  Total Neurons: " << self.getTotalNeuronCount() << "\n";
+            oss << "  Total Synapses: " << self.getTotalSynapseCount() << "\n";
+            oss << "  Firing Neurons: " << self.getFiringNeuronCount() << "\n";
+            oss << "  Average Firing Rate: " << self.getAverageFiringRate() << "\n";
+            oss << "  Total Spikes: " << self.getTotalSpikeCount() << "\n";
+            oss << "  Developmental Stage: " << static_cast<int>(self.getDevelopmentalStage());
+            return oss.str();
+        }, "Get human-readable brain statistics");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,7 +432,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Convenience methods for Python
+        .def("getAgentInfo", [](const AgentBrain& self) {
+            std::ostringstream oss;
+            oss << "Agent Statistics:\n";
+            oss << "  Developmental Stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+            oss << "  Neuromodulation Level: " << self.getNeuromodulationLevel() << "\n";
+            oss << "  Curiosity Level: " << self.getCuriosityLevel() << "\n";
+            oss << "  Novelty Level: " << self.getNoveltyLevel() << "\n";
+            oss << "  Prediction Error: " << self.getPredictionError();
+            return oss.str();
+        }, "Get human-readable agent statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

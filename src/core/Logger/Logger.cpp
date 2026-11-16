@@ -34,7 +34,19 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Use thread-safe version of localtime
+    std::tm tm_buf;
+    if (std::localtime_s(&tm_buf, &time) != 0) {
+        // Fallback to gmtime if localtime_s fails (Windows)
+        std::time_t time_t_copy = time;
+        if (std::gmtime_s(&tm_buf, &time_t_copy) != 0) {
+            oss << "[invalid time] ";
+        } else {
+            oss << "[" << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S") << "] ";
+        }
+    } else {
+        oss << "[" << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S") << "] ";
+    }
     
     oss << " " << entry.message;
     
