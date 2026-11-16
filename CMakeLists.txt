@@ -23,12 +23,9 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
+    # Config parser
+    src/core/Config/ConfigParser.cpp
+    src/core/Config/ConfigParser.hpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -179,26 +176,24 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
-if(NLM_BUILD_PYTHON_BINDINGS)
+pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm PRIVATE src)
+    install(TARGETS pynlm LIBRARY DESTINATION .)
+endif()
+
+# Enhanced Python bindings option
+option(NLM_BUILD_ENHANCED_PYTHON_BINDINGS "Build the enhanced pynlm_enhanced module" OFF)
+if(NLM_BUILD_ENHANCED_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
     # The module is shared, so the static libs it links need PIC.
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    pybind11_add_module(pynlm_enhanced python/bindings_enhanced.cpp)
+    target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm_enhanced PRIVATE src)
+    install(TARGETS pynlm_enhanced LIBRARY DESTINATION .)
 endif()
 
 # Testing

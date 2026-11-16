@@ -1,0 +1,30 @@
+#pragma once
+
+# NLM Unified CLI Build Configuration
+# This CMake file builds the unified CLI framework
+
+# CLI source files
+set(CLI_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/CLI/CLIFramework.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/CLI/CLISubcommands.cpp
+)
+
+# CLI include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/CLI)
+
+# Legacy executables - keep for backward compatibility
+add_executable(nlm_legacy
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+)
+target_link_libraries(nlm_legacy PUBLIC nlm_core)
+
+# Unified CLI executable
+add_executable(nlm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/main_unified.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Install targets
+install(TARGETS nlm nlm_legacy
+    RUNTIME DESTINATION bin
+)
