@@ -38,7 +38,7 @@ problems, not hidden ones.
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION** (Final Implementation)
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
@@ -82,6 +82,11 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
+#### Phase 6 Unified Demo Available
+- `nlm_phase6_unified_demo` provides comprehensive integration test
+- `nlm_phase6_text_demo` demonstrates text-as-a-sense capabilities
+- `nlm_phase6_demo` (legacy) for backward compatibility
+
 ## Building
 
 ```bash
@@ -93,19 +98,36 @@ make -j4
 
 ## Running
 Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+separate demos per phase:
 
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
+./nlm_phase5_demo     # Phase 5 sandbox and pattern probe
+./nlm_phase6_demo     # Phase 6 legacy integration test
+./nlm_phase6_unified_demo # NEW: Comprehensive Phase 6 integration test
+./nlm_phase6_text_demo    # NEW: Phase 6 text and thought capabilities
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+**Phase 6 Unified Demo** (`nlm_phase6_unified_demo`):
+- Runs comprehensive integration test verifying all systems work together
+- Tests memory, neuromodulation, prediction, development, checkpointing, and replay integration
+- Provides detailed output showing connection status of each system
+- Ensures the README's Phase 6 claims match the actual implementation
+
+**Phase 6 Text Demo** (`nlm_phase6_text_demo`):
+- Demonstrates text-as-a-sense capabilities
+- Shows concept formation and social learning
+- Implements advanced text encoding and processing
+- Demonstrates teacher-student interaction patterns
+
+**Important Notes**:
+- Phase 6 represents the final, complete integration of all NLM systems
+- Previous phases (1-5) established individual components
+- Phase 6 ensures all systems work together as a unified artificial brain
+- The unified demo provides comprehensive verification of this integration
 
 ## Project Structure
 
@@ -179,6 +201,7 @@ NLM/
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
+- Brain-personality integration
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
@@ -189,6 +212,7 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- **UNIFIED DEMO:** Comprehensive Phase 6 integration test with unified demo executable
 
 ## Scientific Limitations
 
