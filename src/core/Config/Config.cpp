@@ -56,6 +56,60 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool hasHelp = false;
+    bool hasList = false;
+    bool hasValidate = false;
+    bool hasReset = false;
+    
+    // First pass: collect flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle help command
+        if (arg == "--help" || arg == "-h") {
+            hasHelp = true;
+        }
+        // Handle list command
+        else if (arg == "--list" || arg == "-l") {
+            hasList = true;
+        }
+        // Handle validate command
+        else if (arg == "--validate" || arg == "-v") {
+            hasValidate = true;
+        }
+        // Handle reset command
+        else if (arg == "--reset" || arg == "-r") {
+            hasReset = true;
+        }
+    }
+    
+    // Handle help command
+    if (hasHelp) {
+        printHelp();
+        return true;
+    }
+    
+    // Handle list command
+    if (hasList) {
+        listConfiguration();
+        return true;
+    }
+    
+    // Handle reset command
+    if (hasReset) {
+        resetToDefaults();
+        return true;
+    }
+    
+    // Handle validation command
+    if (hasValidate) {
+        if (!validateConfiguration()) {
+            NLM_LOG_ERROR("Configuration validation failed");
+        }
+        return true;
+    }
+    
+    // Normal command-line parsing (original logic)
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -76,6 +130,91 @@ bool Config::loadFromArgs(int argc, char** argv) {
         }
     }
     return true;
+}
+
+void Config::printHelp() const {
+    NLM_LOG_INFO("Available configuration commands:");
+    NLM_LOG_INFO("  -h, --help                  Display this help message");
+    NLM_LOG_INFO("  -l, --list                 List all configuration keys");
+    NLM_LOG_INFO("  -v, --validate             Validate current configuration");
+    NLM_LOG_INFO("  -r, --reset                Reset to default configuration");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Usage examples:");
+    NLM_LOG_INFO("  --config=config_file       Load configuration from file");
+    NLM_LOG_INFO("  --neuron_count=1000       Set neuron count to 1000");
+    NLM_LOG_INFO("  --connection_probability=0.2");
+    NLM_LOG_INFO("  --random_seed=42          Set random seed to 42");
+}
+
+void Config::listConfiguration() const {
+    NLM_LOG_INFO("Available configuration keys:");
+    for (const auto& entry : pImpl->entries) {
+        NLM_LOG_INFO("  " + entry.key + " (" + std::to_string(static_cast<int>(entry.source)) + ")");
+    }
+}
+
+void Config::resetToDefaults() {
+    clear();
+    // Re-apply default values
+    set("random_seed", 42, ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", 1000, ConfigSource::Default);
+    set("region_count", 1, ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    NLM_LOG_INFO("Configuration reset to defaults");
+}
+
+bool Config::validateConfiguration() const {
+    bool isValid = true;
+    
+    // Check required configurations
+    if (!has("neuron_count") || getOr<int64_t>("neuron_count", 0) <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count configuration: must be positive");
+        isValid = false;
+    }
+    
+    if (!has("region_count") || getOr<int64_t>("region_count", 0) <= 0) {
+        NLM_LOG_ERROR("Invalid region_count configuration: must be positive");
+        isValid = false;
+    }
+    
+    if (!has("connection_probability") || 
+        getOr<float>("connection_probability", 1.1f) < 0.0f || 
+        getOr<float>("connection_probability", 1.1f) > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability configuration: must be between 0.0 and 1.0");
+        isValid = false;
+    }
+    
+    if (!has("simulation_timestep") || getOr<double>("simulation_timestep", 0.0) <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep configuration: must be positive");
+        isValid = false;
+    }
+    
+    // Check for conflicting configurations
+    if (has("neuron_count") && has("region_count")) {
+        int64_t neuronCount = getOr<int64_t>("neuron_count", 0);
+        int64_t regionCount = getOr<int64_t>("region_count", 0);
+        if (neuronCount / regionCount < 1) {
+            NLM_LOG_ERROR("Invalid configuration: too many regions for given neuron count");
+            isValid = false;
+        }
+    }
+    
+    if (isValid) {
+        NLM_LOG_INFO("Configuration validation passed");
+    }
+    
+    return isValid;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
