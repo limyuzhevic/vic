@@ -1,85 +1,162 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
+// Phase 6 Demo Implementation
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
-#include <iostream>
+Phase6Demo::Phase6Demo() : experiment_(nullptr), brain_(nullptr), agent_(nullptr), world_(nullptr) {}
 
-using namespace nlm;
+Phase6Demo::~Phase6Demo() {}
 
-int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
-    
-    // Initialize logging
-    Logger::getGlobal().setLevel(LogLevel::Info);
-    
-    // Create experiment
-    Phase6IntegratedExperiment experiment;
-    
-    // First, run the quick integration verification
-    std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
-    
-    std::cout << std::endl;
-    
-    if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
-        return 1;
+bool Phase6Demo::run(const Phase6DemoConfig& config) {
+    // Initialize the demo
+    if (!initialize(config)) {
+        return false;
     }
     
-    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    // Run integration verification
+    if (!runIntegrationVerification()) {
+        return false;
+    }
     
-    // Test individual systems
+    // Run system integration tests
+    runSystemIntegrationTests();
+    
+    // Run full integration experiment
+    Phase6Config experimentConfig;
+    experimentConfig.neuronCount = config.neuronCount;
+    experimentConfig.maxSteps = config.maxSteps;
+    experimentConfig.enableCheckpointing = config.enableCheckpointing;
+    experimentConfig.enableReplay = config.enableReplay;
+    experimentConfig.enableDevelopment = config.enableDevelopment;
+    experimentConfig.checkpointPath = config.checkpointPath;
+    
+    result_ = experiment_->run(experimentConfig);
+    
+    return true;
+}
+
+bool Phase6Demo::initialize(const Phase6DemoConfig& config) {
+    // Create configuration
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
+    cfg->set("region_count", static_cast<int64_t>(config.regionCount));
+    cfg->set("connection_probability", config.connectionProbability);
+    
+    // Initialize experiment
+    experiment_ = std::make_unique<Phase6IntegratedExperiment>();
+    
+    // Create and initialize brain
+    brain_ = std::make_shared<Brain>(cfg);
+    if (!brain_->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return false;
+    }
+    
+    // Create and configure world
+    world_ = std::make_unique<SimpleWorld>();
+    world_->configure(config.worldWidth, config.worldHeight, 
+                     config.visionWidth, config.visionHeight);
+    world_->reset();
+    
+    // Create and initialize agent
+    agent_ = std::make_unique<AgentBrain>(brain_);
+    agent_->initialize(*world_);
+    
+    // Enable learning subsystems
+    agent_->enableRewardModulation(true);
+    agent_->enableStructuralPlasticity(config.enableDevelopment);
+    agent_->enableDevelopment(config.enableDevelopment);
+    agent_->enableCuriosity(true);
+    
+    return true;
+}
+
+void Phase6Demo::printBanner() const {
+    std::cout << "===========================================\n";
+    std::cout << "  NLM Phase 6 Integration Demo\n";
+    std::cout << "===========================================\n\n";
+}
+
+void Phase6Demo::printConfiguration(const Phase6DemoConfig& config) const {
+    std::cout << "Configuration:\n";
+    std::cout << "  Neurons: " << config.neuronCount << "\n";
+    std::cout << "  Steps: " << config.maxSteps << "\n";
+    std::cout << "  Checkpointing: " << (config.enableCheckpointing ? "Yes" : "No") << "\n";
+    std::cout << "  Replay: " << (config.enableReplay ? "Yes" : "No") << "\n";
+    std::cout << "  Development: " << (config.enableDevelopment ? "Yes" : "No") << "\n";
+    std::cout << std::endl;
+}
+
+bool Phase6Demo::runIntegrationVerification() {
+    std::cout << "--- Integration Verification ---" << std::endl;
+    return experiment_->verifyIntegration();
+}
+
+void Phase6Demo::runSystemIntegrationTests() {
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    experiment_->testMemoryIntegration();
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    experiment_->testNeuromodulationIntegration();
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    experiment_->testCheckpointing();
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    experiment_->testReplay();
     std::cout << std::endl;
-    
-    // Run full experiment with smaller settings for demo
+}
+
+void Phase6Demo::runFullIntegration(const Phase6DemoConfig& config) {
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    Phase6Config experimentConfig;
+    experimentConfig.neuronCount = config.neuronCount;
+    experimentConfig.maxSteps = config.maxSteps;
+    experimentConfig.enableCheckpointing = config.enableCheckpointing;
+    experimentConfig.enableReplay = config.enableReplay;
+    experimentConfig.enableDevelopment = config.enableDevelopment;
+    experimentConfig.checkpointPath = config.checkpointPath;
     
-    auto result = experiment.run(config);
+    result_ = experiment_->run(experimentConfig);
+}
+
+void Phase6Demo::printSummary() const {
+    std::cout << "===========================================\n";
+    std::cout << "          PHASE 6 DEMO SUMMARY\n";
+    std::cout << "===========================================\n\n";
     
-    std::cout << std::endl;
-    std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
-    std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
-    std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
-    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
-    std::cout << std::endl;
+    std::cout << "Integration Results:\n";
+    std::cout << "  Working Memory: " << (result_.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Episodic Memory: " << (result_.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Neuromodulation: " << (result_.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Prediction: " << (result_.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Development: " << (result_.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Checkpointing: " << (result_.checkpointingWorks ? "WORKING" : "NOT WORKING") << "\n";
+    std::cout << "  Replay: " << (result_.replayWorks ? "FUNCTIONAL" : "NOT FUNCTIONAL") << "\n\n";
     
-    std::cout << "=== INTEGRATION STATUS ===" << std::endl;
-    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
-    std::cout << std::endl;
+    std::cout << "Performance Metrics:\n";
+    std::cout << "  Total Reward: " << result_.totalReward << "\n";
+    std::cout << "  Average Firing Rate: " << result_.avgFiringRate << " Hz\n";
+    std::cout << "  Memory Episodes Stored: " << result_.memoryEpisodesStored << "\n";
+    std::cout << "  Dopamine Level: " << result_.dopamineLevel << "\n";
+    std::cout << "  Novelty Level: " << result_.noveltyLevel << "\n";
+    std::cout << "  Curiosity Level: " << result_.curiosityLevel << "\n\n";
     
-    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    std::cout << "Timing:\n";
+    std::cout << "  Total Wall Clock Time: " << result_.totalWallClockTime << " seconds\n";
     
-    return 0;
+    if (success()) {
+        std::cout << "\n✓ SUCCESS: All Phase 6 systems are properly integrated!\n";
+    } else {
+        std::cout << "\n✗ FAILURE: Some Phase 6 systems are not properly integrated.\n";
+    }
+}
+
+bool Phase6Demo::success() const {
+    return result_.memoryWorkingMemoryIntegrated &&
+           result_.memoryEpisodicMemoryIntegrated &&
+           result_.neuromodulationIntegrated &&
+           result_.predictionIntegrated &&
+           result_.developmentIntegrated &&
+           result_.checkpointingWorks;
 }

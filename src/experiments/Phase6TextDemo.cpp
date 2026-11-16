@@ -33,16 +33,7 @@
 // or a real personality. Text here is a sensory channel, not
 // grammar, meaning, or a pretrained language model.
 
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "experiments/Phase6TextDemo.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>

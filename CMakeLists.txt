@@ -128,6 +128,7 @@ target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 # Phase 6 experiments
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/EnhancedRewardSystem.cpp
 )
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
