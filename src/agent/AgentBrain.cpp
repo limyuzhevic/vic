@@ -903,7 +903,10 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         float norm = 0.0f;
         for (float v : pat) norm += v * v;
         if (norm > 0.01f) {
-            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
+            // Store the reward for later use in learned preference updates
+            // rather than immediately, allowing concepts to form first
+            // based on pattern/reward pairings without immediate bias.
+            thoughtReward_ = reward;
         }
     }
     // Phase 5 learning for the thought/preference systems, from the

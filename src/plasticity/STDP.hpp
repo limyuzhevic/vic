@@ -19,7 +19,7 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // STDP parameters
+        // STDP parameters
     void setLTPWeight(float weight);    // Long-term potentiation weight
     float getLTPWeight() const;
     void setLTDWeight(float weight);    // Long-term depression weight
@@ -29,6 +29,16 @@ public:
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    
+    // Reward-modulated STDP parameters
+    void setRewardSensitivity(float sensitivity);
+    float getRewardSensitivity() const;
+    void setPredictionErrorDecay(float decay);
+    float getPredictionErrorDecay() const;
+    
+    // Update parameters from config
+    void configureRewardModulated(float baselineLTP, float baselineLTD, float tau,
+                                  float rewardSensitivity, float predictionErrorDecay);
     
 private:
     struct Impl;

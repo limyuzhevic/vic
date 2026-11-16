@@ -74,11 +74,7 @@ public:
             ExperimentMetrics metrics;
             metrics.episode = episode;
 
-            // Phase 5 navigation/interact metrics: visited 1x1 cells,
-            // interact outcomes from the world's own result message
-            // (consumed_resource / hit_hazard / no_object — not a label
-            // given to the brain), and forward/backward oscillation
-            // (a Fwd step immediately followed by Bwd, or vice versa).
+// Phase 5 navigation/interact metrics: visited 1x1 cells,
             std::set<std::pair<int, int>> visitedCells;
             int resourcesConsumed = 0, hazardsHit = 0, emptyInteracts = 0;
             int tooSoonCount = 0;

@@ -5,16 +5,32 @@
 
 namespace nlm {
 
+// NeuralWorkingMemory.hpp
+// Brain memory management for storing and updating neural activity patterns
+// Implements working memory with capacity constraints, decay, and competitive selection
+// Provides pattern storage, retrieval, and maintenance through recurrent connections
+
+#include "NeuralWorkingMemory.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+
+namespace nlm {
+
 struct NeuralWorkingMemory::Impl {
+    // Brain interface for neural manipulation
     Brain* brain;
     
-    // Maintenance connections (recurrent)
+    // Maintenance connections (recurrent) - form working memory loops
     std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
     
-    // Memory trace ages
+    // Memory trace ages - track when memories were stored
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    // Internal state management
+    Impl() : brain(nullptr) {
+        // Initialize internal structures
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -23,6 +39,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize working memory with default parameters
+    // Capacity is set high (100) to support Phase 6 requirements
+    // Decay rate controls how quickly memories fade (1% per timestep)
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -31,6 +50,10 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Phase 6: active traces are populated by storeToNeuron when neurons are stored,
+    // and cleared when neurons are no longer active (decay or explicit clear).
+    // This ensures that getActiveTraces() accurately reflects current working memory content.
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
@@ -84,23 +107,33 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         it = memoryNeurons_.end() - 1;
     }
 
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
-    // reports, and it was never populated — only cleared — so it
-    // always read 0 even when memory held 50 neurons. A stored
-    // neuron is an active trace; decayWeakTraces() below removes
-    // it again when its activation falls below threshold, and
-    // clear()/restoreSnapshot() reset the list with the content.
+    // Phase 6: activeTraces_ is the trace list getActiveTraces() reports,
+    // and it was never populated — only cleared — so it always read 0
+    // even when memory held 50 neurons. A stored neuron is an active trace;
+    // decayWeakTraces() below removes it again when its activation falls
+    // below threshold, and clear()/restoreSnapshot() reset the list with the
+    // content.
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+        if (activation > 0.1f) {
+            // When neuron is newly stored or has strong activation, add to active traces
+            if (!present) activeTraces_.push_back(idx);
+        }
         if (activation <= 0.1f && present) {
+            // When activation decays, remove from active traces
             activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
                                 activeTraces_.end());
         }
     }
     
-    // Inject current to maintain activation
+    // Store the neuron activation in working memory
+    // This is the primary mechanism for maintaining memory content over time
+    memoryNeurons_.push_back(neuron);
+    memoryActivations_.push_back(activation);
+    memoryTimestamps_.push_back(0);
+    
+    // Inject maintenance current to sustain neural activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
