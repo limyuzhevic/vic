@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,27 +21,33 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNum;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with better error handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key on line " + std::to_string(lineNum));
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -49,7 +57,15 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line (no '='): " + line + " on line " + std::to_string(lineNum));
         }
+    }
+    
+    if (!entries.empty()) {
+        NLM_LOG_INFO("Loaded configuration from " + filepath + " (" + std::to_string(entries.size()) + " entries)");
+    } else {
+        NLM_LOG_WARNING("No valid configuration entries found in file: " + filepath);
     }
     
     return true;
@@ -175,6 +191,52 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+bool Config::validate(const std::vector<std::string>& requiredKeys) const {
+    bool valid = true;
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_ERROR("Missing required configuration key: " + key);
+            valid = false;
+        }
+    }
+    return valid;
+}
+
+std::string Config::toString(const std::string& key) const {
+    auto value = get<std::string>(key);
+    return value.has_value() ? value.value() : "";
+}
+
+int64_t Config::toInt64(const std::string& key) const {
+    auto value = get<int64_t>(key);
+    return value.has_value() ? value.value() : 0;
+}
+
+double Config::toDouble(const std::string& key) const {
+    auto value = get<double>(key);
+    return value.has_value() ? value.value() : 0.0;
+}
+
+float Config::toFloat(const std::string& key) const {
+    auto value = get<float>(key);
+    return value.has_value() ? value.value() : 0.0f;
+}
+
+bool Config::toBool(const std::string& key) const {
+    auto value = get<bool>(key);
+    return value.has_value() ? value.value() : false;
+}
+
+std::string Config::getSourceString(ConfigSource source) const {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
 }
 
 std::string Config::trim(const std::string& str) {

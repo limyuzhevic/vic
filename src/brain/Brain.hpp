@@ -10,6 +10,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace nlm {
 
