@@ -62,6 +62,44 @@ LogLevel ConsoleLogger::getLevel() const {
     return pImpl->level;
 }
 
+void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    closeOutputFile();
+    
+    // Open new file
+    pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        // Log error but continue with console-only logging
+        std::cerr << "WARNING: Could not open log file: " << filepath << std::endl;
+    }
+}
+
+void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    closeOutputFile();
+    
+    // Open new file
+    pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        // Log error but continue with console-only logging
+        std::cerr << "WARNING: Could not open log file: " << filepath << std::endl;
+    }
+}
+
+void ConsoleLogger::closeOutputFile() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+bool ConsoleLogger::hasOutputFile() const {
+    return pImpl->fileOut.is_open();
+}
+
+std::string ConsoleLogger::getOutputFile() const {
+    return pImpl->fileOut.is_open() ? pImpl->fileOut.rdbuf()->fname() : "";
+}
+
 void ConsoleLogger::setUseColors(bool useColors) {
     pImpl->useColors = useColors;
 }
@@ -130,7 +168,7 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -169,7 +207,7 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
+        if (logger->isEnabled(level)) {
             return true;
         }
     }
@@ -191,12 +229,52 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     }
 }
 
+std::vector<std::shared_ptr<ILogger>> Logger::getLoggers() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->loggers;
+}
+
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+}
+
+// Additional logging utility functions
+namespace LogUtils {
+    std::string formatEntry(const LogEntry& entry) {
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        ss << " [" << levelToString(entry.level) << "] ";
+        ss << entry.message;
+        return ss.str();
+    }
+    
+    bool isValidLogLevel(const std::string& levelStr) {
+        static const std::vector<std::string> validLevels = {"debug", "info", "warning", "error", "critical"};
+        return std::find(validLevels.begin(), validLevels.end(), levelStr) != validLevels.end();
+    }
+    
+    LogLevel parseLogLevel(const std::string& levelStr) {
+        std::string normalized = levelStr;
+        std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                       [](char c) { return std::tolower(c); });
+        
+        if (normalized == "debug") return LogLevel::Debug;
+        if (normalized == "info") return LogLevel::Info;
+        if (normalized == "warning") return LogLevel::Warning;
+        if (normalized == "error") return LogLevel::Error;
+        if (normalized == "critical") return LogLevel::Critical;
+        
+        return LogLevel::Info; // Default
+    }
+    
+    std::vector<std::string> getAvailableLogLevels() {
+        return {"Debug", "Info", "Warning", "Error", "Critical"};
+    }
 }
 
 } // namespace nlm

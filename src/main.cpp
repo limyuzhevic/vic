@@ -28,27 +28,63 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM — Neural Learning Machine
+
+USAGE:
+    nlm [--config <file>] [--help] [--version] [--log-level <level>]
+
+OPTIONS:
+    --config <file>      Load configuration from file (default: configs/default.cfg)
+    --help               Show this help message
+    --version            Show version information
+    --log-level <level>  Set minimum log level (Debug, Info, Warning, Error, Critical)
+    --neuron-count <n>   Override neuron count
+    --region-count <n>   Override region count
+    --seed <n>           Set random seed
+
+EXAMPLES:
+    nlm                                    Run with default configuration
+    nlm --config myconfig.cfg               Load custom configuration
+    nlm --seed 123 --neuron-count 100      Run with specific settings
+
+Phase 2: Real Neural Computation
+- LIF neuron dynamics
+- Event-driven spike propagation with delays
+- STDP and Hebbian plasticity
+- Structural plasticity (synaptogenesis/pruning)
+
+Phase 6: Final Integration
+- All memory systems (working, episodic, associative)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction and planning systems
+- Cognitive mechanisms
+- Development stages
+
+) " << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printVersion() {
+    std::cout << R"(
+NLM — Neural Learning Machine
+Version: 2.6.0 (Phase 6: Final Integration)
+Build: Debug
+
+Experimental artificial developmental brain simulator.
+Phase 6 provides comprehensive integration of all neural systems:
+- Memory systems (working, episodic, associative)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction and planning mechanisms
+- Cognitive functions (attention, concept formation, learning)
+- Developmental stages and plasticity modulation
+- Checkpointing and replay capabilities
+
+Contact: https://github.com/nlm-project/nlm
+License: MIT
+
+) " << std::endl;
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -308,6 +344,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check for help/version flags before anything else
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -419,17 +467,33 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    // Helper to parse log level from string
+LogLevel parseLogLevel(const std::string& levelStr) {
+    std::string normalized = levelStr;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](char c) { return std::tolower(c); });
     
-    return 0;
+    if (normalized == "debug") return LogLevel::Debug;
+    if (normalized == "info") return LogLevel::Info;
+    if (normalized == "warning") return LogLevel::Warning;
+    if (normalized == "error") return LogLevel::Error;
+    if (normalized == "critical") return LogLevel::Critical;
+    
+    return LogLevel::Info; // Default
+}
+
+// Validate configuration values and fix issues
+void validateConfig(std::shared_ptr<Config> config) {
+    // Ensure critical values are present and valid
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
 }

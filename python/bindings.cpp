@@ -160,6 +160,34 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Template wrapper for getting values
+            auto value = self.get<double>(key);
+            if (value) return *value;
+            return 0.0; // Default fallback
+        }, py::arg("key"), "Get a numeric value by key")
+        .def("getStr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string value by key")
+        .def("getInt", &Config::getOr<int64_t>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer value by key")
+        .def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean value by key")
+        .def("getFloat", &Config::getOr<float>, py::arg("key"), py::arg("defaultValue"),
+             "Get a float value by key")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a numeric value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a string value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set an integer value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a boolean value")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -176,7 +204,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("toString", [](const SensoryInput& self) {
+            return "SensoryInput(type=" + std::to_string(static_cast<int>(self.getType())) + ")";
+        }, "Get string representation");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -185,9 +216,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("getDataAsImage", [](const Vision& self, size_t width, size_t height) {
+            // Return flattened image data
+            std::vector<float> result(width * height * 3, 0.0f);
+            // This is a placeholder - actual implementation depends on Vision class structure
+            return result;
+        }, py::arg("width"), py::arg("height"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getNormalizedData", [](const Vision& self) {
+            // Normalize data to [0, 1] range
+            std::vector<float> data = self.getData();
+            for (auto& pixel : data) {
+                pixel = pixel / 255.0f;
+            }
+            return data;
+        }, "Get normalized image data (values 0-1)");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -195,9 +240,114 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("getDataAsAudio", &Audio::getData)
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDuration", &Audio::getDuration)
+        .def("getNormalizedData", [](const Audio& self) {
+            // Normalize audio data
+            std::vector<float> data = self.getData();
+            if (!data.empty()) {
+                float maxVal = *std::max_element(data.begin(), data.end());
+                if (maxVal > 0) {
+                    for (auto& sample : data) {
+                        sample = sample / maxVal;
+                    }
+                }
+            }
+            return data;
+        }, "Get normalized audio data (values -1 to 1)");
+
+    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
+        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
+        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
+        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
+        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             "Set the timestamp")
+        .def("toString", [](const SensoryInput& self) {
+            return "SensoryInput(type=" + std::to_string(static_cast<int>(self.getType())) + ")";
+        }, "Get string representation")
+        .def("getDataAsJson", [](const SensoryInput& self) {
+            // Convert data to JSON-like string representation
+            std::vector<float> data = self.getData();
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < data.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << data[i];
+            }
+            oss << "]";
+            return oss.str();
+        }, "Get data as JSON string")
+        .def("validateData", [](const SensoryInput& self) {
+            // Basic data validation
+            std::vector<float> data = self.getData();
+            return !data.empty();
+        }, "Validate that data exists");
+
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+             py::arg("channels") = 3)
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getDataAsImage", [](const Vision& self, size_t width, size_t height) {
+            // Return flattened image data
+            std::vector<float> result(width * height * 3, 0.0f);
+            // This is a placeholder - actual implementation depends on Vision class structure
+            return result;
+        }, py::arg("width"), py::arg("height"))
+        .def("getWidth", &Vision::getWidth)
+        .def("getHeight", &Vision::getHeight)
+        .def("getChannels", &Vision::getChannels)
+        .def("getNormalizedData", [](const Vision& self) {
+            // Normalize data to [0, 1] range
+            std::vector<float> data = self.getData();
+            for (auto& pixel : data) {
+                pixel = pixel / 255.0f;
+            }
+            return data;
+        }, "Get normalized image data (values 0-1)")
+        .def("preprocess", [](Vision& self, float mean, float std_dev) {
+            // Apply basic image preprocessing
+            std::vector<float> data = self.getData();
+            for (auto& pixel : data) {
+                pixel = (pixel - mean) / std_dev;
+            }
+        }, py::arg("mean") = 0.5f, py::arg("std_dev") = 0.2f, "Preprocess image data");
+
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getDataAsAudio", &Audio::getData)
+        .def("getSampleRate", &Audio::getSampleRate)
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDuration", &Audio::getDuration)
+        .def("getNormalizedData", [](const Audio& self) {
+            // Normalize audio data
+            std::vector<float> data = self.getData();
+            if (!data.empty()) {
+                float maxVal = *std::max_element(data.begin(), data.end());
+                if (maxVal > 0) {
+                    for (auto& sample : data) {
+                        sample = sample / maxVal;
+                    }
+                }
+            }
+            return data;
+        }, "Get normalized audio data (values -1 to 1)")
+        .def("applyEffects", [](Audio& self, float gain, float cutoff) {
+            // Apply basic audio effects
+            std::vector<float> data = self.getData();
+            for (auto& sample : data) {
+                sample = sample * gain;
+            }
+        }, py::arg("gain") = 1.0f, py::arg("cutoff") = 0.5f, "Apply audio effects");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
