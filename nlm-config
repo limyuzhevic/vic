@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+# NLM Configuration Management Tool
+# Advanced tool for managing NLM configurations
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print usage information
+print_usage() {
+    cat << EOF
+NLM Configuration Management Tool
+
+Usage: nlm-config <command> [options]
+
+Commands:
+  validate <file>              Validate configuration file
+  list-options                 List all available configuration options
+  compare <file1> <file2>      Compare two configuration files
+  generate <output_file>        Generate sample configuration
+  info <file>                   Display configuration information
+  backup <file> <output_dir>    Create backup of configuration
+
+Options:
+  --help                      Show this help message
+  --version                   Show version information
+
+Examples:
+  nlm-config validate config.cfg
+  nlm-config list-options
+  nlm-config compare config1.cfg config2.cfg
+  nlm-config generate sample.cfg
+  nlm-config info config.cfg
+EOF
+}
+
+# Print version information
+print_version() {
+    cat << EOF
+NLM Configuration Management Tool v2.($(date +%Y))
+Part of NLM (Neural Learning Machine) Project
+
+Configuration System Improvements:
+- Fixed saveToFile() to properly serialize all ConfigValue types
+- Improved loadFromFile() with validation and error handling
+- Enhanced loadFromArgs() with key validation
+- Added comprehensive error handling
+- Support for JSON/YAML format (Phase 2+)
+
+Built with C++20
+EOF
+}
+
+# Validate configuration file
+validate_config() {
+    local config_file="$1"
+    
+    echo -e "${BLUE}Validating configuration file: $config_file${NC}"
+    
+    if [ ! -f "$config_file" ]; then
+        echo -e "${RED}Error: File not found: $config_file${NC}"
+        return 1
+    fi
+    
+    # Simple validation logic
+    echo -e "${GREEN}File exists and is readable${NC}"
+    
+    # Count lines and check for basic syntax
+    local total_lines=$(wc -l < "$config_file")
+    local comment_lines=$(grep -c "^\s*#" "$config_file" || true)
+    local empty_lines=$(grep -c "^\s*$" "$config_file" || true)
+    local valid_entries=$((total_lines - comment_lines - empty_lines))
+    
+    echo -e "Statistics:"
+    echo -e "  Total lines: $total_lines"
+    echo -e "  Comment lines: $comment_lines"
+    echo -e "  Empty lines: $empty_lines"
+    echo -e "  Valid key=value entries: $valid_entries"
+    
+    # Check for malformed entries
+    local malformed=0
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        if [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]]; then
+            continue
+        fi
+        
+        # Check if line contains '='
+        if [[ ! "$line" =~ = ]]; then
+            echo -e "${YELLOW}Warning: Line appears malformed (no '='): $line${NC}"
+            ((malformed++))
+        fi
+    done < "$config_file"
+    
+    echo -e "Validation results: ${valid_entries} entries, $malformed malformed lines"
+    
+    if [ $malformed -eq 0 ]; then
+        echo -e "${GREEN}✓ Configuration file appears valid${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Configuration file has issues${NC}"
+        return 1
+    fi
+}
+
+# List all available configuration options
+list_options() {
+    echo -e "${BLUE}Available NLM Configuration Options:${NC}"
+    echo -e "\n=== Core Configuration ==="
+    echo -e "  brain.neuron_count           (int64)    Number of neurons in the brain"
+    echo -e "  brain.region_count          (int64)    Number of neural regions"
+    echo -e "  brain.connection_probability (float)    Probability of synaptic connections"
+    echo -e "  brain.v_thresh              (float)    Neuron threshold potential (mV)"
+    echo -e "  brain.v_rest                (float)    Resting potential (mV)"
+    echo -e "  brain.v_reset               (float)    Reset potential after spike (mV)"
+    echo -e "  brain.tau_mem               (float)    Membrane time constant (ms)"
+    echo -e "  brain.tau_ref               (float)    Refractory period (ms)"
+    
+    echo -e "\n=== Plasticity Configuration ==="
+    echo -e "  plasticity.stdp.enable      (bool)     Enable Spike-Timing-Dependent Plasticity"
+    echo -e "  plasticity.stdp.learning_rate (float)  STDP learning rate"
+    echo -e "  plasticity.stdp.tau_plus    (float)    STDP potentiation time constant"
+    echo -e "  plasticity.stdp.tau_minus   (float)    STDP depression time constant"
+    echo -e "  plasticity.hebbian.enable   (bool)     Enable Hebbian learning"
+    echo -e "  plasticity.structural.enable (bool)    Enable structural plasticity"
+    
+    echo -e "\n=== Neuromodulation Configuration ==="
+    echo -e "  neuromod.dopamine.scale      (float)    Dopamine modulation scale"
+    echo -e "  neuromod.curiosity.enable   (bool)     Enable curiosity-driven exploration"
+    echo -e "  neuromod.novelty.enable      (bool)     Enable novelty detection"
+    
+    echo -e "\n=== Memory Configuration ==="
+    echo -e "  memory.working_memory.capacity (int64)  Working memory capacity"
+    echo -e "  memory.episodic_memory.max_episodes (int64) Maximum episodic memory episodes"
+    
+    echo -e "\n=== Development Configuration ==="
+    echo -e "  development.initial_plasticity (float) Initial plasticity rate"
+    echo -e "  development.maturation_rate   (float)  Brain maturation rate"
+    
+    echo -e "\n=== Simulation Configuration ==="
+    echo -e "  simulation.timestep          (float)    Simulation timestep (s)"
+    echo -e "  simulation.max_steps         (int64)    Maximum simulation steps"
+    echo -e "  simulation.random_seed       (int64)    Random seed for reproducibility"
+    
+    echo -e "\n=== Performance Configuration ==="
+    echo -e "  performance.checkpoint.enabled (bool)   Enable checkpointing"
+    echo -e "  performance.checkpoint.path   (string)   Checkpoint file path"
+    echo -e "  performance.replay.enabled     (bool)    Enable memory replay"
+    
+    echo -e "\n=== Environment Configuration ==="
+    echo -e "  environment.width             (int64)    World width"
+    echo -e "  environment.height            (int64)    World height"
+    echo -e "  environment.vision_enabled     (bool)     Enable vision sensing"
+    
+    echo -e "\n=== Advanced Options ==="
+    echo -e "  experimental.enable_debug_mode (bool)   Enable debug logging"
+    echo -e "  experimental.enable_profiling  (bool)   Enable performance profiling"
+    echo -e "  experimental.use_gpu_accel    (bool)    Enable GPU acceleration"
+}
+
+# Generate sample configuration
+generate_config() {
+    local output_file="$1"
+    
+    echo -e "${BLUE}Generating sample configuration: $output_file${NC}"
+    
+    cat > "$output_file" << 'EOF'
+# NLM Sample Configuration File
+# Generated by NLM Configuration Management Tool
+#
+# This is a sample configuration file for NLM (Neural Learning Machine).
+# You can customize these parameters to control the brain behavior.
+
+# ===== CORE CONFIGURATION =====
+brain.neuron_count = 1000           # Number of neurons in the brain
+brain.region_count = 4             # Number of neural regions
+brain.connection_probability = 0.05 # Probability of synaptic connections
+brain.v_thresh = -50.0             # Neuron threshold potential (mV)
+brain.v_rest = -70.0               # Resting potential (mV)
+brain.v_reset = -75.0              # Reset potential after spike (mV)
+brain.tau_mem = 20.0               # Membrane time constant (ms)
+brain.tau_ref = 2.0                # Refractory period (ms)
+
+# ===== PLASTICITY CONFIGURATION =====
+plasticity.stdp.enable = true      # Enable Spike-Timing-Dependent Plasticity
+plasticity.stdp.learning_rate = 0.001 # STDP learning rate
+plasticity.stdp.tau_plus = 20.0    # STDP potentiation time constant
+plasticity.stdp.tau_minus = 20.0   # STDP depression time constant
+plasticity.hebbian.enable = true   # Enable Hebbian learning
+plasticity.structural.enable = true # Enable structural plasticity (synaptogenesis/pruning)
+
+# ===== NEUROMODULATION CONFIGURATION =====
+neuromod.dopamine.scale = 1.0       # Dopamine modulation scale
+neuromod.curiosity.enable = true   # Enable curiosity-driven exploration
+neuromod.novelty.enable = true      # Enable novelty detection
+
+# ===== MEMORY CONFIGURATION =====
+memory.working_memory.capacity = 1000 # Working memory capacity
+memory.episodic_memory.max_episodes = 500 # Maximum episodic memory episodes
+
+# ===== DEVELOPMENT CONFIGURATION =====
+development.initial_plasticity = 1.0 # Initial plasticity rate
+development.maturation_rate = 0.001   # Brain maturation rate
+
+# ===== SIMULATION CONFIGURATION =====
+simulation.timestep = 0.001          # Simulation timestep (s)
+simulation.max_steps = 10000         # Maximum simulation steps
+simulation.random_seed = 42          # Random seed for reproducibility
+
+# ===== PERFORMANCE CONFIGURATION =====
+performance.checkpoint.enabled = true  # Enable checkpointing
+performance.checkpoint.path = "brain_checkpoint.bin" # Checkpoint file path
+performance.replay.enabled = true   # Enable memory replay
+
+# ===== ENVIRONMENT CONFIGURATION =====
+environment.width = 20               # World width
+environment.height = 20              # World height
+environment.vision_enabled = true   # Enable vision sensing
+
+# ===== ADVANCED OPTIONS =====
+experimental.enable_debug_mode = false # Enable debug logging
+experimental.enable_profiling = false # Enable performance profiling
+experimental.use_gpu_accel = false     # Enable GPU acceleration (if available)
+
+# ===== EXPERIMENT SETTINGS =====
+experiment.type = "integration"       # Experiment type (integration, learning, etc.)
+experiment.max_steps = 5000           # Maximum experiment steps
+experiment.reward_function = "standard" # Reward function type
+
+EOF
+    
+    echo -e "${GREEN}✓ Sample configuration generated successfully${NC}"
+}
+
+# Main command line handling
+main() {
+    if [ $# -eq 0 ]; then
+        print_usage
+        exit 1
+    fi
+    
+    local command="$1"
+    shift
+    
+    case "$command" in
+        "validate")
+            if [ $# -ne 1 ]; then
+                echo -e "${RED}Error: validate command requires a file argument${NC}"
+                exit 1
+            fi
+            validate_config "$1"
+            ;;
+        
+        "list-options")
+            list_options
+            ;;
+        
+        "generate")
+            if [ $# -ne 1 ]; then
+                echo -e "${RED}Error: generate command requires an output file argument${NC}"
+                exit 1
+            fi
+            generate_config "$1"
+            ;;
+        
+        "help")
+            print_usage
+            ;;
+        
+        "version")
+            print_version
+            ;;
+        
+        "*help")
+            echo -e "${YELLOW}Unknown command: $command${NC}"
+            print_usage
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@"

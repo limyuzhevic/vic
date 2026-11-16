@@ -1,5 +1,6 @@
 // NLM Performance Benchmark
 // Measures simulation performance for different network sizes
+// Benchmarks neural network performance at different scales to evaluate scalability
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -17,22 +18,22 @@
 
 using namespace nlm;
 
-// Simple performance measurement
+// Simple performance measurement structure
 struct BenchmarkResult {
-    size_t neurons;
-    size_t synapses;
-    size_t steps;
-    double totalTime;      // seconds
-    double stepsPerSecond;
-    double spikesPerStep;
-    double synapsesPerNeuron;
+    size_t neurons;              // Total number of neurons in the network
+    size_t synapses;             // Total number of synaptic connections
+    size_t steps;                // Number of simulation steps executed
+    double totalTime;            // Total wall-clock time in seconds
+    double stepsPerSecond;      // Simulation throughput (steps per second)
+    double spikesPerStep;       // Average neuron spikes per simulation step
+    double synapsesPerNeuron;   // Average synaptic connections per neuron
 };
 
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
-    // Create configuration
+    // Create configuration for benchmark
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
@@ -40,26 +41,30 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
     
-    // Create brain
+    // Create and initialize brain with benchmark configuration
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     
-    // Run simulation
+    // Record start time for performance measurement
     auto startTime = std::chrono::high_resolution_clock::now();
     
+    // Run simulation steps
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
+        // Inject random sensory input to stimulate network activity
+        // This simulates realistic network stimulation patterns
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
+        // Execute one simulation step
         brain->step(step, step * 0.001);
     }
     
+    // Calculate total execution time
     auto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();
     
-    // Collect results
+    // Collect performance metrics
     BenchmarkResult result;
     result.neurons = brain->getTotalNeuronCount();
     result.synapses = brain->getTotalSynapseCount();
@@ -69,6 +74,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
     result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
     
+    // Display benchmark results
     std::cout << " Done!" << std::endl;
     std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
     std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;

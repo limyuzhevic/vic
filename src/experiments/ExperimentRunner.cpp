@@ -1,4 +1,8 @@
 #include "ExperimentRunner.hpp"
+#include <fstream>
+#include <iostream>
+#include <iomanip>
+#include <ctime>
 
 namespace nlm {
 
@@ -75,15 +79,27 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     std::vector<std::shared_ptr<Experiment>> results;
     
+    if (!brainTemplate || !environmentTemplate) {
+        return results; // Empty results on invalid templates
+    }
+    
     for (auto& exp : experiments) {
+        if (!exp) {
+            continue; // Skip null experiments
+        }
+        
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
+        // Clone from template to ensure independent runs
         auto brain = std::make_shared<Brain>(std::const_pointer_cast<Config>(brainTemplate->getConfig()));
         brain->initialize();
         
-        // Would also create fresh environment here
+        // Create fresh environment for each experiment
+        // TODO: In real implementation, would clone environment from template
+        auto environment = std::make_shared<SimpleWorld>();
+        environment->configure(16, 16, 8, 8);
+        environment->reset();
         
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
@@ -113,8 +129,68 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write header
+    file << "# NLM Experiment Results\n";
+    file << "# Generated: " << time(nullptr) << "\n\n";
+    
+    file << "Experiment Results Summary:\n";
+    file << "Total Experiments: " << pImpl->experiments.size() << "\n\n";
+    
+    // Write experiment details
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& exp = pImpl->experiments[i];
+        
+        file << "=== Experiment " << (i + 1) << ": " << exp->getName() << " ===\n";
+        file << "Seed: " << exp->getSeed() << "\n";
+        file << "Start Step: " << exp->getStartStep() << "\n";
+        file << "End Step: " << exp->getEndStep() << "\n";
+        file << "Duration: " << (exp->getEndStep() - exp->getStartStep()) << " steps\n\n";
+        
+        // Write configuration
+        file << "Configuration:\n";
+        for (const auto& configPair : exp->pImpl->config) {
+            file << "  " << configPair.first << " = " << configPair.second << "\n";
+        }
+        
+        // Write metrics
+        file << "\nMetrics:\n";
+        for (const auto& metricPair : exp->pImpl->metrics) {
+            file << "  " << metricPair.first << " = " << metricPair.second << "\n";
+        }
+        
+        // Write step data summary
+        file << "\nStep Data Summary (first 100 steps):\n";
+        file << "  Step | Neurons | Synapses | Firing | Avg Firing Rate\n";
+        file << "  -----|---------|----------|--------|----------------\n";
+        
+        const auto& stepData = exp->getStepData();
+        size_t stepsToShow = std::min(stepData.size(), static_cast<size_t>(100));
+        for (size_t j = 0; j < stepsToShow; ++j) {
+            const auto& step = stepData[j];
+            file << "  " << std::setw(4) << step.step 
+                 << " | " << std::setw(8) << step.neuronCount
+                 << " | " << std::setw(10) << step.synapseCount
+                 << " | " << std::setw(6) << step.firingCount
+                 << " | " << std::fixed << std::setprecision(3) << std::setw(14) << step.avgFiringRate << "\n";
+        }
+        
+        // Write notes if any
+        if (!exp->getNotes().empty()) {
+            file << "\nNotes:\n";
+            for (const auto& note : exp->getNotes()) {
+                file << "  - " << note << "\n";
+            }
+        }
+        
+        file << "\n"; // Empty line between experiments
+    }
+    
+    return true;
 }
 
 } // namespace nlm

@@ -11,11 +11,40 @@
 
 namespace nlm {
 
+/**
+ * Phase 6 Integrated Experiment Demo
+ * 
+ * This demo implements Phase 6 of the NLM project, which represents
+ * the final integration of all neural systems into a coherent artificial brain.
+ * 
+ * Phase 6 builds upon all previous phases to create a complete, functional
+ * artificial brain with:
+ * - Integrated memory systems (working memory + episodic memory)
+ * - Neuromodulation (dopamine, curiosity, novelty detection)
+ * - Predictive processing capabilities
+ * - Cognitive functions (planning, concept formation, attention)
+ * - Developmental system for brain maturation
+ * - Checkpoint persistence and replay capabilities
+ * 
+ * The demo verifies that all these systems are properly connected and
+ * can work together in a unified brain loop.
+ */
+
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+    /**
+     * Run comprehensive Phase 6 integration experiment
+     * 
+     * This function executes the complete integration test, simulating
+     * a full brain with all subsystems connected. The simulation runs for
+     * maxSteps, updating the world, processing sensory input, and making decisions.
+     * 
+     * @param config Phase 6 configuration parameters
+     * @return Results containing performance metrics and integration status
+     */
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
