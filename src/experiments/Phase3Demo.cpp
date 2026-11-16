@@ -188,7 +188,7 @@ public:
                     default: metrics.waitCount++; break;
                 }
                 
-                // Print periodic updates
+                // Print periodic updates and highlight successful rewards
                 if (step % 50 == 0) {
                     std::cout << "  Step " << step 
                               << ": reward=" << result.reward
@@ -197,6 +197,10 @@ public:
                               << ", novelty=" << agentBrain.getNoveltyLevel()
                               << ", energy=" << world.getAgentBody().energy
                               << "\n";
+                    
+                    // Highlight significant rewards
+                    if (result.reward > 5.0f) std::cout << "    (RESOURCE gained!)";
+                    if (result.reward < -5.0f) std::cout << "    (HAZARD hit!)";
                 }
             }
             
