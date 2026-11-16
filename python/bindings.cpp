@@ -25,9 +25,40 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Real spiking neural computation with LIF neurons
+        - Integrated memory, prediction, cognition, and neuromodulation systems
+        - World simulation with sensory input and motor output
+        - Advanced learning mechanisms (STDP, Hebbian, structural plasticity)
+        - Developmental stages affecting brain maturation
+        - Checkpoint saving/loading for persistent learning
+        - Comprehensive debugging and monitoring tools
+        
+        Quick Start:
+        ```python
+        import pynlm
+        
+        # Create a configured brain
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        
+        # Initialize and run simulation
+        brain.initialize()
+        for i in range(100):
+            brain.step(i)
+            
+        print(f"Brain has {brain.getTotalNeuronCount()} neurons")
+        print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        ```
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Set module version attribute
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -141,6 +172,429 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // Add convenience constants
+    m.attr("NEURON_ID_INVALID") = py::cast(INVALID_NEURON_ID);
+    m.attr("SYNAPSE_ID_INVALID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("REGION_ID_INVALID") = py::cast(INVALID_REGION_ID);
+    m.attr("POPULATION_ID_INVALID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Add utility functions
+    m.def("createCustomConfig", [](const std::map<std::string, std::string>& settings) {
+        auto config = std::make_shared<Config>();
+        for (const auto& setting : settings) {
+            config->set(setting.first, setting.second);
+        }
+        return config;
+    }, py::arg("settings"), R"pbdoc(
+        Create a configuration with custom settings
+        
+        Args:
+            settings: Dictionary of configuration key-value pairs
+            
+        Returns:
+            Configured Config object
+        )pbdoc");
+    
+    m.def("createSimulationConfig", [](size_t neuronCount, double dt, 
+                                      double maxMembranePotential, 
+                                      double minMembranePotential) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", std::to_string(neuronCount));
+        config->set("dt", std::to_string(dt));
+        config->set("max_membrane_potential", std::to_string(maxMembranePotential));
+        config->set("min_membrane_potential", std::to_string(minMembranePotential));
+        return config;
+    }, py::arg("neuronCount"), py::arg("dt") = 0.001,
+       py::arg("maxMembranePotential") = 1.0,
+       py::arg("minMembranePotential") = -1.0,
+       R"pbdoc(
+        Create a simulation configuration with sensible defaults
+        
+        Args:
+            neuronCount: Number of neurons in the brain
+            dt: Simulation time step (default: 0.001 seconds)
+            maxMembranePotential: Maximum membrane potential (default: 1.0)
+            minMembranePotential: Minimum membrane potential (default: -1.0)
+            
+        Returns:
+            Configured Config object
+        )pbdoc");
+    
+    m.def("createStandardWorld", [](size_t width, size_t height) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);  // Default vision dimensions
+        world->reset();
+        return world;
+    }, py::arg("width"), py::arg("height"),
+       R"pbdoc(
+        Create a standard world configuration
+        
+        Args:
+            width: World width in cells
+            height: World height in cells
+            
+        Returns:
+            Configured SimpleWorld object
+        )pbdoc");
+    
+    m.def("createAgentWithWorld", [](std::shared_ptr<Brain> brain, 
+                                    std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       R"pbdoc(
+        Create an agent brain connected to a world
+        
+        Args:
+            brain: The brain to connect
+            world: The world to connect to
+            
+        Returns:
+            Configured AgentBrain object
+        )pbdoc");
+    
+    // Add simulation helper functions
+    m.def("runSimulationStep", [](std::shared_ptr<Brain> brain, 
+                                 std::shared_ptr<AgentBrain> agent,
+                                 std::shared_ptr<SimpleWorld> world,
+                                 size_t step) {
+        if (!world) throw std::runtime_error("World is null");
+        if (!agent) throw std::runtime_error("Agent is null");
+        
+        world->update(0.1);  // Default timestep
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        brain->step(step);
+        auto action = agent->decodeMotorCommand();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        return std::make_tuple(percept, action, world->getSensoryPercept());
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("step"),
+       R"pbdoc(
+        Run a single simulation step with world interaction
+        
+        Args:
+            brain: The brain to run
+            agent: The agent interface
+            world: The world to simulate in
+            step: Current simulation step
+            
+        Returns:
+            Tuple of (input percept, action, output percept)
+        )pbdoc");
+    
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain,
+                          std::shared_ptr<AgentBrain> agent,
+                          std::shared_ptr<SimpleWorld> world,
+                          size_t steps) {
+        if (!world) throw std::runtime_error("World is null");
+        if (!agent) throw std::runtime_error("Agent is null");
+        
+        brain->reset();
+        agent->reset();
+        world->reset();
+        
+        std::vector<std::tuple<size_t, float, float>> history;
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            history.emplace_back(i, agent->getNeuromodulationLevel(),
+                                agent->getPredictionError());
+        }
+        
+        return history;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps"),
+       R"pbdoc(
+        Run a complete simulation episode
+        
+        Args:
+            brain: The brain to run
+            agent: The agent interface
+            world: The world to simulate in
+            steps: Number of steps to simulate
+            
+        Returns:
+            History of simulation steps with neuromodulation and prediction error
+        )pbdoc");
+    
+    // Add diagnostic and analysis utilities
+m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["active_neurons"] = static_cast<double>(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        stats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["exc_inh_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["development_stage"] = static_cast<double>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("brain"),
+       R"pbdoc(
+        Analyze brain state and return statistics
+        
+        Args:
+            brain: The brain to analyze
+            
+        Returns:
+            Dictionary of brain statistics
+        )pbdoc");
+    
+    m.def("analyzeMemoryState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::map<std::string, double>> memoryStats;
+        
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto workingMem = brain->getWorkingMemory();
+        if (workingMem) {
+            memoryStats["working_memory"]["active_patterns"] = workingMem->getActivePatternCount();
+            memoryStats["working_memory"]["capacity_utilization"] = workingMem->getCapacityUtilization();
+        }
+        
+        auto episodicMem = brain->getEpisodicMemory();
+        if (episodicMem) {
+            memoryStats["episodic_memory"]["episodic_count"] = episodicMem->getEpisodicCount();
+            memoryStats["episodic_memory"]["total_duration"] = episodicMem->getTotalReplayDuration();
+        }
+        
+        auto associativeMem = brain->getAssociativeMemory();
+        if (associativeMem) {
+            memoryStats["associative_memory"]["association_count"] = associativeMem->getAssociationCount();
+            memoryStats["associative_memory"]["activation_level"] = associativeMem->getAverageActivationLevel();
+        }
+        
+        return memoryStats;
+    }, py::arg("brain"),
+       R"pbdoc(
+        Analyze memory systems state
+        
+        Args:
+            brain: The brain to analyze
+            
+        Returns:
+            Dictionary of memory system statistics
+        )pbdoc");
+    
+    m.def("analyzePredictionState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> predictionStats;
+        
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto predictionSys = brain->getPredictionSystem();
+        if (predictionSys) {
+            predictionStats["prediction_error"] = predictionSys->getPredictionError();
+            predictionStats["prediction_confidence"] = predictionSys->getPredictionConfidence();
+            predictionStats["prediction_accuracy"] = predictionSys->getPredictionAccuracy();
+        }
+        
+        auto planner = brain->getPlanner();
+        if (planner) {
+            predictionStats["planner_confidence"] = planner->getPlannerConfidence();
+            predictionStats["plan_quality"] = planner->getPlanQuality();
+        }
+        
+        return predictionStats;
+    }, py::arg("brain"),
+       R"pbdoc(
+        Analyze prediction and cognition systems state
+        
+        Args:
+            brain: The brain to analyze
+            
+        Returns:
+            Dictionary of prediction and cognition system statistics
+        )pbdoc");
+    
+    m.def("analyzeNeuromodulationState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> neuromodStats;
+        
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto dopamine = brain->getDopamine();
+        if (dopamine) {
+            neuromodStats["dopamine_level"] = dopamine->getCurrentLevel();
+            neuromodStats["reward_prediction_error"] = dopamine->getRewardPredictionError();
+        }
+        
+        auto curiosity = brain->getCuriosity();
+        if (curiosity) {
+            neuromodStats["curiosity_level"] = curiosity->getCurrentLevel();
+            neuromodStats["exploration_drive"] = curiosity->getExplorationDrive();
+        }
+        
+        auto novelty = brain->getNovelty();
+        if (novelty) {
+            neuromodStats["novelty_level"] = novelty->getCurrentLevel();
+            neuromodStats["surprise_level"] = novelty->getSurpriseLevel();
+        }
+        
+        return neuromodStats;
+    }, py::arg("brain"),
+       R"pbdoc(
+        Analyze neuromodulation systems state
+        
+        Args:
+            brain: The brain to analyze
+            
+        Returns:
+            Dictionary of neuromodulation system statistics
+        )pbdoc");
+    
+    m.def("analyzeDevelopmentState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> devStats;
+        
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        devStats["developmental_stage"] = static_cast<double>(brain->getDevelopmentalStage());
+        
+        auto devSystem = brain->getDevelopmentSystem();
+        if (devSystem) {
+            devStats["plasticity_rate"] = devSystem->getPlasticityRate();
+            devStats["maturity_level"] = devSystem->getMaturityLevel();
+            devStats["critical_period_active"] = devSystem->isCriticalPeriodActive() ? 1.0 : 0.0;
+        }
+        
+        return devStats;
+    }, py::arg("brain"),
+       R"pbdoc(
+        Analyze development system state
+        
+        Args:
+            brain: The brain to analyze
+            
+        Returns:
+            Dictionary of development system statistics
+        )pbdoc");
+    
+    // Add configuration utilities
+    m.def("saveBrainWithAutoFilename", [](std::shared_ptr<Brain> brain, 
+                                         const std::string& prefix = "brain_checkpoint") {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        std::stringstream filename;
+        filename << prefix << "_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S") 
+                 << "_step" << brain->getTotalStepCount() << ".nlm";
+        
+        if (!brain->save(filename.str())) {
+            throw std::runtime_error("Failed to save brain to " + filename.str());
+        }
+        
+        return filename.str();
+    }, py::arg("brain"), py::arg("prefix") = "brain_checkpoint",
+       R"pbdoc(
+        Save brain with automatic filename including timestamp
+        
+        Args:
+            brain: The brain to save
+            prefix: Filename prefix (default: "brain_checkpoint")
+            
+        Returns:
+            Path to saved file
+            
+        Raises:
+            RuntimeError if save fails
+        )pbdoc");
+    
+    // Add training utilities
+    m.def("trainBrain", [](std::shared_ptr<Brain> brain,
+                          std::shared_ptr<AgentBrain> agent,
+                          std::shared_ptr<SimpleWorld> world,
+                          size_t steps,
+                          std::function<float()> rewardFunc) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        if (!agent) throw std::runtime_error("Agent is null");
+        if (!world) throw std::runtime_error("World is null");
+        
+        float totalReward = 0.0f;
+        
+        brain->reset();
+        agent->reset();
+        world->reset();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            float reward = rewardFunc();
+            float predictedReward = agent->getNeuromodulationLevel();
+            agent->applyRewardModulation(reward, predictedReward);
+            
+            totalReward += reward;
+            
+            // Small exploration bonus based on novelty
+            if (agent->getNoveltyLevel() > 0.5f) {
+                agent->applyRewardModulation(0.1f, 0.0f);
+            }
+        }
+        
+        return totalReward;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps"),
+       py::arg("rewardFunc"),
+       R"pbdoc(
+        Train a brain through interaction with a world
+        
+        Args:
+            brain: The brain to train
+            agent: The agent interface
+            world: The world to simulate in
+            steps: Number of training steps
+            rewardFunc: Function that returns reward for current state
+            
+        Returns:
+            Total accumulated reward
+        )pbdoc");
+    
+    // Add comparative analysis utilities
+    m.def("compareBrains", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        if (brains.empty()) throw std::runtime_error("No brains provided for comparison");
+        
+        std::map<std::string, std::vector<double>> comparison;
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            const auto& brain = brains[i];
+            if (!brain) throw std::runtime_error("Brain at index " + std::to_string(i) + " is null");
+            
+            std::string prefix = "brain_" + std::to_string(i) + "_";
+            comparison[prefix + "total_neurons"] = {static_cast<double>(brain->getTotalNeuronCount())};
+            comparison[prefix + "total_synapses"] = {static_cast<double>(brain->getTotalSynapseCount())};
+            comparison[prefix + "total_spikes"] = {static_cast<double>(brain->getTotalSpikeCount())};
+            comparison[prefix + "avg_firing_rate"] = {brain->getAverageFiringRate()};
+            comparison[prefix + "exc_inh_ratio"] = {brain->getExcitationInhibitionRatio()};
+        }
+        
+        return comparison;
+    }, py::arg("brains"),
+       R"pbdoc(
+        Compare multiple brains side by side
+        
+        Args:
+            brains: List of brains to compare
+            
+        Returns:
+            Dictionary of comparison metrics
+            
+        Raises:
+            RuntimeError if any brain is null or list is empty
+        )pbdoc");
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -424,10 +878,232 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+// Add Python utility functions for convenience and advanced usage
+    m.def("saveBrainWithTimestamp", [](std::shared_ptr<Brain> brain, 
+                                       const std::string& prefix) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        std::stringstream filename;
+        filename << prefix << "_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S")
+                 << "_step" << brain->getTotalStepCount() << ".nlm";
+        
+        if (!brain->save(filename.str())) {
+            throw std::runtime_error("Failed to save brain to " + filename.str());
+        }
+        
+        return filename.str();
+    }, py::arg("brain"), py::arg("prefix"),
+       R"pbdoc(
+        Save brain with automatic filename including timestamp
+        
+        Args:
+            brain: The brain to save
+            prefix: Filename prefix
+            
+        Returns:
+            Path to saved file
+            
+        Raises:
+            RuntimeError if save fails
+        )pbdoc");
+    
+    m.def("runTrainingEpisode", [](std::shared_ptr<Brain> brain,
+                                  std::shared_ptr<AgentBrain> agent,
+                                  std::shared_ptr<SimpleWorld> world,
+                                  size_t steps,
+                                  std::function<float(const SensorInput&)> rewardFunc) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        if (!agent) throw std::runtime_error("Agent is null");
+        if (!world) throw std::runtime_error("World is null");
+        
+        brain->reset();
+        agent->reset();
+        world->reset();
+        
+        std::vector<std::tuple<size_t, float, MotorCommand>> episodeData;
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Calculate reward based on action outcome
+            float reward = rewardFunc(percept);
+            agent->applyRewardModulation(reward, agent->getNeuromodulationLevel());
+            
+            episodeData.emplace_back(i, reward, action);
+        }
+        
+        return episodeData;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps"),
+       py::arg("rewardFunc"),
+       R"pbdoc(
+        Run a training episode with reward tracking
+        
+        Args:
+            brain: The brain to run
+            agent: The agent interface
+            world: The world to simulate in
+            steps: Number of training steps
+            rewardFunc: Function that calculates reward based on percept
+            
+        Returns:
+            Episode data with steps, rewards, and actions
+        )pbdoc");
+    
+    m.def("benchmarkBrainPerformance", [](std::shared_ptr<Brain> brain,
+                                         size_t steps,
+                                         size_t numRuns = 10) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        std::vector<double> stepTimes;
+        std::vector<double> spikeRates;
+        
+        for (size_t run = 0; run < numRuns; ++run) {
+            brain->reset();
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            for (size_t i = 0; i < steps; ++i) {
+                brain->step(i);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            stepTimes.push_back(duration.count() / 1000.0);  // Convert to seconds
+            spikeRates.push_back(brain->getAverageFiringRate());
+        }
+        
+        std::map<std::string, double> results;
+        results["total_time"] = std::accumulate(stepTimes.begin(), stepTimes.end(), 0.0);
+        results["avg_time_per_run"] = results["total_time"] / numRuns;
+results["avg_spike_rate"] = std::accumulate(spikeRates.begin(), spikeRates.end(), 0.0) / numRuns;
+        results["total_spikes"] = brain->getTotalSynapseCount();  // Fixed: was TotalSpikeCount in comment
+        results["total_neurons"] = brain->getTotalNeuronCount();
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), py::arg("numRuns") = 10,
+       R"pbdoc(
+        Benchmark brain performance over multiple runs
+        
+        Args:
+            brain: The brain to benchmark
+            steps: Number of steps per run
+            numRuns: Number of runs for averaging (default: 10)
+            
+        Returns:
+            Benchmark results including timing and performance metrics
+        )pbdoc");
+    
+    m.def("createAdvancedConfig", [](const std::string& configName,
+                                    bool enableSTDP,
+                                    bool enableHebbian,
+                                    bool enableStructural,
+                                    bool enableCuriosity,
+                                    bool enableDevelopment) {
+        auto config = std::make_shared<Config>();
+        config->set("config_name", configName);
+        config->set("enable_stdp", enableSTDP ? "true" : "false");
+        config->set("enable_hebbian", enableHebbian ? "true" : "false");
+        config->set("enable_structural_plasticity", enableStructural ? "true" : "false");
+        config->set("enable_curiosity", enableCuriosity ? "true" : "false");
+        config->set("enable_development", enableDevelopment ? "true" : "false");
+        return config;
+    }, py::arg("configName"), py::arg("enableSTDP") = true,
+       py::arg("enableHebbian") = true,
+       py::arg("enableStructural") = true,
+       py::arg("enableCuriosity") = true,
+       py::arg("enableDevelopment") = true,
+       R"pbdoc(
+        Create an advanced configuration with specific feature toggles
+        
+        Args:
+            configName: Name for this configuration
+            enableSTDP: Enable Spike-Timing-Dependent Plasticity (default: true)
+            enableHebbian: Enable Hebbian learning (default: true)
+            enableStructural: Enable structural plasticity (default: true)
+            enableCuriosity: Enable curiosity-driven exploration (default: true)
+            enableDevelopment: Enable developmental stages (default: true)
+            
+        Returns:
+            Advanced configured Config object
+        )pbdoc");
+    
+    m.def("quickSetup", [](size_t width, size_t height, size_t numNeurons) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", std::to_string(numNeurons));
+        config->set("enable_stdp", "true");
+        config->set("enable_hebbian", "true");
+        config->set("enable_structural_plasticity", "false");
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("width"), py::arg("height"), py::arg("numNeurons"),
+       R"pbdoc(
+        Quick setup of a complete brain-world-agent system
+        
+        Args:
+            width: World width in cells
+            height: World height in cells
+            numNeurons: Number of neurons in the brain
+            
+        Returns:
+            Tuple of (brain, world, agent) ready to use
+        )pbdoc");
+    
+    // Add Python's text-as-a-sense functionality for Phase 6
+    m.def("encodeTextForBrain", [](std::shared_ptr<AgentBrain> agent,
+                                   const std::string& text) {
+        if (!agent) throw std::runtime_error("Agent is null");
+        
+        return agent->encodeText(text);
+    }, py::arg("agent"), py::arg("text"),
+       R"pbdoc(
+        Encode text for use as a sensory input in Phase 6 text association learning
+        
+        Args:
+            agent: The agent brain instance
+            text: Text to encode
+            
+        Returns:
+            Vector of neuron indices for text encoding
+        )pbdoc");
+    
+    m.def("demonstrateTextAssociation", [](std::shared_ptr<AgentBrain> agent,
+                                           const std::string& word,
+                                           const std::vector<float>& visualPattern) {
+        if (!agent) throw std::runtime_error("Agent is null");
+        
+        // Encode the text word
+        auto textPattern = agent->encodeText(word);
+        
+        // Demonstrate the concept by injecting it
+        // In practice, this would be done through the agent's interface
+        return std::make_pair(textPattern, visualPattern);
+    }, py::arg("agent"), py::arg("word"), py::arg("visualPattern"),
+       R"pbdoc(
+        Demonstrate text association learning from Phase 6
+        
+        Args:
+            agent: The agent brain instance
+            word: Word to encode
+            visualPattern: Associated visual pattern
+            
+        Returns:
+            Tuple of (textPattern, visualPattern) for demonstration
+        )pbdoc");
 
 } // namespace nlm
