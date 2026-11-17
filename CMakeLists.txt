@@ -1,21 +1,25 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Find required dependencies
+find_package(nlohmann_json REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
 
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 # Source directory
@@ -89,66 +93,87 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Add nlohmann_json and yaml-cpp include directories
+target_include_directories(nlm_core PUBLIC
+    ${nlohmann_json_INCLUDE_DIRS}
+    ${yaml-cpp_INCLUDE_DIRS}
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+target_link_libraries(nlm_agent PUBLIC nlm_core nlohmann_json::nlohmann_json yaml-cpp)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
+
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 5 experiments
 add_library(nlm_phase5 STATIC
     src/experiments/Phase5Experiment.cpp
 )
+
 target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 6 experiments
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
 )
+
 target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+
+target_link_libraries(nlm PUBLIC nlm_core nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 5 demo executable (Phase 5, added here: pattern probe,
 # sandbox run, and checkpoint round-trip for the brain-personality
@@ -156,13 +181,15 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
@@ -171,13 +198,15 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6 nlohmann_json::nlohmann_json yaml-cpp)
 
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlohmann_json::nlohmann_json yaml-cpp)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
@@ -196,7 +225,7 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
     pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json yaml-cpp)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
