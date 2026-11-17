@@ -28,7 +28,14 @@
 
 using namespace nlm;
 
-void printBanner() {
+// Forward declarations for command-line argument helpers
+bool shouldShowHelp(int argc, char** argv);
+void printHelp();
+bool isVerboseMode(int argc, char** argv);
+bool isQuietMode(int argc, char** argv);
+
+// Forward declarations for utility functions
+void printBanner();
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -41,6 +48,12 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
@@ -331,6 +344,7 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configLoadedFromFile = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -342,15 +356,19 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with better error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoadedFromFile = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Failed to load configuration from " + configFile + ". Using defaults.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_ERROR("Failed to load configuration from command line arguments!");
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -396,18 +414,28 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Phase 2 Tests ===");
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for plasticity experiment with error checking
+    NLM_LOG_INFO("Resetting brain for next test...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain after reset!");
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
+    NLM_LOG_INFO("Resetting brain for STDP test...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain for STDP test!");
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status
@@ -432,4 +460,62 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Helper functions implementations
+bool shouldShowHelp(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h" || arg == "--usage") {
+            return true;
+        }
+    }
+    return false;
+}
+
+void printHelp() {
+    std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "===============================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: ./nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --verbose, -v             Enable verbose logging" << std::endl;
+    std::cout << "  --quiet, -q               Only show errors" << std::endl;
+    std::cout << "  --config=file             Load configuration from file" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file (alternative format)" << std::endl;
+    std::cout << "  --neuron_count=X          Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=X          Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --timestep=X              Set simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --seed=X                  Set random seed (default: 42)" << std::endl;
+    std::cout << "  --connection_probability=X Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --stdp_ltp_weight=X       Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=X       Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau=X              Set STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis_rate=X   Set synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning_rate=X          Set pruning rate (default: 0.00001)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm --neuron_count=1000 --timestep=0.0005" << std::endl;
+    std::cout << "  ./nlm --config=custom.cfg --seed=12345" << std::endl;
+    std::cout << "  ./nlm -v -q --help" << std::endl;
+}
+
+bool isVerboseMode(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == std::string("--verbose") || argv[i] == std::string("-v")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isQuietMode(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == std::string("--quiet") || argv[i] == std::string("-q")) {
+            return true;
+        }
+    }
+    return false;
 }

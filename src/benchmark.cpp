@@ -32,7 +32,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
-    // Create configuration
+    // Create configuration with error checking
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
@@ -40,15 +40,24 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
     
-    // Create brain
-    auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
+    // Validate configuration
+    if (!config->validate()) {
+        std::cerr << " ERROR: Invalid configuration!" << std::endl;
+        throw std::runtime_error("Invalid configuration in benchmark");
+    }
     
-    // Run simulation
+    // Create brain with error handling
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << " ERROR: Failed to initialize brain!" << std::endl;
+        throw std::runtime_error("Brain initialization failed in benchmark");
+    }
+    
+    // Run simulation with performance measurement
     auto startTime = std::chrono::high_resolution_clock::now();
     
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
+        // Inject some random input with error checking
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
@@ -59,7 +68,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();
     
-    // Collect results
+    // Collect results with additional metrics
     BenchmarkResult result;
     result.neurons = brain->getTotalNeuronCount();
     result.synapses = brain->getTotalSynapseCount();
@@ -79,11 +88,11 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
 
 void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::endl;
-    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
-    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
-    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
-    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
+    std::cout << "╔════════════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                     NLM Performance Benchmark Results                            ║" << std::endl;
+    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╦═══════════╣" << std::endl;
+    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec  ║ Spikes/step ║ Synapses/Neuron      ║ Memory(MB) ║" << std::endl;
+    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╬═══════════╣" << std::endl;
     
     for (const auto& r : results) {
         std::cout << "║ " << std::setw(13) << r.neurons 
@@ -91,8 +100,30 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
                   << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << r.stepsPerSecond
                   << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << r.spikesPerStep
                   << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) << r.synapsesPerNeuron
+                  << " ║ " << std::setw(9) << std::fixed << std::setprecision(2) << r.memoryUsageMB
                   << " ║" << std::endl;
     }
+    
+    std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╩═══════════╝" << std::endl;
+    std::cout << std::endl;
+    
+    // Print performance analysis
+    std::cout << "Performance Analysis:" << std::endl;
+    if (!results.empty()) {
+        size_t maxNeurons = results[0].neurons;
+        double minTime = results[0].totalTime;
+        double maxTime = results[0].totalTime;
+        
+        for (const auto& r : results) {
+            if (r.totalTime < minTime) minTime = r.totalTime;
+            if (r.totalTime > maxTime) maxTime = r.totalTime;
+        }
+        
+        std::cout << "  Min time per benchmark: " << minTime << "s" << std::endl;
+        std::cout << "  Max time per benchmark: " << maxTime << "s" << std::endl;
+        std::cout << "  Time efficiency: " << std::fixed << std::setprecision(2) << (minTime / maxTime * 100) << "%" << std::endl;
+    }
+}
     
     std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╝" << std::endl;
     std::cout << std::endl;
@@ -130,15 +161,23 @@ int main() {
     };
     
     for (const auto& [neurons, steps] : benchmarks) {
-        auto result = runBenchmark(neurons, steps);
-        results.push_back(result);
-        std::cout << std::endl;
+        try {
+            auto result = runBenchmark(neurons, steps);
+            results.push_back(result);
+            std::cout << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << " ERROR: Benchmark failed for " << neurons << " neurons: " << e.what() << std::endl;
+        }
     }
     
     // Print summary
-    printBenchmarkResults(results);
-    
-    std::cout << "Benchmark complete." << std::endl;
+    if (!results.empty()) {
+        printBenchmarkResults(results);
+        std::cout << "Benchmark complete." << std::endl;
+    } else {
+        std::cerr << "ERROR: All benchmarks failed!" << std::endl;
+        return 1;
+    }
     
     return 0;
 }

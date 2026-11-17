@@ -96,9 +96,13 @@ struct Phase6Config {
         , checkpointPath("./checkpoint_test.bin") {}
 };
 
+// Forward declarations for argument parsing
+Phase6Config parsePhase6Arguments(int argc, char* argv[]);
+void printPhase6Summary(const Phase6IntegrationResult& result);
+
 /**
- * Phase 6 integrated experiment runner
- */
+  * Phase 6 integrated experiment runner
+  */
 class Phase6IntegratedExperiment {
 public:
     Phase6IntegratedExperiment();
@@ -135,4 +139,6 @@ public:
     bool testReplay();
 };
 
-} // namespace nlm
+// Helper functions
+Phase6Config parsePhase6Arguments(int argc, char* argv[]);
+void printPhase6Summary(const Phase6IntegrationResult& result);
