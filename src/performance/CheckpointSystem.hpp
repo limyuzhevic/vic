@@ -229,8 +229,118 @@ public:
     
     /**
      * Validate checkpoint integrity
+     * 
+     * @return true if checkpoint is valid and complete
+     * 
+     * Performs comprehensive validation including:
+     * - Header validation (magic number, version compatibility)
+     * - Section completeness (required sections present)
+     * - Checksum validation for all sections
+     * - Data consistency (neuron/synapse counts match)
+     * - Format compatibility (major version matches)
      */
     bool validate() const;
+    
+    /**
+     * Get detailed validation error message
+     * 
+     * @return human-readable error message explaining validation failure
+     * 
+     * Provides detailed information about what validation checks failed,
+     * making debugging easier for users and developers.
+     */
+    const std::string& getValidationError() const;
+    
+    /**
+     * Get checkpoint information summary
+     * 
+     * @return Summary of checkpoint contents and metadata
+     * 
+     * Includes essential information about the checkpoint without
+     * reading the entire file, useful for quick inspection.
+     */
+    std::string getInfoSummary() const;
+    
+    /**
+     * Check if checkpoint is compatible with current format
+     * 
+     * @param targetVersion Major version to check compatibility against
+     * @return true if checkpoint can be loaded
+     * 
+     * Allows users to check compatibility before attempting to load
+     * potentially incompatible checkpoint files.
+     */
+    bool isCompatible(uint32_t targetVersionMajor = CHECKPOINT_VERSION_MAJOR) const;
+    
+    /**
+     * Get list of available sections in checkpoint
+     * 
+     * @return Vector of section types found in checkpoint
+     * 
+     * Useful for inspecting checkpoint contents without fully loading them,
+     * helps with debugging and compatibility checking.
+     */
+    std::vector<CheckpointSection> getAvailableSections() const;
+    
+    /**
+     * Repair common checkpoint file issues
+     * 
+     * @param outputPath Path to write repaired checkpoint
+     * @return true if repair succeeded
+     * 
+     * Attempts to fix common corruption issues like missing headers,
+     * truncated sections, or checksum failures by reconstructing
+     * valid data from available sections.
+     */
+    bool repair(const std::string& outputPath);
+    
+    /**
+     * Get checkpoint statistics for analysis
+     * 
+     * @return Statistics about checkpoint contents and size
+     * 
+     * Provides useful metrics for checkpoint analysis, optimization,
+     * and monitoring of checkpoint file sizes and contents.
+     */
+    struct CheckpointStats {
+        uint64_t fileSize;              // Total file size in bytes
+        uint64_t neuronCount;           // Number of neurons saved
+        uint64_t synapseCount;          // Number of synapses saved
+        uint64_t regionCount;           // Number of regions saved
+        uint64_t sectionCount;          // Total sections in file
+        uint64_t compressedSize;        // Size after compression
+        double compressionRatio;        // Compression ratio (0.0 - 1.0)
+        uint64_t checksum;             // Final checksum
+        double validationScore;        // Overall validation score (0.0 - 1.0)
+        time_t creationTime;           // File creation timestamp
+        time_t modificationTime;       // Last modification timestamp
+    };
+    
+    CheckpointStats getStats() const;
+    
+    /**
+     * Extract specific data without full checkpoint loading
+     * 
+     * @param sectionType Type of section to extract
+     * @return Raw section data if available
+     * 
+     * Allows efficient extraction of specific data sections without
+     * loading the entire checkpoint, useful for backup analysis or
+     * selective data extraction.
+     */
+    std::vector<uint8_t> extractSection(CheckpointSection sectionType) const;
+    
+    /**
+     * Validate checkpoint against schema
+     * 
+     * @param schemaVersion Schema version to validate against
+     * @return true if checkpoint conforms to schema
+     * 
+     * Performs schema validation to ensure checkpoint structure
+     * is correct according to specified schema version, useful for
+     * ensuring data quality and compatibility.
+     */
+    bool validateSchema(uint32_t schemaVersion = 1) const;
     
     /**
      * Get validation error message

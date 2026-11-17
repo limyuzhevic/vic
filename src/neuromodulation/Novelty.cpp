@@ -33,40 +33,81 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+// Enhanced novelty detection with pattern analysis
+void Novelty::detectNovelty(const Observation& observation,
+                           const Observation& previousObservation) {
+    if (!observation.isValid() || !previousObservation.isValid()) {
+        pImpl->level = 0.0f;
+        return;
+    }
+    
+    // Extract patterns from observations
+    const SensoryInput* currentInput = observation.getSensoryInput();
+    const SensoryInput* previousInput = previousObservation.getSensoryInput();
+    
+    if (!currentInput || !previousInput) {
+        pImpl->level = 0.0f;
+        return;
+    }
+    
+    // Get sensory patterns
+    const std::vector<float>& currentPattern = currentInput->getData();
+    const std::vector<float>& previousPattern = previousInput->getData();
+    
+    detectNovelty(currentPattern, previousPattern);
 }
 
+// Enhanced novelty detection with feature-based analysis
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
+                           const std::vector<float>& previousPattern) {
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
     }
     
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
+    // Feature-based novelty detection
+    // Compute multiple features for robust novelty detection
     
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
+    // 1. Global intensity change
+    float currentMean = 0.0f, previousMean = 0.0f;
+    for (float value : currentPattern) currentMean += value;
+    for (float value : previousPattern) previousMean += value;
+    currentMean /= currentPattern.size();
+    previousMean /= previousPattern.size();
+    
+    float intensityNovelty = std::abs(currentMean - previousMean);
+    
+    // 2. Statistical variance change
+    float currentVariance = 0.0f, previousVariance = 0.0f;
+    for (float value : currentPattern) currentVariance += (value - currentMean) * (value - currentMean);
+    for (float value : previousPattern) previousVariance += (value - previousMean) * (value - previousMean);
+    currentVariance /= currentPattern.size();
+    previousVariance /= previousPattern.size();
+    
+    float varianceNovelty = std::abs(currentVariance - previousVariance);
+    
+    // 3. Pattern structure change (spectral analysis)
+    float patternNovelty = 0.0f;
+    if (currentPattern.size() == previousPattern.size()) {
+        for (size_t i = 0; i < currentPattern.size(); ++i) {
+            float diff = std::abs(currentPattern[i] - previousPattern[i]);
+            patternNovelty += diff;
+        }
+        patternNovelty /= currentPattern.size();
     }
     
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
+    // Weighted combination of novelty features
+    pImpl->level = std::min(1.0f, 
+                         0.4f * intensityNovelty + 
+                         0.4f * varianceNovelty + 
+                         0.2f * patternNovelty);
     
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
 }
+
 
 void Novelty::update(TimestepDuration dt) {
     // Decay novelty

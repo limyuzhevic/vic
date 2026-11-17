@@ -277,10 +277,46 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Enhanced integrate-and-fire dynamics
+    // Use biologically realistic timestep for millisecond-level simulation
+    TimestepDuration dt = 0.001;  // 1ms standard timestep for neural simulations
+    
+    // Check for external timestep override via configuration
+    // This allows for different simulation speeds while maintaining
+    // the biological time constants of the neuron model
+    if (pImpl->state.refractoryPeriod > 0) {
+        // During refractory period, use smaller timestep for precision
+        // This prevents neurons from firing multiple times in quick succession
+        dt = std::min(dt, 0.0005f);  // 0.5ms during refractory period
+    }
+    
+    // Apply enhanced integrate-and-fire dynamics
+    bool fired = stepLIF(currentTime, dt);
+    
+    // Post-spike processing
+    if (fired) {
+        // Enhanced firing rate calculation
+        // Use exponential moving average for more stable firing rate estimation
+        float alpha = 0.9f;  // Smoothing factor
+        pImpl->state.firingRate = alpha * pImpl->state.firingRate + 
+                                (1.0f - alpha) * (1000.0f / static_cast<float>(dt));
+        
+        // Biological refractory period with realistic dynamics
+        // Refractory period should prevent immediate re-firing
+        // and allow ion channel recovery
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+    }
+    
+    // Update adaptation variable for spike-frequency adaptation
+    // Higher firing rates lead to stronger adaptation
+    if (fired) {
+        pImpl->state.adaptationVariable += 1.0f;
+        // Clamp adaptation to reasonable range
+        pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, 0.0f, 10.0f);
+    }
 }
+
 
 void Neuron::reset() {
     pImpl->state = NeuronState();

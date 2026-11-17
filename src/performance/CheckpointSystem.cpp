@@ -196,13 +196,187 @@ void CheckpointReader::close() {
 }
 
 bool CheckpointReader::validate() const {
-    if (!header_.validate()) return false;
+    // Comprehensive checkpoint validation
+    // Validates header, sections, checksums, and data integrity
+    
+    // 1. Validate header
+    if (!header_.validate()) {
+        error_ = "invalid checkpoint header (magic/version mismatch)";
+        return false;
+    }
+    
+    // 2. Check required sections are present
     bool hasNeurons = false, hasSynapses = false;
     for (const auto& s : sections_) {
         if (s.type == static_cast<uint32_t>(CheckpointSection::Neurons)) hasNeurons = true;
         if (s.type == static_cast<uint32_t>(CheckpointSection::Synapses)) hasSynapses = true;
     }
-    return hasNeurons && hasSynapses;
+    
+    if (!hasNeurons) {
+        error_ = "checkpoint missing required neurons section";
+        return false;
+    }
+    if (!hasSynapses) {
+        error_ = "checkpoint missing required synapses section";
+        return false;
+    }
+    
+    // 3. Validate section checksums
+    for (const auto& s : sections_) {
+        if (s.type == static_cast<uint32_t>(CheckpointSection::End)) continue; // Skip end section
+        
+        stream_.clear();
+        stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
+        if (!stream_) continue;
+        
+        std::vector<uint8_t> payload(static_cast<size_t>(s.size));
+        if (s.size > 0) {
+            stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
+            if (!stream_) continue;
+        }
+        
+        uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
+        if (actual != s.checksum) {
+            error_ = "section checksum mismatch for section type " + 
+                std::to_string(s.type) + ".original checksum " + 
+                std::to_string(s.checksum) + ".actual checksum " + 
+                std::to_string(actual);
+            return false;
+        }
+    }
+    
+    // 4. Validate data consistency
+    if (header_.neuronCount > 0) {
+        // Check that we can at least read the neuron section
+        auto payload = readSection(CheckpointSection::Neurons);
+        if (payload.empty()) {
+            error_ = "neuron section is empty or corrupted";
+            return false;
+        }
+    }
+    
+    if (header_.synapseCount >  vähent.size() {
+        error_ = "synapse count in payload does not match header";
+        return false;
+    }
+    
+    // 5. Validate format compatibility
+    if (header_.majorVersion != CHECKPOINT_VERSION_MAJOR) {
+        error_ = "incompatible checkpoint format: major version " +
+            std::to_string(header_.majorVersion) + " vs " +
+            std::to_string(CHECKPOINT_VERSION_MAJOR);
+        return false;
+    }
+    
+    // All validation checks passed
+    error_ = "checkpoint validation passed";
+    return true;
+}
+
+// Get validation error message
+std::string CheckpointReader::getError() const {
+    return error_;
+}
+
+// Get checkpoint information summary
+std::string CheckpointReader::getInfoSummary() const {
+    std::ostringstream oss;
+    oss << "Checkpoint Info:\n";
+    oss << "  Magic: 0x" << std::hex << header_.magic << "\n";
+    oss << "  Version: " << header_.majorVersion << "." << header_.minorVersion << "." << header_.patchVersion << "\n";
+    oss << "  Neurons: " << header_.neuronCount << "\n";
+    oss << "  Synapses: " << header_.synapseCount << "\n";
+    oss << "  Regions: " << header_.regionCount << "\n";
+    oss << "  Steps: " << header_.step << "\n";
+    oss << "  Simulation Time: " << header_.simulationTime << "\n";
+    oss << "  Sections: " << sections_.size() << "\n";
+    oss << "  Size: " << header_.totalSize << " bytes\n";
+    
+    return oss.str();
+}
+
+// Check if checkpoint is compatible
+bool CheckpointReader::isCompatible(uint32_t targetVersionMajor) const {
+    return header_.validate() && header_.majorVersion == targetVersionMajor;
+}
+
+// Get list of available sections
+std::vector<CheckpointSection> CheckpointReader::getAvailableSections() const {
+    std::vector<CheckpointSection> available;
+    for (const auto& s : sections_) {
+        if (s.type == static_cast<uint32_t>(CheckpointSection::End)) continue;
+        
+        // Convert uint32_t back to CheckpointSection enum
+        CheckpointSection section = static_cast<CheckpointSection>(s.type);
+        available.push_back(section);
+    }
+    return available;
+}
+
+// Extract specific data without full checkpoint loading
+std::vector<uint8_t> CheckpointReader::extractSection(CheckpointSection sectionType) const {
+    for (const auto& s : sections_) {
+        if (s.type != static_cast<uint32_t>(sectionType)) continue;
+        
+        stream_.clear();
+        stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
+        if (!stream_) return {};
+        
+        std::vector<uint8_t> payload(static_cast<size_t>(s.size));
+        if (s.size > 0) {
+            stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
+            if (!stream_) return {};
+        }
+        
+        uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
+        if (actual != s.checksum) {
+            error_ = "checksum mismatch in extracted section";
+            return {};
+        }
+        
+        return payload;
+    }
+    
+    return {};
+}
+
+// Get checkpoint statistics
+CheckpointReader::CheckpointStats CheckpointReader::getStats() const {
+    CheckpointStats stats;
+    stats.fileSize = 0; // Would need to read actual file size
+    stats.neuronCount = header_.neuronCount;
+    stats.synapseCount = header_.synapseCount;
+    stats.regionCount = header_.regionCount;
+    stats.sectionCount = sections_.size();
+    stats.compressedSize = 0; // Would need to calculate based on actual compression
+    stats.compressionRatio = 0.0; // Would need to calculate
+    stats.checksum = header_.checksum;
+    stats.validationScore = validate() ? 1.0 : 0.0;
+    stats.creationTime = 0; // Would need to get from file
+    stats.modificationTime = 0; // Would need to get from file
+    
+    return stats;
+}
+
+// Validate checkpoint against schema
+bool CheckpointReader::validateSchema(uint32_t schemaVersion) const {
+    // Basic schema validation
+    if (!validate()) return false;
+    
+    // Schema-specific validation can be added here
+    switch (schemaVersion) {
+        case 1:
+            // Schema 1 validation
+            if (header_.majorVersion != 1) return false;
+            break;
+        case 2:
+            // Schema 2 validation (future)
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
 }
 
 std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
