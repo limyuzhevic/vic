@@ -48,6 +48,37 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage(const char* programName) {
+    std::cout << R"(
+Usage: " + std::string(programName) + R"( [--config=<file>] [--<key>=<value>] [--test1] [--test2] [--test3] [--all] [--help]
+
+Options:
+  --config=<file>              Load configuration from file (default: configs/default.cfg)
+  --<key>=<value>              Set configuration key (e.g., --neuron_count=500)
+  --test1                      Run only Test 1: Basic neural connectivity
+  --test2                      Run only Test 2: Plasticity learning experiment
+  --test3                      Run only Test 3: STDP verification
+  --all                        Run all three tests (default)
+  --help                       Show this help message
+  --version                    Show version information
+
+Configuration Keys:
+  neuron_count, region_count, connection_probability
+  stdp_ltp_weight, stdp_ltd_weight, stdp_tau
+  synaptogenesis_rate, pruning_rate
+  plasticity_learning_rate
+  development_synaptogenesis_rate, development_pruning_rate
+  dopamine_baseline, reward_discount_factor
+  environment_name, environment_width, environment_height
+  log_level, max_simulation_steps, visualization_enabled
+
+Examples:
+  " + std::string(programName) + R"( --config=my_config.cfg --neuron_count=2000 --test2
+  " + std::string(programName) + R"( --test3 --log_level=ERROR
+  " + std::string(programName) + R"( --stdp_ltp_weight=0.05 --stdp_ltd_weight=0.04 --all
+)";
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -277,24 +308,24 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float beforeWeight = syn->getWeight();
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
 
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
-
+                  " (Δ=" + std::to_string(delta) + ")");
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -309,6 +340,39 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Print usage if no arguments or --help
+    if (argc == 1) {
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    // Parse command line arguments
+    bool runTest1 = false;
+    bool runTest2 = false;
+    bool runTest3 = false;
+    bool runAll = true;
+    std::string configFile = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+            std::cout << "Version: 0.1.0" << std::endl;
+            return 0;
+        } else if (arg.substr(0, 8) == "--config=") {
+            configFile = arg.substr(8);
+        } else if (arg.substr(0, 2) == "--test") {
+            if (arg == "--test1") runTest1 = true;
+            else if (arg == "--test2") runTest2 = true;
+            else if (arg == "--test3") runTest3 = true;
+            runAll = false;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -330,19 +394,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
@@ -395,20 +446,52 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Determine which tests to run
+    if (runAll) {
+        runTest1 = true;
+        runTest2 = true;
+        runTest3 = true;
+    } else {
+        // Check if specific tests were requested via command line
+        // This is handled earlier in the argument parsing
+    }
+    
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runTest1) {
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        if (runTest2) {
+            runPlasticityExperiment(brain);
+            
+            // Reset and run Test 3: STDP verification
+            if (runTest3) {
+                brain->reset();
+                brain->initialize();
+                runStdpVerification(brain);
+            }
+        } else if (runTest3) {
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+        }
+    } else if (runTest2) {
+        runPlasticityExperiment(brain);
+        
+        if (runTest3) {
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+        }
+    } else if (runTest3) {
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
