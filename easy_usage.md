@@ -71,6 +71,86 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Simulation (NEW!)
+
+```python
+import pynlm
+
+# Setup with advanced features
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 2.0)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable advanced learning
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableCuriosity(True)
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=12, visionHeight=12)
+agent.initialize(world)
+
+# Run extended simulation with monitoring
+print("Starting advanced simulation...")
+for step in range(500):
+    world.update(0.05)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action and apply
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Print progress every 50 steps
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+
+print("Advanced simulation complete!")
+```
+
+### Example 4: Command-Line Advanced Usage (C++)
+
+```bash
+# Run with custom configuration
+./nlm --config=my_config.cfg --neuron-count=3000 --region-count=4 --timestep=0.002
+
+# Run with specific plasticity mode
+./nlm --plasticity-mode=stdp-only --max-steps=2000 --enable-logging
+
+# Run performance benchmark
+./nlm --benchmark --max-steps=5000
+
+# Run STDP verification only
+./nlm --stdp-only
+
+# Run plasticity learning experiment only
+./nlm --plasticity-only
+
+# Run basic connectivity test only
+./nlm --connectivity-only
+
+# Run continuous simulation for specific duration
+./nlm --duration=10.0 --verbose
+```
+
 ---
 
 ## Simple Analogy

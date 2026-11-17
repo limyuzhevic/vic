@@ -359,7 +359,148 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Advanced utility functions for power users
+        .def("getNeuronPopulationStats", [](const Brain& self, NeuronType type) {
+            std::vector<std::pair<NeuronId, float>> stats;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == type) {
+                        float avgPotential = 0.0f;
+                        size_t count = 0;
+                        for (const auto* neuron : pop->getNeurons()) {
+                            avgPotential += neuron->getMembranePotential();
+                            count++;
+                        }
+                        if (count > 0) {
+                            avgPotential /= count;
+                        }
+                        stats.push_back({pop->getId(), avgPotential});
+                    }
+                }
+            }
+            return stats;
+        }, py::arg("type"), "Get population statistics by neuron type (advanced utility)")
+        
+        .def("simulateForTime", [](Brain& self, double duration, double timestep) {
+            size_t steps = static_cast<size_t>(duration / timestep);
+            for (size_t step = 0; step < steps; ++step) {
+                self.step(step, step * timestep);
+            }
+            return steps;
+        }, py::arg("duration"), py::arg("timestep") = 0.001,
+             "Simulate for a specific duration in seconds (advanced utility)")
+        
+        .def("getPerformanceMetrics", [](const Brain& self) {
+            py::dict metrics;
+            
+            metrics["total_neurons"] = self.getTotalNeuronCount();
+            metrics["total_synapses"] = self.getTotalSynapseCount();
+            metrics["firing_neurons"] = self.getFiringNeuronCount();
+            metrics["total_spikes"] = self.getTotalSpikeCount();
+            metrics["avg_firing_rate"] = self.getAverageFiringRate();
+            metrics["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            
+            // Get firing rate per region
+            py::list regionRates;
+            for (auto regionId : self.getRegionIds()) {
+                if (auto* region = self.getRegion(regionId)) {
+                    float regionRate = 0.0f;
+                    size_t count = 0;
+                    for (const auto& pop : region->getPopulations()) {
+                        for (const auto* neuron : pop->getNeurons()) {
+                            regionRate += neuron->getFiringRate();
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        regionRate /= count;
+                    }
+                    regionRates.append(regionRate);
+                }
+            }
+            metrics["region_firing_rates"] = regionRates;
+            
+            return metrics;
+        }, "Get comprehensive performance metrics (advanced utility)")
+        
+        .def("exportNetworkGraph", [](const Brain& self, const std::string& filepath) {
+            std::ofstream file(filepath);
+            if (!file.is_open()) {
+                throw std::runtime_error("Cannot open file for writing: " + filepath);
+            }
+            
+            file << "graph NLM_Network {\n";
+            file << "  node [shape=box];\n";
+            
+            // Write neurons
+            for (const auto& region : self.getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        file << "  \"n" << neuron->getId().index() 
+                             << "\" [label=\"" << neuron->getId().index()
+                             << " (" << static_cast<int>(pop->getNeuronType()) << ")\"]\n";
+                    }
+                }
+            }
+            
+            // Write synapses
+            file << "  edge [style=solid];\n";
+            for (const auto& region : self.getRegions()) {
+                for (const auto& syn : region->getSynapses()) {
+                    file << "  \"n" << syn->getSourceNeuron().index()
+                         << "\" -- \"n" << syn->getDestinationNeuron().index()
+                         << "\" [label=\"" << syn->getWeight() << "\"]\n";
+                }
+            }
+            
+            file << "}\n";
+            return true;
+        }, py::arg("filepath"), "Export network as Graphviz DOT file (advanced utility)")
+        
+        .def("createCustomPattern", [](Brain& self, const std::vector<NeuronId>& neuronIds, 
+                                       float current, NeuronType type) {
+            for (const auto& id : neuronIds) {
+                self.injectCurrent(id, current);
+            }
+            return neuronIds.size();
+        }, py::arg("neuron_ids"), py::arg("current"), py::arg("type"),
+             "Inject current into specific neurons using custom pattern (advanced utility)")
+        
+        .def("batchSave", [](Brain& self, const std::vector<std::string>& filepaths) {
+            size_t saved = 0;
+            for (const auto& filepath : filepaths) {
+                if (self.save(filepath)) {
+                    saved++;
+                }
+            }
+            return saved;
+        }, py::arg("filepaths"), "Save brain state to multiple files (advanced utility)")
+        
+        .def("advancedStdpPattern", [](Brain& self, std::vector<std::pair<NeuronId, NeuronId>> connections,
+                                       bool potentiate) {
+            for (const auto& conn : connections) {
+                auto* srcRegion = self.getRegion(RegionId(conn.first.index() / 100));
+                auto* dstRegion = self.getRegion(RegionId(conn.second.index() / 100));
+                
+                if (srcRegion && dstRegion) {
+                    auto synapses = srcRegion->getSynapsesFrom(conn.first);
+                    for (auto* syn : synapses) {
+                        if (syn->getDestinationNeuron() == conn.second) {
+                            syn->setPlasticityFlags(true, true, false); // STDP + Hebbian
+                            if (potentiate) {
+                                syn->setWeight(std::min(1.0f, syn->getWeight() + 0.01f));
+                            } else {
+                                syn->setWeight(std::max(0.0f, syn->getWeight() - 0.01f));
+                            }
+                        }
+                    }
+                }
+            }
+            return connections.size();
+        }, py::arg("connections"), py::arg("potentiate"), 
+             "Apply advanced STDP patterns to specific connections (advanced utility)");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

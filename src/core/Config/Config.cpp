@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <cmath>
 
 namespace nlm {
 
@@ -10,7 +12,19 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize debug info with default values
+    debugInfo.debugMode = false;
+    debugInfo.profileMode = false;
+    debugInfo.validateMode = false;
+    debugInfo.logNeuronActivity = false;
+    debugInfo.logSynapseActivity = false;
+    debugInfo.logMemoryActivity = false;
+    debugInfo.logPerformanceMetrics = false;
+    debugInfo.exportVisualizationData = false;
+    debugInfo.debugOutputFile = "";
+    debugInfo.activityLogSampleRate = 100;
+}
 
 Config::~Config() = default;
 
@@ -86,7 +100,41 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert value to string based on type
+        std::string valueStr;
+        std::visit([&valueStr](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, bool>) {
+                valueStr = val ? "true" : "false";
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                std::ostringstream oss;
+                oss << val;
+                valueStr = oss.str();
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                valueStr = "\"" + val + "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                std::ostringstream oss;
+                oss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << val[i];
+                }
+                oss << "]";
+                valueStr = oss.str();
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                std::ostringstream oss;
+                oss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::setprecision(6) << val[i];
+                }
+                oss << "]";
+                valueStr = oss.str();
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStr << "\n\n";
     }
     
     return true;
@@ -100,7 +148,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.push_back(ConfigEntry(key, value, source));
     }
 }
 
