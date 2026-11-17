@@ -1,5 +1,5 @@
 #include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
+#include "core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
 

@@ -1,12 +1,17 @@
 #pragma once
 
 #include "AgentBody.hpp"
-#include "../sensory/SensoryInput.hpp"
+#include "sensory/SensoryInput.hpp"
 #include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
+#include "brain/Brain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "cognition/NeuralPlanner.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "AgentBrainSensoryProcessing.hpp"
+#include "AgentBrainMotorDecoding.hpp"
+#include "AgentBrainNeuromodulation.hpp"
+#include "AgentBrainDevelopment.hpp"
+#include "AgentBrainTextEncoding.hpp"
 #include <memory>
 #include <string>
 #include <vector>

@@ -92,16 +92,16 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> validateAndGetErrors() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get configuration schema for validation
+    static std::map<std::string, std::string> getSchema();
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Validate specific key
+    bool validateKey(const std::string& key) const;
+    std::string getKeyValidationError(const std::string& key) const;
 };
 
 } // namespace nlm

@@ -1,7 +1,7 @@
 #include "AgentBrain.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/Random/Random.hpp"
+#include "cognition/NeuralPlanner.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
 
