@@ -39,18 +39,37 @@ void appendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
     }
 }
 
-template <typename T>
-bool readVec(const uint8_t*& p, const uint8_t* end, std::vector<T>& v) {
-    if (static_cast<size_t>(end - p) < sizeof(uint64_t)) return false;
-    uint64_t count = 0;
-    std::memcpy(&count, p, sizeof(count));
-    p += sizeof(uint64_t);
-    size_t bytes = static_cast<size_t>(count) * sizeof(T);
-    if (static_cast<size_t>(end - p) < bytes) return false;
-    v.resize(static_cast<size_t>(count));
-    if (bytes > 0) std::memcpy(v.data(), p, bytes);
-    p += bytes;
-    return true;
+inline uint64_t ChecksumCalculator::crc64(const void* data, size_t size) {
+    // Simple CRC-64 implementation (placeholder - use real CRC64 if available)
+    uint64_t crc = 0;
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    
+    for (size_t i = 0; i < size; ++i) {
+        crc ^= bytes[i];
+        for (int j = 0; j < 64; ++j) {
+            if (crc & 1ULL) {
+                crc = (crc >> 1) ^ 0x42F0E1EBA9EA3693ULL;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    
+    return crc;
+}
+
+inline uint32_t ChecksumCalculator::crc32(const void* data, size_t size) {
+    uint32_t crc = 0xFFFFFFFF;
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+
+    for (size_t i = 0; i < size; ++i) {
+        crc ^= bytes[i];
+        for (int j = 0; j < 8; ++j) {
+            crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+        }
+    }
+
+    return ~crc;
 }
 
 std::vector<uint8_t> serializeNeurons(const NeuronCheckpointData& d) {
@@ -181,7 +200,7 @@ bool CheckpointReader::open(const std::string& filepath) {
         if (!stream_) break;
         sections_.push_back(section);
         if (section.type == static_cast<uint32_t>(CheckpointSection::End)) break;
-        stream_.seekg(static_cast<std::streamoff>(section.offset + section.size), std::ios::beg);
+        stream_.seekg(static_cast<std::streamoff>(section.offset + sizeof(SectionHeader) + section.size), std::ios::beg);
         if (!stream_) break;
     }
     stream_.clear();
@@ -384,7 +403,19 @@ bool CheckpointWriter::finalize() {
     bytesWritten_ += sizeof(endHeader);
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
-    header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    // Combine checksums from all sections
+    uint64_t neuronChecksum = neuronPayload_.empty() ? 0 : ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    uint64_t synapseChecksum = synapsePayload_.empty() ? 0 : ChecksumCalculator::crc32(synapsePayload_.data(), synapsePayload_.size());
+    uint64_t spikeChecksum = delayedSpikePayload_.empty() ? 0 : ChecksumCalculator::crc32(delayedSpikePayload_.data(), delayedSpikePayload_.size());
+    uint64_t combinedChecksum = ChecksumCalculator::combine(neuronChecksum, synapseChecksum);
+    combinedChecksum = ChecksumCalculator::combine(combinedChecksum, spikeChecksum);
+    for (const auto& entry : extraPayloads_) {
+        if (!entry.second.empty()) {
+            uint32_t entryChecksum = ChecksumCalculator::crc32(entry.second.data(), entry.second.size());
+            combinedChecksum = ChecksumCalculator::combine(static_cast<uint64_t>(entryChecksum), combinedChecksum);
+        }
+    }
+    header_.checksum = static_cast<uint64_t>(combinedChecksum);
     stream_.seekp(0, std::ios::beg);
     stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
     stream_.flush();
@@ -479,8 +510,7 @@ std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoint
         info.fileSize = entry.file_size(ec);
         auto ftime = entry.last_write_time(ec);
         // Convert the filesystem clock time to a system-clock time_t.
-        auto sysTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
+        auto sysTime = decltype(ftime)::clock::to_sys(ftime);
         info.timestamp = std::chrono::system_clock::to_time_t(sysTime);
         infos.push_back(info);
     }
