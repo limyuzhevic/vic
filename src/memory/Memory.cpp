@@ -108,7 +108,31 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Remove episodes with low relevance
+    auto it = std::remove_if(pImpl->episodes.begin(), pImpl->episodes.end(),
+        [this, relevanceThreshold](const EpisodicMemoryItem& episode) {
+            // Calculate episode relevance based on multiple factors
+            float relevance = 0.0f;
+            
+            // Higher reward = higher relevance
+            relevance += episode.reward * 0.3f;
+            
+            // Recent episodes are more relevant
+            float recencyFactor = 1.0f - (static_cast<float>(episode.age) / 1000.0f);
+            relevance += recencyFactor * 0.2f;
+            
+            // Episodes with action selection are more relevant
+            if (episode.action != ActionType::Wait) {
+                relevance += 0.3f;
+            }
+            
+            // Episodes with high energy change are more relevant
+            relevance += std::abs(episode.energy - 0.5f) * 0.2f;
+            
+            return relevance < relevanceThreshold;
+        });
+    
+    pImpl->episodes.erase(it, pImpl->episodes.end());
 }
 
 // Semantic Memory Implementation

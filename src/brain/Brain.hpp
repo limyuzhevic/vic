@@ -20,7 +20,6 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -30,6 +29,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Include prediction system headers
+#include "../prediction/NeuralPrediction.hpp"
+#include "../prediction/ActionConsequencePredictor.hpp"
+#include "../prediction/PredictionErrorSignal.hpp"
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -146,9 +150,6 @@ public:
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
