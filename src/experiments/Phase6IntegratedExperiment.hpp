@@ -47,6 +47,15 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
+    // Enhanced reward tracking for Phase 6
+    float maxRewardPerStep;
+    float minRewardPerStep;
+    float rewardStdDev;
+    float totalStepsExecuted;
+    float stepsWithPositiveReward;
+    float stepsWithNegativeReward;
+    float stepsWithZeroReward;
+    
     // Timestamps
     time_t startTime;
     time_t endTime;
@@ -67,6 +76,13 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , maxRewardPerStep(0.0f)
+        , minRewardPerStep(0.0f)
+        , rewardStdDev(0.0f)
+        , totalStepsExecuted(0.0f)
+        , stepsWithPositiveReward(0.0f)
+        , stepsWithNegativeReward(0.0f)
+        , stepsWithZeroReward(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}

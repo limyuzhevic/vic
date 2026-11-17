@@ -191,16 +191,26 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    
+    // Checkpoint management (Phase 5/6)
+    CheckpointManager* getCheckpointManager();
+    
+    // Set checkpoint data providers (required for Phase 5/6 checkpointing)
+    void setCheckpointDataProviders(
+        std::function<bool(NeuronCheckpointData&)> neuronProvider,
+        std::function<bool(SynapseCheckpointData&)> synapseProvider);
+    
+    // Update checkpoint state (call each simulation step)
+    void updateCheckpointState(uint64_t currentStep, double currentTime);
+    
+    // Save checkpoint immediately
+    bool saveCheckpoint(const std::string& name = "");
+    
+    // Load checkpoint
+    bool loadCheckpoint(const std::string& name);
+    
+    // List available checkpoints
+    std::vector<CheckpointManager::CheckpointInfo> listCheckpoints() const;
     
     // Logging
     void logStatus() const;

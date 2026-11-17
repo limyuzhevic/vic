@@ -1547,8 +1547,95 @@ std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
+// Checkpoint management
+CheckpointManager* Brain::getCheckpointManager() {
+    return pImpl->checkpointManager.get();
+}
+
+// Set checkpoint data providers (required for Phase 5/6 checkpointing)
+void Brain::setCheckpointDataProviders(
+    std::function<bool(NeuronCheckpointData&)> neuronProvider,
+    std::function<bool(SynapseCheckpointData&)> synapseProvider) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->setNeuronProvider(neuronProvider);
+        pImpl->checkpointManager->setSynapseProvider(synapseProvider);
+    }
+}
+
+// Update checkpoint state (call each simulation step)
+void Brain::updateCheckpointState(uint64_t currentStep, double currentTime) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+}
+
+// Save checkpoint immediately
+bool Brain::saveCheckpoint(const std::string& name) {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->saveImmediately(name);
+    }
+    return false;
+}
+
+// Load checkpoint
+bool Brain::loadCheckpoint(const std::string& name) {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->load(name);
+    }
+    return false;
+}
+
+// List available checkpoints
+std::vector<CheckpointManager::CheckpointInfo> Brain::listCheckpoints() const {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->listCheckpoints();
+    }
+    return std::vector<CheckpointManager::CheckpointInfo>();
+}
+
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Checkpoint management
+CheckpointManager* Brain::getCheckpointManager() {
+    return pImpl->checkpointManager.get();
+}
+
+void Brain::setCheckpointDataProviders(
+    std::function<bool(NeuronCheckpointData&)> neuronProvider,
+    std::function<bool(SynapseCheckpointData&)> synapseProvider) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->setNeuronProvider(neuronProvider);
+        pImpl->checkpointManager->setSynapseProvider(synapseProvider);
+    }
+}
+
+void Brain::updateCheckpointState(uint64_t currentStep, double currentTime) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+}
+
+bool Brain::saveCheckpoint(const std::string& name) {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->saveImmediately(name);
+    }
+    return false;
+}
+
+bool Brain::loadCheckpoint(const std::string& name) {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->load(name);
+    }
+    return false;
+}
+
+std::vector<CheckpointManager::CheckpointInfo> Brain::listCheckpoints() const {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->listCheckpoints();
+    }
+    return std::vector<CheckpointManager::CheckpointInfo>();
 }
 
 void Brain::logStatus() const {
@@ -1579,13 +1666,6 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
-}
+} // namespace nlm
 
 } // namespace nlm

@@ -158,11 +158,15 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Checkpoint test executable
+add_executable(checkpoint_test
+    checkpoint_test.cpp
+)
+target_link_libraries(checkpoint_test PUBLIC nlm_core)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
