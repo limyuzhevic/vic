@@ -25,8 +25,8 @@ NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(ot
 
 NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        Impl* old_pImpl = std::exchange(pImpl, other.pImpl);
+        delete old_pImpl;
         other.pImpl = nullptr;
     }
     return *this;

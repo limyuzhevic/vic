@@ -15,7 +15,9 @@ struct Dopamine::Impl {
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
 
-Dopamine::~Dopamine() = default;
+Dopamine::~Dopamine() {
+    delete pImpl;
+}
 
 const char* Dopamine::getName() const {
     return "DA";

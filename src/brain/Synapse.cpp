@@ -70,8 +70,8 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        Impl* old_pImpl = std::exchange(pImpl, other.pImpl);
+        delete old_pImpl;
         other.pImpl = nullptr;
     }
     return *this;

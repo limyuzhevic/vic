@@ -43,8 +43,8 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        Impl* old_pImpl = std::exchange(pImpl, other.pImpl);
+        delete old_pImpl;
         other.pImpl = nullptr;
     }
     return *this;

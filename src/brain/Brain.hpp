@@ -3,13 +3,11 @@
 #include "../core/Types/Types.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainSystem.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -47,8 +45,7 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Integrates all systems through BrainSystem
 
 class Brain {
 public:
@@ -191,23 +188,92 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
+    
+    // Learned preference trait (Phase 5)
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
+    
+    // Get brain system
+    BrainSystem* getBrainSystem() { return brainSystem_.get(); }
+    const BrainSystem* getBrainSystem() const { return brainSystem_.get(); }
+    
+    // Legacy compatibility - will be deprecated
+    NeuralRegion* getLegacyRegion(RegionId id);
+    const NeuralRegion* getLegacyRegion(RegionId id) const;
+    NeuralPopulation* getLegacyPopulation(PopulationId id);
+    const NeuralPopulation* getLegacyPopulation(PopulationId id) const;
+    Neuron* getLegacyNeuron(NeuronId id);
+    const Neuron* getLegacyNeuron(NeuronId id) const;
     
     // Logging
     void logStatus() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    std::shared_ptr<Config> config_;
+    std::unique_ptr<BrainSystem> brainSystem_;
+    
+    // Legacy implementation (to be removed after full migration)
+    struct LegacyImpl {
+        std::shared_ptr<Config> config;
+        std::unique_ptr<RandomGenerator> rng;
+        std::vector<std::unique_ptr<NeuralRegion>> regions;
+        std::vector<InterRegionConnection> interRegionConnections;
+        
+        // Legacy memory systems
+        std::unique_ptr<NeuralWorkingMemory> workingMemory;
+        std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+        std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+        
+        // Legacy prediction system
+        std::unique_ptr<PredictionSystem> predictionSystem;
+        
+        // Legacy cognition systems
+        std::unique_ptr<NeuralPlanner> planner;
+        std::unique_ptr<ConceptFormation> conceptFormation;
+        std::unique_ptr<AttentionalSelection> attention;
+        
+        // Legacy development system
+        std::unique_ptr<DevelopmentSystem> developmentSystem;
+        
+        // Legacy neuromodulation systems
+        std::unique_ptr<Dopamine> dopamine;
+        std::unique_ptr<Curiosity> curiosity;
+        std::unique_ptr<PredictionError> predictionError;
+        std::unique_ptr<Novelty> novelty;
+        
+        // Legacy neural computation components
+        std::unique_ptr<SpikeSystem> spikeSystem;
+        std::unique_ptr<STDP> stdp;
+        std::unique_ptr<Hebbian> hebbian;
+        std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+        
+        // Legacy state
+        SimulationStep currentStep;
+        Timestamp currentTime;
+        size_t totalSpikesThisStep;
+        size_t totalSpikesTotal;
+        float learnedPreference;
+        std::vector<Neuron*> sensoryNeurons;
+        std::vector<Neuron*> motorNeurons;
+        std::unordered_map<uint64_t, Neuron*> neuronById;
+        bool spikeHandlersRegistered;
+        
+        // Legacy integration state
+        bool isResting;
+        size_t stepsSinceLastEpisode;
+        size_t replayInterval;
+        size_t consolidationInterval;
+        
+        // Legacy checkpoint system
+        std::unique_ptr<CheckpointManager> checkpointManager;
+        
+        LegacyImpl(std::shared_ptr<Config> cfg) 
+            : config(cfg), currentStep(0), currentTime(0.0), 
+              totalSpikesThisStep(0), totalSpikesTotal(0), learnedPreference(0.0f),
+              isResting(false), stepsSinceLastEpisode(0), replayInterval(100), 
+              consolidationInterval(1000), spikeHandlersRegistered(false) {}
+    };
+    LegacyImpl legacyImpl_;
 };
 
 } // namespace nlm

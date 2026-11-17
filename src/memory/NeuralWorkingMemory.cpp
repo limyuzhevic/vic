@@ -183,15 +183,28 @@ void NeuralWorkingMemory::runCompetition() {
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
+    // Optimized: Use direct index access instead of std::find
+    winners_.reserve(memoryNeurons_.size());
+    
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
     }
     
+    // Optimized: Create winner lookup set for O(1) checks
+    // Reserve space for potential winners (usually much smaller than total neurons)
+    if (winners_.size() > pImpl->winnersSet.max_size() / 4) {
+        pImpl->winnersSet.reserve(winners_.size() * 4);
+    }
+    pImpl->winnersSet.clear();
+    for (NeuronId winner : winners_) {
+        pImpl->winnersSet.insert(winner.index());
+    }
+    
     // Inhibitory competition - suppress non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+        bool isWinner = pImpl->winnersSet.find(memoryNeurons_[i].index()) != pImpl->winnersSet.end();
         
         if (!isWinner && brain_) {
             // Apply strong inhibition
@@ -201,7 +214,8 @@ void NeuralWorkingMemory::runCompetition() {
 }
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
+    // Optimized: Use O(1) lookup instead of O(n) std::find
+    return pImpl->winnersSet.find(neuron.index()) != pImpl->winnersSet.end();
 }
 
 float NeuralWorkingMemory::getMemoryActivity() const {
@@ -295,12 +309,13 @@ void AttentionalSelection::initialize(Brain* brain) {
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
+                                                               float globalInhibition) {
     winners_.clear();
+    pImpl->inhibitionLevel.clear();
     
     if (competitors.empty()) return winners_;
     
-    // Compute activity levels for competitors
+    // Compute activity levels for competitors (O(n))
     std::vector<float> activities(competitors.size(), 0.0f);
     float totalActivity = 0.0f;
     
@@ -322,33 +337,48 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
         return competitors;
     }
     
-    // Competition: neurons inhibit each other based on relative activity
+    // Optimized competition: sort by activity to reduce comparisons
+    // Create indexed vector for sorting
+    std::vector<std::pair<size_t, float>> indexedActivities;
+    indexedActivities.reserve(competitors.size());
     for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
-                }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
+        indexedActivities.emplace_back(i, activities[i]);
+    }
+    
+    // Sort by activity descending (O(n log n))
+    std::sort(indexedActivities.begin(), indexedActivities.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Optimized competition: only compare with significantly weaker competitors
+    // and use early termination for dominant neurons
+    for (size_t i = 0; i < indexedActivities.size(); ++i) {
+        size_t i_idx = indexedActivities[i].first;
+        float activity_i = indexedActivities[i].second;
+        
+        // Find first competitor with much lower activity
+        size_t j = i + 1;
+        while (j < indexedActivities.size() && 
+               activity_i / indexedActivities[j].second > 1.5f) {
+            // i is much stronger than j - apply inhibition to j
+            size_t j_idx = indexedActivities[j].first;
+            if (brain_) {
+                brain_->injectCurrent(competitors[j_idx], -globalInhibition * inhibitionStrength_);
             }
+            pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
+            j++;
         }
     }
     
-    // Winners are neurons with above-threshold activity
+    // Winners are neurons with above-threshold activity (O(n))
     float threshold = competitionThreshold_ * totalActivity / competitors.size();
     
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        if (activities[i] >= threshold) {
-            winners_.push_back(competitors[i]);
+    for (size_t i = 0; i < indexedActivities.size(); ++i) {
+        if (indexedActivities[i].second >= threshold) {
+            winners_.push_back(competitors[indexedActivities[i].first]);
             
             // Apply excitation to winners
             if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+                brain_->injectCurrent(competitors[indexedActivities[i].first], excitationStrength_ * 2.0f);
             }
         }
     }

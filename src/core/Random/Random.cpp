@@ -23,8 +23,8 @@ RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        Impl* old_pImpl = std::exchange(pImpl, other.pImpl);
+        delete old_pImpl;
         other.pImpl = nullptr;
     }
     return *this;
