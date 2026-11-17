@@ -56,10 +56,85 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true;  // No arguments provided
+    }
+    
+    bool showHelp = false;
+    bool showVersion = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --help flag
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+            continue;
+        }
+        
+        // Handle --version flag
+        if (arg == "--version") {
+            showVersion = true;
+            continue;
+        }
+        
+        // Handle --config=value or -c value format
+        if (arg.substr(0, 2) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = "config_file";
+                std::string value = arg.substr(arg.find('=') + 1);
+                set(key, value, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                std::string key = "config_file";
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
+            continue;
+        }
+        
+        // Handle --logfile=value or -l value format
+        if (arg.substr(0, 2) == "--logfile") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = "log_file";
+                std::string value = arg.substr(arg.find('=') + 1);
+                set(key, value, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                std::string key = "log_file";
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
+            continue;
+        }
+        
+        // Handle --seed=value or -s value format
+        if (arg.substr(0, 2) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = "random_seed";
+                std::string value = arg.substr(arg.find('=') + 1);
+                set(key, value, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                std::string key = "random_seed";
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
+            continue;
+        }
+        
+        // Handle --steps=value or -t value format
+        if (arg.substr(0, 2) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = "max_simulation_steps";
+                std::string value = arg.substr(arg.find('=') + 1);
+                set(key, value, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                std::string key = "max_simulation_steps";
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
+            continue;
+        }
+        
+        // Handle standard --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -67,14 +142,43 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
+            continue;
         }
+        
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            continue;
         }
+        
+        // Handle unknown arguments - log error
+        NLM_LOG_WARNING("Unknown command line argument: " + arg);
     }
+    
+    // Display help or version information
+    if (showHelp) {
+        std::cout << "NLM - Neural Learning Machine\n" << std::endl;
+        std::cout << "Usage: nlm [options]\n" << std::endl;
+        std::cout << "Options:\n" << std::endl;
+        std::cout << "  -h, --help                    Show this help message\n" << std::endl;
+        std::cout << "  --version                     Show version information\n" << std::endl;
+        std::cout << "\nConfiguration file:\n" << std::endl;
+        std::cout << "  -c, --config <file>          Load configuration from file\n" << std::endl;
+        std::cout << "\nBasic configuration:\n" << std::endl;
+        std::cout << "  --seed <value>               Set random seed (default: 42)\n" << std::endl;
+        std::cout << "  --steps <value>              Set max simulation steps (default: 10000)\n" << std::endl;
+        std::cout << "\nLogging:\n" << std::endl;
+        std::cout << "  -l, --logfile <file>         Set log file (default: nlm.log)\n" << std::endl;
+        std::cout << "\nOther options:\n" << std::endl;
+        std::cout << "  Any other --key=value pair to set custom configuration values\n" << std::endl;
+        std::cout << "  -key value                    Short option format\n" << std::endl;
+    } else if (showVersion) {
+        std::cout << "NLM - Neural Learning Machine v0.1. policy.built_version\n" << std::endl;
+        std::cout << "Phase 6: Final Integration\n" << std::endl;
+    }
+    
     return true;
 }
 

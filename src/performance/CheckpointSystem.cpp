@@ -355,17 +355,23 @@ bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* d
 
 bool CheckpointWriter::finalize() {
     if (!stream_.is_open()) return false;
+    
     // Reserve space for the header, then write sections.
     stream_.seekp(0, std::ios::beg);
+    
+    // Write placeholder header first
     CheckpointHeader placeholder;
-    stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
-    if (!stream_) return false;
+    if (!stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder)) || !stream_) {
+        return false;
+    }
     bytesWritten_ = sizeof(placeholder);
+    
+    // Write sections using proper writeSectionHeader method
     if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
     if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
     if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
-    // Phase 5 extra sections, in fixed order so a reader can rely on
-    // layout (readSection also finds them by type, order-independent).
+    
+    // Phase 5 extra sections
     for (CheckpointSection type : {CheckpointSection::SimulationState,
                                    CheckpointSection::RandomState,
                                    CheckpointSection::Plasticity,
@@ -376,17 +382,22 @@ bool CheckpointWriter::finalize() {
             }
         }
     }
+    
+    // Write End section
     SectionHeader endHeader;
     endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
     endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
-    stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
-    if (!stream_) return false;
+    if (!writeSectionHeader(endHeader) || !stream_) return false;
     bytesWritten_ += sizeof(endHeader);
+    
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
     header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    
+    // Write real header
     stream_.seekp(0, std::ios::beg);
-    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!writeHeader() || !stream_) return false;
+    
     stream_.flush();
     if (!stream_) return false;
     close();
@@ -401,9 +412,49 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    
+    // Write the header to the stream
+    if (stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_))) {
+        bytesWritten_ = sizeof(header_);
+        return true;
+    }
+    return false;
+}
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    
+    // Write section header
+    if (stream_.write(reinterpret_cast<const char*>(&header), sizeof(header))) {
+        bytesWritten_ += sizeof(header);
+        return true;
+    }
+    return false;
+}
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open() || alignment == 0) return true;
+    
+    // Calculate current position
+    uint64_t currentPos = static_cast<uint64_t>(stream_.tellp());
+    
+    // Calculate padding needed
+    size_t remainder = currentPos % alignment;
+    size_t padding = (remainder ? 0 : alignment) - remainder;
+    
+    // Write padding bytes
+    if (padding > 0) {
+        // Create padding buffer
+        std::vector<char> paddingBuffer(padding, static_cast<char>(0));
+        
+        if (stream_.write(paddingBuffer.data(), paddingBuffer.size())) {
+            bytesWritten_ += padding;
+            return true;
+        }
+    }
+    
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 
