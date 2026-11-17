@@ -80,12 +80,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
+// Compute reward
         float reward = actionResult.reward;
         totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Log reward signal
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Neuromodulation: " + std::to_string(agent.getNeuromodulationLevel()) +
+                        " | Curiosity: " + std::to_string(agent.getCuriosityLevel()) +
+                        " | Novelty: " + std::to_string(agent.getNoveltyLevel()));
+        }
+        
+        // Apply reward modulation with actual predicted reward
+        agent.applyRewardModulation(reward, agent.getExpectedReward());
         
         // Update development
         if (config.enableDevelopment) {

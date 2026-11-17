@@ -294,8 +294,19 @@ bool Brain::initialize() {
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(1.0f);      // Increase inhibition
+    pImpl->attention->setExcitationStrength(1.2f);      // Reduce excitation
+    
+    // Also increase global inhibition to help with high spike rates
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->getType() == NeuronType::Inhibitory) {
+                    neuron->setThreshold(neuron->getThreshold() * 0.8f);  // Make inhibitory neurons fire more easily
+                }
+            }
+        }
+    }
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);

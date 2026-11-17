@@ -135,8 +135,13 @@ public:
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
                 
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // 6. Apply reward modulation with actual predicted reward
+                agentBrain.applyRewardModulation(result.reward, agentBrain.getExpectedReward());
+                
+                // Log neuromodulation effects
+                if (step % 50 == 0) {
+                    std::cout << "  Neuromodulation level: " << agentBrain.getNeuromodulationLevel() << " (prediction error: " << agentBrain.getPredictionError() << ")" << std::endl;
+                }
                 
                 // 7. Update world — Phase 6 pacing fix: one decision
                 // is one world action interval (0.1 s). The old

@@ -942,8 +942,21 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Update dopamine neuromodulator with actual reward and prediction error
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->signalReward(reward);
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+        brain_->getDopamine()->update(0.001);  // Use timestep for update
+        
+        // Log dopamine levels for debugging
+        NLM_LOG_INFO("Dopamine signal: reward=" + std::to_string(reward) +
+                    " pred_error=" + std::to_string(predictionError_) +
+                    " level=" + std::to_string(brain_->getDopamine()->getLevel()) +
+                    " plasticity_factor=" + std::to_string(brain_->getDopamine()->getPlasticityFactor()));
+    }
+    
+    // Use neuromodulator's level for internal calculations
+    dopamineLevel_ = brain_->getDopamine() ? brain_->getDopamine()->getLevel() : predictionError_;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
@@ -965,6 +978,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 // selectivity in one step (standard R-STDP scaling).
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
                 delta = std::clamp(delta, -0.1f, 0.1f);
+                
+                // Apply weight-dependent scaling to prevent saturation
+                // Similar to STDP and Hebbian: scale potentiation by (1 - |w|)
+                // and depression by |w|, so weights approach bounds asymptotically
+                float w = syn->getWeight();
+                bool awayFromZero = std::abs(w + delta) > std::abs(w);
+                delta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+                
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -981,8 +1002,16 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        // Use neuromodulator's plasticity factor if available, otherwise use calculated one
+        float finalPlasticityFactor = plasticityFactor;
+        if (brain_->getDopamine()) {
+            float neuromodulatorFactor = brain_->getDopamine()->getPlasticityFactor();
+            finalPlasticityFactor = (neuromodulatorFactor + plasticityFactor) * 0.5f;
+            NLM_LOG_INFO("Neuromodulator plasticity factor: " + std::to_string(neuromodulatorFactor));
+        }
+        
+        stdp->setLTPWeight(0.01f * finalPlasticityFactor);
+        stdp->setLTDWeight(0.012f * finalPlasticityFactor);
     }
 }
 

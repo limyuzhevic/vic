@@ -33,17 +33,44 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
-}
+        // TODO PHASE 2: Implement real reward computation from observation
+        // PLACEHOLDER: Returns 0
+        return 0.0f;
+    }
 
-const std::vector<float>& Reward::getHistory() const {
-    return pImpl->history;
-}
+    const char* Reward::getName() const {
+        return "R";
+    }
 
-void Reward::clearHistory() {
-    pImpl->history.clear();
-}
+    float Reward::getLevel() const {
+        return getValue();
+    }
 
-} // namespace nlm
+    void Reward::setLevel(float level) {
+        setValue(level);
+    }
+
+    float Reward::getPlasticityFactor() const {
+        // TODO PHASE 2: Implement real reward-modulated plasticity factor
+        // PLACEHOLDER: Higher reward increases plasticity
+        return 0.5f + 0.5f * getValue();
+    }
+
+    void Reward::update(TimestepDuration dt) {
+        // TODO PHASE 2: Implement real reward dynamics
+        // PLACEHOLDER: Decay towards zero
+        if (pImpl->currentValue > 0.0f) {
+            pImpl->currentValue = std::max(0.0f, pImpl->currentValue - 0.1f * static_cast<float>(dt));
+        }
+    }
+
+    void Reward::signalReward(float reward) {
+        // TODO PHASE 2: Implement real reward signaling
+        // PLACEHOLDER: Accumulate reward
+        pImpl->currentValue = std::min(1.0f, pImpl->currentValue + reward);
+        pImpl->accumulatedReward += reward;
+        pImpl->history.push_back(reward);
+        if (pImpl->history.size() > 100) {
+            pImpl->history.erase(pImpl->history.begin());
+        }
+    }
