@@ -1,213 +1,267 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# Enhanced NLM CMake Configuration
+# This CMake file provides enhanced build options for the NLM project
+# with improved checkpointing and learning capabilities
 
-# C++20 standard
+cmake_minimum_required(VERSION 3.16)
+project(NLM-Enhanced VERSION 0.1.0 LANGUAGES CXX)
+
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Build configuration options
+option(NLM_BUILD_EXPERIMENTS "Build experiment demos" ON)
+option(NLM_BUILD_CHECKPOINT_DEMO "Build enhanced checkpoint demo" ON)
+option(NLM_BUILD_TESTING "Build test suite" ON)
+option(NLM_ENABLE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_SANITIZERS "Enable memory sanitizers" OFF)
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Project directories
+set(NLM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(NLM_EXPERIMENTS_DIR "${NLM_SRC_DIR}/experiments")
+set(NLM_PERFORMANCE_DIR "${NLM_SRC_DIR}/performance")
+set(NLM_TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/Memory.cpp
-    src/performance/CheckpointSystem.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/motor/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    ${NLM_SRC_DIR}/core/Config/Config.cpp
+    ${NLM_SRC_DIR}/core/Random/Random.cpp
+    ${NLM_SRC_DIR}/core/Logger/Logger.cpp
+    ${NLM_SRC_DIR}/core/SimulationClock/SimulationClock.cpp
+    ${NLM_SRC_DIR}/core/Types/Types.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+# Enhanced checkpoint system
+add_library(nlm_checkpoint Enhanced
+    ${NLM_PERFORMANCE_DIR}/CheckpointSystem.cpp
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Brain implementation
+add_library(nlm_brain STATIC
+    ${NLM_SRC_DIR}/brain/Brain.cpp
+    ${NLM_SRC_DIR}/brain/Brain.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
-)
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
-
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Phase 5 experiments
-add_library(nlm_phase5 STATIC
-    src/experiments/Phase5Experiment.cpp
-)
-target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
-)
-target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
-add_executable(nlm_phase5_demo
-    src/experiments/Phase5Demo.cpp
-)
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
-
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
-)
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
-
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
-add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
-)
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
-
-# Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
-)
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
-
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
-if(NLM_BUILD_PYTHON_BINDINGS)
-    find_package(Python REQUIRED COMPONENTS Interpreter Development)
-    find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
-    set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
-        POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+# Experiment components
+if(NLM_BUILD_EXPERIMENTS)
+    add_library(nlm_experiments STATIC
+        ${NLM_EXPERIMENTS_DIR}/Experiment.cpp
+        ${NLM_EXPERIMENTS_DIR}/ExperimentRunner.cpp
+        ${NLM_EXPERIMENTS_DIR}/Metrics.cpp
+        ${NLM_EXPERIMENTS_DIR}/AblationSystem.cpp
+        ${NLM_EXPERIMENTS_DIR}/ScalingBenchmark.cpp
+    )
+    
+    # Enhanced checkpoint demo
+    if(NLM_BUILD_CHECKPOINT_DEMO)
+        add_executable(nlm_enhanced_checkpoint_demo
+            ${NLM_EXPERIMENTS_DIR}/EnhancedCheckpointDemo.cpp
+        )
+        target_link_libraries(nlm_enhanced_checkpoint_demo
+            nlm_core
+            nlm_checkpoint
+            nlm_brain
+            nlm_experiments
+        )
+        target_compile_definitions(nlm_enhanced_checkpoint_demo PRIVATE "NLM_BUILD_CHECKPOINT_DEMO")
+    endif()
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 3 demo (original)
+add_executable(nlm_phase3_demo
+    ${NLM_EXPERIMENTS_DIR}/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo
+    nlm_core
+    nlm_brain
+)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+# Phase 6 demo (original)
+add_executable(nlm_phase6_demo
+    ${NLM_EXPERIMENTS_DIR}/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo
+    nlm_core
+    nlm_brain
+    nlm_experiments
+)
+
+# Test executables
+if(NLM_BUILD_TESTING)
+    enable_testing()
+    
+    # Core tests
+    add_executable(test_core_utilities
+        ${NLM_TESTS_DIR}/test_types.cpp
+        ${NLM_TESTS_DIR}/test_config.cpp
+        ${NLM_TESTS_DIR}/test_logger.cpp
+    )
+    target_link_libraries(test_core_utilities nlm_core)
+    add_test(NAME core_utilities_test COMMAND test_core_utilities)
+    
+    # Synapse tests
+    add_executable(test_synapse)
+    target_sources(test_synapse PRIVATE
+        ${NLM_TESTS_DIR}/test_synapse.cpp
+    )
+    target_link_libraries(test_synapse nlm_core nlm_brain)
+    add_test(NAME synapse_test COMMAND test_synapse)
+    
+    # Neuron tests
+    add_executable(test_neuron)
+    target_sources(test_neuron PRIVATE
+        ${NLM_TESTS_DIR}/test_neuron.cpp
+    )
+    target_link_libraries(test_neuron nlm_core nlm_brain)
+    add_test(NAME neuron_test COMMAND test_neuron)
+    
+    # Enhanced checkpoint tests
+    add_executable(test_checkpoint_integration
+        ${NLM_TESTS_DIR}/test_checkpoint_integration.cpp
+        ${NLM_TESTS_DIR}/test_checkpoint_performance.cpp
+    )
+    target_link_libraries(test_checkpoint_integration
+        nlm_core
+        nlm_checkpoint
+        nlm_brain
+        nlm_experiments
+    )
+    add_test(NAME checkpoint_integration_test COMMAND test_checkpoint_integration)
+    
+    # Reward system tests
+    add_executable(test_reward_system
+        ${NLM_TESTS_DIR}/test_reward_system.cpp
+    )
+    target_link_libraries(test_reward_system
+        nlm_core
+        nlm_brain
+        nlm_experiments
+    )
+    add_test(NAME reward_system_test COMMAND test_reward_system)
+    
+    # Learning dynamics tests
+    add_executable(test_learning_dynamics
+        ${NLM_TESTS_DIR}/test_learning_dynamics.cpp
+    )
+    target_link_libraries(test_learning_dynamics
+        nlm_core
+        nlm_brain
+        nlm_experiments
+    )
+    add_test(NAME learning_dynamics_test COMMAND test_learning_dynamics)
+endif()
+
+# Installation
+install(TARGETS nlm_core nlm_brain
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+if(NLM_BUILD_EXPERIMENTS)
+    install(TARGETS nlm_phase3_demo nlm_phase6_demo
+        RUNTIME DESTINATION bin
+    )
+endif()
+
+if(NLM_BUILD_CHECKPOINT_DEMO)
+    install(TARGETS nlm_enhanced_checkpoint_demo
+        RUNTIME DESTINATION bin
+    )
+endif()
+
+# Configuration files
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/configs/default.cfg
+    DESTINATION etc/nlm
+)
+
+# Documentation
+install(DIRECTORY docs/
+    DESTINATION share/doc/nlm
+    FILES_MATCHING PATTERN "*.md"
+)
+
+# Print build summary
+function(print_build_summary)
+    message(STATUS "=== NLM Enhanced Build Summary ===")
+    message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+    message(STATUS "Experiments enabled: ${NLM_BUILD_EXPERIMENTS}")
+    message(STATUS "Checkpoint demo enabled: ${NLM_BUILD_CHECKPOINT_DEMO}")
+    message(STATUS "Testing enabled: ${NLM_BUILD_TESTING}")
+    message(STATUS "Profiling enabled: ${NLM_ENABLE_PROFILING}")
+    message(STATUS "Sanitizers enabled: ${NLM_ENABLE_SANITIZERS}")
+    message(STATUS "")
+    message(STATUS "Targets:")
+    if(NLM_BUILD_EXPERIMENTS)
+        message(STATUS "  - nlm_phase3_demo (Phase 3 world interaction)")
+        message(STATUS "  - nlm_phase6_demo (Phase 6 integration test)")
+    endif()
+    if(NLM_BUILD_CHECKPOINT_DEMO)
+        message(STATUS "  - nlm_enhanced_checkpoint_demo (Enhanced checkpoint system)")
+    endif()
+    if(NLM_BUILD_TESTING)
+        message(STATUS "  - test_core_utilities (Core functionality tests)")
+        message(STATUS "  - test_synapse (Synapse functionality tests)")
+        message(STATUS "  - test_neuron (Neuron functionality tests)")
+        message(STATUS "  - test_checkpoint_integration (Checkpoint tests)")
+        message(STATUS "  - test_reward_system (Reward system tests)")
+        message(STATUS "  - test_learning_dynamics (Learning dynamics tests)")
+    endif()
+    message(STATUS "")
+    message(STATUS "=== End Build Summary ===")
+endfunction()
+
+# Call build summary
+print_build_summary()
+
+# Compiler flags
+if(NLM_ENABLE_PROFILING)
+    target_compile_options(nlm_core PRIVATE -O2 -g -march=native -fomit-frame-pointer)
+    target_compile_options(nlm_brain PRIVATE -O2 -g -march=native -fomit-frame-pointer)
+endif()
+
+if(NLM_ENABLE_SANITIZERS)
+    target_compile_options(nlm_core PRIVATE -fsanitize=address,undefined)
+    target_compile_options(nlm_brain PRIVATE -fsanitize=address,undefined)
+    target_link_options(nlm_core PRIVATE -fsanitize=address,undefined)
+    target_link_options(nlm_brain PRIVATE -fsanitize=address,undefined)
+endif()
+
+# Installation prefix
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation prefix" FORCE)
+endif()
+
+# Output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# Clean build option
+if(CMAKE_GENERATOR_IS_MAKEFILE)
+    add_custom_target(clean
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/bin
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/lib
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/test_results
+        COMMENT "Cleaning build artifacts"
+    )
+endif()
+
+# Help target
+add_custom_target(help
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/help.cmake
+    COMMENT "Showing available build targets and options"
+)
+
+# Development convenience targets
+add_custom_target(dev-setup
+    COMMAND ${CMAKE_COMMAND} -E echo "=== Development Setup Complete ==="
+    COMMAND ${CMAKE_COMMAND} -E echo "To build all targets: make -j4"
+    COMMAND ${CMAKE_COMMAND} -E echo "To run all tests: make test"
+    COMMAND ${CMAKE_COMMAND} -E echo "To run enhanced checkpoint demo: ./bin/nlm_enhanced_checkpoint_demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "To run Phase - 3 demo: ./bin/nlm_phase3_demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "To run Phase 6 demo: ./bin/nlm_phase6_demo"
+    COMMENT "Showing development setup information"
 )
