@@ -166,6 +166,48 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Convenience methods for common configuration operations
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a float configuration value")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a float configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a string configuration value")
+        .def("configure", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+            return self;  // Enable method chaining
+        }, py::arg("key"), py::arg("value"),
+           "Configure a setting and return self for chaining")
+        .def("validate", &Config::has, py::arg("key"),
+             "Validate that a configuration key exists")
+        .def("validateRequired", [](const Config& self, const std::vector<std::string>& requiredKeys) {
+            for (const auto& key : requiredKeys) {
+                if (!self.has(key)) {
+                    throw std::runtime_error("Missing required configuration key: " + key);
+                }
+            }
+            return true;
+        }, py::arg("requiredKeys"),
+           "Validate that all required configuration keys are present")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
