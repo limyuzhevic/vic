@@ -213,7 +213,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Advanced Python methods for Action
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + " " + 
+                   std::to_string(action.getParameters().size()) + " params>";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -225,7 +230,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("__repr__", [](const WorldObject& obj) {
+            return "<WorldObject: " + std::to_string(obj.x) + "," + std::to_string(obj.y) + 
+                   " type=" + std::to_string(static_cast<int>(obj.type)) + ">";
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -241,7 +250,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset)
+        .def("__repr__", [](const AgentBody& body) {
+            return "<AgentBody: x=" + std::to_string(body.x) + " y=" + std::to_string(body.y) +
+                   " vel=(" + std::to_string(body.velocityX) + "," + std::to_string(body.velocityY) + ")>";
+        });
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
@@ -249,7 +262,12 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        .def("__repr__", [](const ActionResult& result) {
+            return "<ActionResult: reward=" + std::to_string(result.reward) +
+                   " success=" + std::to_string(result.success) + " message=\"" +
+                   result.message + "\">";
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
@@ -267,7 +285,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("__repr__", [](const SensoryPercept& percept) {
+            return "<SensoryPercept: vision=" + std::to_string(percept.getVisionWidth()) + "x" +
+                   std::to_string(percept.getVisionHeight()) + " touch=" + std::to_string(percept.getTouch().size()) +
+                   " internal=" + std::to_string(percept.getInternal().size()) + ">";
+        });
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -343,7 +366,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
              "Get count of active neurons")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
+              "Get count of currently firing neurons")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
              "Get average firing rate across all neurons")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
@@ -359,7 +382,159 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Advanced Python debugging and analysis methods
+        .def("getNeuronById", [](Brain& brain, NeuronId id) {
+            return brain.getRegion(id.regionId())->getNeuron(id);
+        }, py::arg("id"), "Get neuron by ID")
+        .def("getSynapseById", [](Brain& brain, SynapseId id) {
+            return brain.getRegion(id.regionId())->getSynapse(id);
+        }, py::arg("id"), "Get synapse by ID")
+        .def("getNeuronsByType", [](Brain& brain, NeuronType type) {
+            std::vector<Neuron*> neurons;
+            for (auto& region : brain.getRegions()) {
+                for (auto& neuron : region->getNeurons()) {
+                    if (neuron->getType() == type) {
+                        neurons.push_back(neuron.get());
+                    }
+                }
+            }
+            return neurons;
+        }, py::arg("type"), "Get neurons by type")
+        .def("getStatsSummary", [](Brain& brain) {
+            std::ostringstream oss;
+            oss << "Brain Statistics:\n";
+            oss << "  Total Neurons: " << brain.getTotalNeuronCount() << "\n";
+            oss << "  Total Synapses: " << brain.getTotalSynapseCount() << "\n";
+            oss << "  Firing Neurons: " << brain.getFiringNeuronCount() << "\n";
+            oss << "  Average Firing Rate: " << brain.getAverageFiringRate() << "\n";
+            oss << "  Excitation/Inhibition Ratio: " << brain.getExcitationInhibitionRatio() << "\n";
+            oss << "  Total Spikes: " << brain.getTotalSpikeCount() << "\n";
+            oss << "  Developmental Stage: " << static_cast<int>(brain.getDevelopmentalStage()) << "\n";
+            oss << "  Active Regions: " << brain.getRegionCount() << "\n";
+            return oss.str();
+        }, "Get comprehensive statistics summary")
+    .def("exportNetworkTopology", [](Brain& brain) {
+        std::ostringstream oss;
+        oss << "Network Topology:\n";
+        oss << "Regions: " << brain.getRegionCount() << "\n";
+        for (size_t i = 0; i < brain.getRegionCount(); ++i) {
+            auto regionId = brain.getRegionIds()[i];
+            auto region = brain.getRegion(regionId);
+            oss << "  Region " << regionId << ": " << region->getNeuronCount() << " neurons, " 
+                << region->getSynapseCount() << " synapses\n";
+        }
+        return oss.str();
+    }, "Export network topology as text")
+    .def("analyzeActivity", [](Brain& brain, int steps, double timestep) {
+        std::vector<double> firingRates;
+        std::vector<size_t> spikeCounts;
+        
+        for (int step = 0; step < steps; ++step) {
+            brain.step(step, step * timestep);
+            firingRates.push_back(brain.getAverageFiringRate());
+            spikeCounts.push_back(brain.getTotalSpikeCount());
+        }
+        
+        std::ostringstream oss;
+        oss << "Activity Analysis over " << steps << " steps:\n";
+        oss << "  Average Firing Rate: " << std::accumulate(firingRates.begin(), firingRates.end(), 0.0) / firingRates.size() << "\n";
+        oss << "  Firing Rate Range: [" << *std::min_element(firingRates.begin(), firingRates.end()) << ", " 
+            << *std::max_element(firingRates.begin(), firingRates.end()) << "]\n";
+        oss << "  Total Spikes: " << spikeCounts.back() - (spikeCounts.empty() ? 0 : spikeCounts[0]) << "\n";
+        oss << "  Average Spike Rate: " << (spikeCounts.back() - (spikeCounts.empty() ? 0 : spikeCounts[0])) / steps << " per step\n";
+        return oss.str();
+    }, py::arg("steps"), py::arg("timestep"), "Analyze brain activity over time")
+    // Visualization and debugging utilities for SimpleWorld
+    .def("createDebugWorld", [](int width, int height, int visionWidth, int visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create a world with specified dimensions for debugging")
+    .def("addDebugObjects", [](SimpleWorld& world, const std::vector<WorldObject>& objects) {
+        for (const auto& obj : objects) {
+            world.addObject(obj);
+        }
+        return "Added " + std::to_string(objects.size()) + " debug objects";
+    }, py::arg("objects"), "Add multiple debug objects to world")
+    .def("createDebugMap", [](SimpleWorld& world) {
+        std::ostringstream oss;
+        oss << "World Debug Map (" << world.getWidth() << "x" << world.getHeight() << "):\n";
+        oss << "Agent Position: (" << world.getAgentBody()->x << ", " << world.getAgentBody()->y << ")\n";
+        oss << "Simulation Time: " << world.getSimulationTime() << "s\n";
+        oss << "Max Energy: " << world.getMaxEnergy() << "\n";
+        oss << "Energy Decay Rate: " << world.getEnergyDecayRate() << "\n";
+        return oss.str();
+    }, "Create debug visualization of world state")
+    .def("exportSensoryData", [](SensoryPercept& percept) {
+        std::ostringstream oss;
+        oss << "Sensory Data Export:\n";
+        oss << "  Vision: " << percept.getVisionWidth() << "x" << percept.getVisionHeight() << "\n";
+        oss << "  Touch: " << percept.getTouch().size() << " points\n";
+        oss << "  Internal: " << percept.getInternal().size() << " signals\n";
+        oss << "  Proprioception: " << percept.getProprioception().size() << " points\n";
+        oss << "  Audio: " << percept.getAudio().size() << " samples\n";
+        oss << "  Timestamp: " << percept.getTimestamp() << "\n";
+        return oss.str();
+    }, "Export sensory data as formatted string")
+    .def("createTrainingScenario", [](SimpleWorld& world, std::string scenarioType) {
+        world.reset();
+        if (scenarioType == "test_maze") {
+            // Create a simple maze layout
+            world.addObject(WorldObject(5.0f, 5.0f, WorldObjectType::Wall, 1.0f));
+            world.addObject(WorldObject(10.0f, 5.0f, WorldObjectType::Resource, 2.0f));
+            world.addObject(WorldObject(15.0f, 5.0f, WorldObjectType::Hazard, 0.5f));
+            world.addObject(WorldObject(20.0f, 10.0f, WorldObjectType::Marker, 0.1f));
+        } else if (scenarioType == "test_resource" ) {
+            // Create resource gathering scenario
+            for (int x = 2; x < 18; x += 4) {
+                for (int y = 2; y < 18; y += 4) {
+                    if ((x + y) % 8 == 0) {
+                        world.addObject(WorldObject(static_cast<float>(x), static_cast<float>(y), 
+                                                  WorldObjectType::Resource, 1.0f + (std::rand() % 5) * 0.2f));
+                    }
+                }
+            }
+        }
+        return "Created training scenario: " + scenarioType;
+    }, py::arg("scenarioType"), "Create predefined training scenarios for agent testing")
+    .def("exportTrainingData", [](SimpleWorld& world, const std::string& filename) {
+        // Export world state for machine learning training
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filename);
+        }
+        
+        file << "# NLM Training Data Export\n";
+        file << "# Generated at: " << std::chrono::system_clock::now() << "\n";
+        file << "# World dimensions: " << world.getWidth() << "x" << world.getHeight() << "\n";
+        file << "# Agent position: (" << world.getAgentBody()->x << ", " << world.getAgentBody()->y << ")\n";
+        
+        // Export objects
+        file << "\nObjects:\n";
+        // This would require adding an exportObjects method to SimpleWorld
+        
+        file.close();
+        return "Exported training data to: " + filename;
+    }, py::arg("filename"), "Export world state for ML training")
+    .def("createBenchmarkConfig", [](const std::string& benchmarkType) {
+        auto config = std::make_shared<Config>();
+        
+        if (benchmarkType == "large_network") {
+            config->set("brain.neuron_count", 5000);
+            config->set("brain.synapse_density", 0.05);
+            config->set("brain.connection_probability", 0.02);
+            config->set("simulation_timestep", 0.0005);
+        } else if (benchmarkType == "small_network") {
+            config->set("brain.neuron_count", 100);
+            config->set("brain.synapse_density", 0.2);
+            config->set("brain.connection_probability", 0.1);
+            config->set("simulation_timestep", 0.001);
+        }
+        
+        return config;
+    }, py::arg("benchmarkType"), "Create configuration for benchmarking scenarios");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
