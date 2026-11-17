@@ -438,6 +438,23 @@ void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salience
     }
 }
 
+// Get attention weight for integration with higher cognitive systems
+const std::unordered_map<uint64_t, float>& getAttentionWeight() const {
+    return neuronSalience_;
+}
+
+// Process contextual attention from episodic memory
+void processContextualAttention(const std::vector<NeuronId>& contextNeurons) {
+    for (const auto& neuronId : contextNeurons) {
+        // Boost salience based on contextual importance
+        auto it = neuronSalience_.find(neuronId.value);
+        if (it != neuronSalience_.end()) {
+            // Contextual neurons get enhanced salience
+            it->second += 0.3f;
+        }
+    }
+}
+
 void AttentionalSelection::reset() {
     winners_.clear();
     attendedRegions_.clear();
