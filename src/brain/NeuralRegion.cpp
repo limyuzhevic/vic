@@ -243,59 +243,125 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     // Creates synapses based on neuron types:
     // - Excitatory neurons -> all neurons (excitatory synapses)
     // - Inhibitory neurons -> all neurons (inhibitory synapses)
+    //
+    // Optimization: Pre-compute neuron lists by type to avoid O(N²) scan
+    // and enable faster synaptic delivery
     
     // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
-    for (size_t i = 0; i < neuronCount; ++i) {
-        Neuron* preNeuron = neurons[i];
+    // Pre-compute neurons by type for efficient connectivity
+    std::vector<Neuron*> excitatoryNeurons;
+    std::vector<Neuron*> inhibitoryNeurons;
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+    std::vector<Neuron*> internalNeurons;
+    std::vector<Neuron*> modulatoryNeurons;
+    
+    for (Neuron* neuron : neurons) {
+        NeuronType type = neuron->getType();
+        if (type == NeuronType::Excitatory) {
+            excitatoryNeurons.push_back(neuron);
+        } else if (type == NeuronType::Inhibitory) {
+            inhibitoryNeurons.push_back(neuron);
+        } else if (type == NeuronType::Sensory) {
+            sensoryNeurons.push_back(neuron);
+        } else if (type == NeuronType::Motor) {
+            motorNeurons.push_back(neuron);
+        } else if (type == NeuronType::Internal) {
+            internalNeurons.push_back(neuron);
+        } else if (type == NeuronType::Modulatory) {
+            modulatoryNeurons.push_back(neuron);
+        }
+    }
+    
+    // Vector of all target neurons (everything except the source)
+    auto getAllTargets = [&]() {
+        std::vector<Neuron*> targets;
+        targets.reserve(excitatoryNeurons.size() + inhibitoryNeurons.size() +
+                       sensoryNeurons.size() + motorNeurons.size() + internalNeurons.size());
+        targets.insert(targets.end(), excitatoryNeurons.begin(), excitatoryNeurons.end());
+        targets.insert(targets.end(), inhibitoryNeurons.begin(), inhibitoryNeurons.end());
+        targets.insert(targets.end(), sensoryNeurons.begin(), sensoryNeurons.end());
+        targets.insert(targets.end(), motorNeurons.begin(), motorNeurons.end());
+        targets.insert(targets.end(), internalNeurons.begin(), internalNeurons.end());
+        return targets;
+    };
+    
+    // Create random connections using pre-computed type lists
+    size_t preCount = excitatoryNeurons.size() + inhibitoryNeurons.size() +
+                     sensoryNeurons.size() + motorNeurons.size() + internalNeurons.size();
+    
+    // Connect excitatory neurons
+    for (size_t i = 0; i < preCount; ++i) {
+        // Alternate through pre neurons
+        Neuron* preNeuron;
+        if (i < excitatoryNeurons.size()) {
+            preNeuron = excitatoryNeurons[i];
+        } else if (i < excitatoryNeurons.size() + inhibitoryNeurons.size()) {
+            preNeuron = inhibitoryNeurons[i - excitatoryNeurons.size()];
+        } else if (i < excitatoryNeurons.size() + inhibitoryNeurons.size() + sensoryNeurons.size()) {
+            preNeuron = sensoryNeurons[i - (excitatoryNeurons.size() + inhibitoryNeurons.size())];
+        } else if (i < excitatoryNeurons.size() + inhibitoryNeurons.size() + sensoryNeurons.size() + motorNeurons.size()) {
+            preNeuron = motorNeurons[i - (excitatoryNeurons.size() + inhibitoryNeurons.size() + sensoryNeurons.size())];
+        } else {
+            preNeuron = internalNeurons[i - (excitatoryNeurons.size() + inhibitoryNeurons.size() + sensoryNeurons.size() + motorNeurons.size())];
+        }
+        
         NeuronType preType = preNeuron->getType();
         
         // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
-            
-            Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
-            
-            // Determine synapse type based on pre-synaptic neuron type
-            SynapseType synType;
-            float weight;
-            
-            if (preType == NeuronType::Excitatory || 
-                preType == NeuronType::Sensory ||
-                preType == NeuronType::Motor ||
-                preType == NeuronType::Internal) {
-                // excitatory synapse
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
-                weight = std::max(0.01f, weight);  // Ensure positive
-            } else if (preType == NeuronType::Inhibitory) {
-                // inhibitory synapse
-                synType = SynapseType::Inhibitory;
-                weight = -(meanWeight + rng.normal(0.0f, weightVariance));
-                weight = std::min(-0.01f, weight);  // Ensure negative
-            } else {
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
+        // Get all potential targets (all neurons except self)
+        auto targets = getAllTargets();
+        
+        // Probabilistic connection - shuffle targets for randomness
+        for (size_t j = targets.size(); j > 0; --j) {
+            size_t k = rng.uniformInt(0, j - 1);
+            if (j <= 1 || rng.bernoulli(connectionProbability)) {
+                Neuron* postNeuron = targets[k];
+                
+                if (postNeuron == preNeuron) continue;  // No self-connections
+                
+                // Determine synapse type based on pre-synaptic neuron type
+                SynapseType synType;
+                float weight;
+                
+                if (preType == NeuronType::Excitatory || 
+                    preType == NeuronType::Sensory ||
+                    preType == NeuronType::Motor ||
+                    preType == NeuronType::Internal) {
+                    // excitatory synapse
+                    synType = SynapseType::Excitatory;
+                    weight = meanWeight + rng.normal(0.0f, weightVariance);
+                    weight = std::max(0.01f, weight);  // Ensure positive
+                } else if (preType == NeuronType::Inhibitory) {
+                    // inhibitory synapse
+                    synType = SynapseType::Inhibitory;
+                    weight = -(meanWeight + rng.normal(0.0f, weightVariance));
+                    weight = std::min(-0.01f, weight);  // Ensure negative
+                } else {
+                    synType = SynapseType::Excitatory;
+                    weight = meanWeight + rng.normal(0.0f, weightVariance);
+                }
+                
+                // Add synapse
+                SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+                
+                // Initialize random properties
+                if (Synapse* syn = getSynapse(synId)) {
+                    syn->setType(synType);
+                    syn->initializeRandom(rng);
+                    // A synapse that never updates its weight cannot learn.
+                    // Plasticity flags default to false, so enable them here.
+                    syn->enablePlasticity(true, true, false);
+                }
             }
-            
-            // Add synapse
-            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
-            
-            // Initialize random properties
-            if (Synapse* syn = getSynapse(synId)) {
-                syn->setType(synType);
-                syn->initializeRandom(rng);
-                // A synapse that never updates its weight cannot learn.
-                // Plasticity flags default to false, so enable them here.
-                syn->enablePlasticity(true, true, false);
+            // Swap with last element for shuffle
+            if (k != j - 1) {
+                std::swap(targets[k], targets[j - 1]);
             }
         }
     }

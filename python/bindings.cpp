@@ -142,33 +142,240 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    // Custom Python exceptions for better error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+    
+    // Convenience function to create a research-ready brain
+    m.def("createResearchBrain", [](const std::string& configName) {
+        auto config = std::make_shared<Config>();
+        
+        // Apply research-specific configuration based on configName
+        if (configName == "small") {
+            config->set("neuron_count", 100);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.15f);
+            config->set("simulation_timestep", 0.01);
+        } else if (configName == "medium") {
+            config->set("neuron_count", 1000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.1f);
+            config->set("simulation_timestep", 0.001);
+        } else if (configName == "large") {
+            config->set("neuron_count", 10000);
+            config->set("region_count", 8);
+            config->set("connection_probability", 0.05f);
+            config->set("simulation_timestep", 0.001);
+        } else {
+            // Default research configuration
+            config->set("neuron_count", 1000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.1f);
+            config->set("simulation_timestep", 0.001);
+        }
+        
+        return brain = std::make_shared<Brain>(config);
+    }, py::arg("configName"), R"pbdoc(
+        Create a research-ready brain with sensible defaults.
+        
+        Args:
+            configName: One of "small", "medium", "large" for pre-configured research setups
+        
+        Returns:
+            A configured Brain instance ready for research
+        )pbdoc");
+    
+    m.def("createResearchBrain", []() {
+        return createResearchBrain("medium");
+    }, R"pbdoc(
+        Create a medium-sized research brain with sensible defaults.
+        
+        Returns:
+            A configured Brain instance ready for research
+        )pbdoc");
+    
+    // Convenience function for running complete research experiments
+    m.def("runResearchExperiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, size_t numSteps,
+                                     bool enableLearning, bool enableCuriosity) {
+        
+        if (!brain || !world || !agent) {
+            throw std::invalid_argument("All brain, world, and agent must be provided");
+        }
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+        }
+        
+        if (enableCuriosity) {
+            agent->enableCuriosity(true);
+        }
+        
+        // Record initial statistics
+        auto initialSpikes = brain->getTotalSpikeCount();
+        auto initialNeurons = brain->getTotalNeuronCount();
+        
+        // Run experiment
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(brain->getTimestep());
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation if learning is enabled
+            if (enableLearning) {
+                float reward = 0.0f;
+                // Extract reward from world state (simplified)
+                if (auto internalSignals = percept.getInternal(); !internalSignals.empty()) {
+                    reward = internalSignals[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            // Update development
+            agent->updateDevelopment(brain->getTimestep());
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) +
+                           ": " + std::to_string(brain->getFiringNeuronCount()) + " neurons firing");
+            }
+        }
+        
+        // Calculate experiment statistics
+        auto finalSpikes = brain->getTotalSpikeCount();
+        auto spikeCount = finalSpikes - initialSpikes;
+        auto stepsPerSpike = numSteps / (spikeCount > 0 ? spikeCount : 1);
+        
+        return std::make_map<std::string, py::object>(
+            {
+                {"initial_neurons", py::cast(initialNeurons)},
+                {"final_neurons", py::cast(brain->getTotalNeuronCount())},
+                {"total_spikes", py::cast(finalSpikes)},
+                {"new_spikes", py::cast(spikeCount)},
+                {"steps_per_spike", py::cast(stepsPerSpike)},
+                {"learning_enabled", py::cast(enableLearning)},
+                {"curiosity_enabled", py::cast(enableCuriosity)},
+                {"final_development_stage", py::cast(brain->getDevelopmentalStage())}
+            }
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), 
+             py::arg("enableLearning") = true, py::arg("enableCuriosity") = true,
+             R"pbdoc(
+        Run a complete research experiment with a brain, world, and agent.
+        
+        Args:
+            brain: The brain instance
+            world: The world instance  
+            agent: The agent interface
+            numSteps: Number of simulation steps to run
+            enableLearning: Whether to enable reward modulation and structural plasticity
+            enableCuriosity: Whether to enable curiosity-driven exploration
+        
+        Returns:
+            A dictionary with experiment statistics and results
+        )pbdoc");
+    
+    // Helper function to create standard research environments
+    m.def("createStandardEnvironment", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);  // 20x20 world with 8x8 vision
+        world->reset();
+        return world;
+    }, R"pbdoc(
+        Create a standard research environment (20x20 world with 8x8 vision).
+        
+        Returns:
+            A configured SimpleWorld instance
+        )pbdoc");
+    
+    // Function to export results for analysis
+    m.def("exportExperimentResults", [](const std::map<std::string, py::object>& results, 
+                                       const std::string& filename) {
+        // Simplified CSV export (in real implementation would be more robust)
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filename);
+        }
+        
+        file << "metric,value\n";
+        for (const auto& [key, value] : results) {
+            if (value.is(py::bool_())) {
+                file << key << "," << (value.cast<bool>() ? "true" : "false") << "\n";
+            } else if (value.is(py::int_())) {
+                file << key "," << value.cast<int64_t>() << "\n";
+            } else if (value.is(py::float_())) {
+                file << key "," << value.cast<double>() << "\n";
+            } else if (value.is(py::str())) {
+                file << key << "," << value.cast<std::string>() << "\n";
+            }
+        }
+        
+        file.close();
+        return true;
+    }, py::arg("results"), py::arg("filename"), R"pbdoc(
+        Export experiment results to a CSV file for analysis.
+        
+        Args:
+            results: Dictionary of results from runResearchExperiment
+            filename: Output CSV filename
+        
+        Returns:
+            True if export successful, throws exception on error
+        )pbdoc");
+    
+    // Add helpful attributes to the module
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__description__") = "Python bindings for the Neural Learning Machine (NLM) brain simulation framework";
+    
+    // Add research configuration presets
+    m.def("getResearchPresets", []() {
+        py::dict presets;
+        
+        // Small network for rapid prototyping
+        py::dict smallPreset;
+        smallPreset["name"] = "Small (100 neurons)";
+        smallPreset["neuron_count"] = 100;
+        smallPreset["region_count"] = 2;
+        smallPreset["connection_probability"] = 0.15;
+        smallPreset["simulation_timestep"] = 0.01;
+        presets["small"] = smallPreset;
+        
+        // Medium network for exploratory research
+        py::dict mediumPreset;
+        mediumPreset["name"] = "Medium (1000 neurons)";
+        mediumPreset["neuron_count"] = 1000;
+        mediumPreset["region_count"] = 4;
+        mediumPreset["connection_probability"] = 0.1;
+        mediumPreset["simulation_timestep"] = 0.001;
+        presets["medium"] = mediumPreset;
+        
+        // Large network for comprehensive studies
+        py::dict largePreset;
+        largePreset["name"] = "Large (10000 neurons)";
+        largePreset["neuron_count"] = 10000;
+        largePreset["region_count"] = 8;
+        largePreset["connection_probability"] = 0.05;
+        largePreset["simulation_timestep"] = 0.001;
+        presets["large"] = largePreset;
+        
+        return presets;
+    }, R"pbdoc(
+        Get research configuration presets for common use cases.
+        
+        Returns:
+            Dictionary of preset configurations
+        )pbdoc");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
