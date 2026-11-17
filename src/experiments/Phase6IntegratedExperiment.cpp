@@ -58,27 +58,27 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+        // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        world.update(0.001);
+        // Get observation - advance by action interval (0.1) to ensure rewards are registered
+        world.update(0.1);
         SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
-        // Brain step
-        brain->step(step, step * 0.001);
+        // Brain step - use the actual world time that has elapsed
+        brain->step(step, world.getSimulationTime());
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
+        // Apply action to world - use current simulation time
+        ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
         
         // Compute reward
         float reward = actionResult.reward;
@@ -87,9 +87,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
+        // Update development - use action interval (0.1 s) to match world updates
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            agent.updateDevelopment(0.1);
         }
         
         // Collect metrics

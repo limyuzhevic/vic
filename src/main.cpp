@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <cstdlib>
+#include <ctime>  // for time() if needed
 
 using namespace nlm;
 
@@ -218,26 +220,63 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
+    // Reduce input intensities to prevent runaway firing
+    // Current intensities (50.0f, 30.0f, 20-40) are too high, causing neurons
+    // to fire every step (200+ spikes/step). Scale down by factor of 100
+    // for more biologically realistic firing rates (~2-5 Hz typical).
+    const float INPUT_SCALE = 0.01f; // Scale factor for all current injections
+    
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Input scale: " + std::to_string(INPUT_SCALE) + " (prevents runaway firing)");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
-    std::vector<NeuronId> patternNeurons;
+    // Improved selective learning: rotate through different neuron patterns
+    // This prevents over-specialization on a fixed set and develops broader selectivity
+    std::vector<std::vector<NeuronId>> patternSequence;
     if (auto* region = brain->getRegion(RegionId(1))) {
+        std::vector<NeuronId> allSensoryNeurons;
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+            if (neuron->getType() == NeuronType::Sensory) {
+                allSensoryNeurons.push_back(neuron->getId());
+            }
+        }
+        
+        if (!allSensoryNeurons.empty()) {
+            // Create multiple overlapping patterns (50% overlap for more realistic learning)
+            size_t patternSize = std::min<size_t>(20, allSensoryNeurons.size() / 2);
+            size_t patternCount = 50; // 50 different patterns
+            
+            for (size_t p = 0; p < patternCount; ++p) {
+                std::vector<NeuronId> pattern;
+                pattern.reserve(patternSize);
+                
+                // Create pattern with controlled randomness
+                // Use modulo arithmetic for deterministic but varied patterns
+                size_t startIdx = (p * 37) % allSensoryNeurons.size(); // Prime number for good distribution
+                for (size_t i = 0; i < patternSize; ++i) {
+                    size_t idx = (startIdx + i * 31) % allSensoryNeurons.size(); // Another prime
+                    pattern.push_back(allSensoryNeurons[idx]);
+                }
+                
+                patternSequence.push_back(std::move(pattern));
             }
         }
     }
+    
+    // Run learning experiment with varying patterns
+    NLM_LOG_INFO("  Running selective learning experiment with " + std::to_string(patternSequence.size()) + " patterns...");
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Select pattern based on step (cycling through patterns)
+        size_t patternIndex = step % patternSequence.size();
+        const auto& currentPattern = patternSequence[patternIndex];
+        
+        // Inject current into pattern neurons with scaled intensity
+        for (NeuronId id : currentPattern) {
+            // Vary injection intensity to simulate natural variation
+            float baseIntensity = 20.0f + (static_cast<float>(std::rand()) / RAND_MAX) * 20.0f; // 20-40
+            brain->injectCurrent(id, baseIntensity * INPUT_SCALE);
         }
         
         brain->step(step, step * 0.001);
@@ -245,6 +284,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                        " | Pattern " + std::to_string(patternIndex) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }

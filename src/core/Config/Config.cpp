@@ -18,7 +18,28 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, parseValue(key, value), ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, parseValue(key, value), ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -55,30 +76,49 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+    // Parse string value to appropriate type based on key
+ConfigValue Config::parseValue(const std::string& key, const std::string& valueStr) {
+    // Try to parse as int64 (most common numeric type)
+    if (key == "random_seed" || key == "neuron_count" || key == "region_count" || 
+        key == "connection_probability" || key == "stdp_ltp_weight" || 
+        key == "stdp_ltd_weight" || key == "stdp_tau" || 
+        key == "synaptogenesis_rate" || key == "pruning_rate") {
+        try {
+            size_t pos;
+            int64_t intVal = std::stoll(valueStr, &pos);
+            if (pos == valueStr.size()) {
+                return int64_t(intVal);
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        } catch (...) {
+            // Fall through to other parsers
         }
     }
-    return true;
+    
+    if (key == "simulation_timestep") {
+        try {
+            size_t pos;
+            double doubleVal = std::stod(valueStr, &pos);
+            if (pos == valueStr.size()) {
+                return doubleVal;
+            }
+        } catch (...) {
+            // Fall through
+        }
+    }
+    
+    if (key == "enable_checkpointing" || key == "enable_replay" || key == "enable_development") {
+        std::string lower = valueStr;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower == "true" || lower == "1" || lower == "yes" || lower == "on") {
+            return true;
+        } else if (lower == "false" || lower == "0" || lower == "no" || lower == "off") {
+            return false;
+        }
+    }
+    
+    // Default: return as string
+    return valueStr;
 }
-
-bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;

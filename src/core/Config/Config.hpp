@@ -95,6 +95,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // Parse string value to appropriate type based on key
+    ConfigValue parseValue(const std::string& key, const std::string& valueStr);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
