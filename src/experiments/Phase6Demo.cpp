@@ -15,6 +15,33 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
+    // Parse command line arguments for flexible testing
+    size_t customNeuronCount = 500;
+    size_t customMaxSteps = 2000;
+    bool runQuickTests = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--quick") {
+            runQuickTests = true;
+            customNeuronCount = 100;
+            customMaxSteps = 500;
+            std::cout << "[INFO] Running quick tests (small scale)" << std::endl;
+        } else if (arg.find("--neurons=") == 0) {
+            customNeuronCount = std::stoul(arg.substr(10));
+        } else if (arg.find("--steps=") == 0) {
+            customMaxSteps = std::stoul(arg.substr(8));
+        } else if (arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  --quick          Run quick tests with smaller settings" << std::endl;
+            std::cout << "  --neurons=N      Set neuron count (default: 500)" << std::endl;
+            std::cout << "  --steps=N        Set max steps (default: 2000)" << std::endl;
+            std::cout << "  --help           Show this help message" << std::endl;
+            return 0;
+        }
+    }
+    
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
     
@@ -51,16 +78,13 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
+    // Create Phase6Config object with custom parameters
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = customNeuronCount;
+    config.maxSteps = customMaxSteps;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
-    
-    auto result = experiment.run(config);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

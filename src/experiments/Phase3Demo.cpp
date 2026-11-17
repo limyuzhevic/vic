@@ -64,7 +64,7 @@ public:
         
         // Run episodes
         for (int episode = 0; episode < numEpisodes; ++episode) {
-            std::cout << "--- Episode " << episode << " started ---\n";
+            std::cout << "Episode " << episode << " | ";
             
             // Reset world
             world.reset();
@@ -233,21 +233,7 @@ public:
                       << ", emptyInteracts=" << emptyInteracts
                       << ", oscillations=" << oscillations
                       << ", finalNovelty=" << metrics.finalNovelty
-                      << ", finalCuriosity=" << metrics.finalCuriosity
-                      << ", tooSoon=" << tooSoonCount
-                      << ", executed=" << (stepsPerEpisode - tooSoonCount)
-                      << ", reflexBonus=" << agentBrain.getReflexBonusCount()
-                      << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
-                      << ", wtaPulses=" << agentBrain.getWtaPulseCount()
-                      << ", plannerOverride=" << agentBrain.getPlannerOverrideCount()
-                      << ", plannerAgree=" << agentBrain.getPlannerAgreementCount()
-                      << "/" << agentBrain.getPlannerDecisionCount()
-                      << ", conceptBias=" << agentBrain.getConceptBiasCount()
-                      << ", selfBias=" << agentBrain.getSelfBiasCount()
-                      << ", socialBias=" << agentBrain.getSocialBiasCount()
-                      << ", concepts=" << agentBrain.getConceptCount()
-                      << ", selfConf=" << agentBrain.getSelfModelConfidence()
-                      << ", wmTraces=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0)
+                      << ", finalCurios: " << metrics.finalCuriosity
                       << "\n\n";
         }
         
@@ -345,11 +331,13 @@ int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    if (numEpisodes <= 0) {
+        std::cerr << "Error: numEpisodes must be positive. Using default: 5" << std::endl;
+        numEpisodes = 5;
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    if (stepsPerEpisode <= 0) {
+        std::cerr << "Error: stepsPerEpisode must be positive. Using default: 200" << std::endl;
+        stepsPerEpisode = 200;
     }
     
     nlm::Phase3Demo demo;
