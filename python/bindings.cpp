@@ -187,7 +187,18 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getData", &Vision::getData)
+        .def("getDimensions", &Vision::getDimensions)
+        .def("setTimestamp", &Vision::setTimestamp, py::arg("timestamp"))
+        .def("clone", &Vision::clone)
+        .def("getType", &Vision::getType)
+        .def("__repr__", [](const Vision& vision) {
+            std::stringstream ss;
+            ss << "<Vision: " << vision.getWidth() << "x" << vision.getHeight()
+               << " channels=" << vision.getChannels() << ", size=" << vision.getDimensions() << ">";
+            return ss.str();
+        });
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +208,34 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getData", &Audio::getData)
+        .def("getDimensions", &Audio::getDimensions)
+        .def("getType", &Audio::getType)
+        .def("clone", &Audio::clone)
+        .def("setTimestamp", &Audio::setTimestamp, py::arg("timestamp"))
+        .def("__repr__", [](const Audio& audio) {
+            std::stringstream ss;
+            ss << "<Audio: sampleRate=" << audio.getSampleRate()
+               << ", numSamples=" << audio.getNumSamples()
+               << ", dataSize=" << audio.getData().size() << ">";
+            return ss.str();
+        });
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("getData", &InternalSignals::getData)
+        .def("getDimensions", &InternalSignals::getDimensions)
+        .def("getType", &InternalSignals::getType)
+        .def("clone", &InternalSignals::clone)
+        .def("setTimestamp", &InternalSignals::setTimestamp, py::arg("timestamp"))
+        .def("__repr__", [](const InternalSignals& signals) {
+            std::stringstream ss;
+            ss << "<InternalSignals: signals=" << signals.getData().size() << ", timestamp=" << signals.getTimestamp() << ">";
+            return ss.str();
+        });
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -213,7 +246,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            std::stringstream ss;
+            ss << "<Action: type=" << static_cast<int>(action.getType())
+               << ", parameters=" << action.getParameters().size() << ">";
+            return ss.str();
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -225,7 +264,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("__repr__", [](const WorldObject& obj) {
+            std::stringstream ss;
+            ss << "<WorldObject: type=" << static_cast<int>(obj.type)
+               << ", x=" << obj.x << ", y=" << obj.y
+               << ", radius=" << obj.radius
+               << ", value=" << obj.value << ", active=" << (obj.active ? "true" : "false") << ">";
+            return ss.str();
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -241,7 +288,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset)
+        .def("__repr__", [](const AgentBody& body) {
+            std::stringstream ss;
+            ss << "<AgentBody: pos=(" << body.x << ", " << body.y << ") "
+               << "orient=" << body.orientation << ", "
+               << "energy=" << body.energy << ", health=" << body.health
+               << ", age=" << body.age << ", moving=" << (body.isMoving ? "true" : "false")
+               << ", turning=" << (body.isTurning ? "true" : "false") << ">";
+            return ss.str();
+        });
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
@@ -249,25 +305,57 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        .def("__repr__", [](const ActionResult& result) {
+            std::stringstream ss;
+            ss << "<ActionResult: reward=" << result.reward
+               << ", success=" << (result.success ? "true" : "false")
+               << ", message=\"" << result.message << "\">";
+            return ss.str();
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
+        // Vision
         .def("getVision", &SensoryPercept::getVision)
         .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
         .def("getVisionWidth", &SensoryPercept::getVisionWidth)
         .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def_property("vision", &SensoryPercept::getVision, &SensoryPercept::setVision)
+        // Touch
         .def("getTouch", &SensoryPercept::getTouch)
         .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def_property("touch", &SensoryPercept::getTouch, &SensoryPercept::setTouch)
+        // Internal
         .def("getInternal", &SensoryPercept::getInternal)
         .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def_property("internal", &SensoryPercept::getInternal, &SensoryPercept::setInternal)
+        // Proprioception
         .def("getProprioception", &SensoryPercept::getProprioception)
         .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def_property("proprioception", &SensoryPercept::getProprioception, &SensoryPercept::setProprioception)
+        // Audio
         .def("getAudio", &SensoryPercept::getAudio)
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def_property("audio", &SensoryPercept::getAudio, &SensoryPercept::setAudio)
+        // Text
+        .def("getText", &SensoryPercept::getText)
+        .def("setText", &SensoryPercept::setText, py::arg("text"))
+        .def_property("text", &SensoryPercept::getText, &SensoryPercept::setText)
+        // All signals
         .def("getAllSignals", &SensoryPercept::getAllSignals)
+        // Timestamp
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("__repr__", [](const SensoryPercept& percept) {
+            std::stringstream ss;
+            ss << "<SensoryPercept: vision=" << percept.getVisionWidth() << "x" << percept.getVisionHeight()
+               << ", touch=" << percept.getTouch().size() << ", internal=" << percept.getInternal().size()
+               << ", proprioception=" << percept.getProprioception().size()
+               << ", audio=" << percept.getAudio().size()
+               << ", text=\"" << percept.getText() << "\">";
+            return ss.str();
+        });
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
