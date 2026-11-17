@@ -168,6 +168,9 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (pImpl->loggers.empty()) {
+        return false;
+    }
     for (auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;

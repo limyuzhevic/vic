@@ -18,41 +18,594 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+bool Config::parseJSONFile(const std::string& filepath) {
+    // Simple JSON parser implementation
+    // This is a basic implementation that handles:
+    // - Key-value objects
+    // - Strings (quoted)
+    // - Numbers (integers and floats)
+    // - Booleans (true/false)
+    // - Arrays of numbers, strings, booleans
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Simple state machine parser
+    size_t pos = 0;
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size() || content[pos] != '{') {
+        return false;  // Not a JSON object
+    }
+    
+    pos++;  // Skip '{'
+    
+    while (pos < content.size()) {
+        skipWhitespace(content, pos);
+        
+        if (content[pos] == '}') {
+            pos++;  // Skip '}'
+            break;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Parse key
+        std::string key = parseString(content, pos);
+        if (key.empty()) {
+            break;  // Error
+        }
+        
+        skipWhitespace(content, pos);
+        if (pos >= content.size() || content[pos] != ':') {
+            break;  // Expected ':'
+        }
+        
+        pos++;  // Skip ':'
+        skipWhitespace(content, pos);
+        
+        // Parse value
+        ConfigValue value = parseJSONValue(content, pos);
+        if (value.index() == -1) {
+            break;  // Error parsing value
+        }
+        
+        set(key, value, ConfigSource::File);
+        
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;  // Skip ','
+        } else if (pos < content.size() && content[pos] == '}') {
+            pos++;  // Skip '}'
+            break;
         }
     }
     
     return true;
+}
+
+std::string Config::parseString(const std::string& content, size_t& pos) {
+    std::string result;
+    
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size() || content[pos] != '\"') {
+        return "";  // Not a string
+    }
+    
+    pos++;  // Skip opening quote
+    
+    while (pos < content.size()) {
+        if (content[pos] == '\"') {
+            pos++;  // Skip closing quote
+            return result;
+        } else if (content[pos] == '\\' && pos + 1 < content.size()) {
+            // Handle escape sequences
+            pos += 2;  // Skip escape character and escaped char
+        } else {
+            result += content[pos];
+            pos++;
+        }
+    }
+    
+    return "";  // Unterminated string
+}
+
+ConfigValue Config::parseJSONValue(const std::string& content, size_t& pos) {
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) {
+        return ConfigValue();  // Empty
+    }
+    
+    char ch = content[pos];
+    
+    if (ch == '\"') {
+        // String
+        std::string value = parseString(content, pos);
+        return value;
+    } else if (ch == 't' || ch == 'f') {
+        // Boolean
+        if (content.substr(pos, 4) == "true") {
+            pos += 4;
+            return true;
+        } else if (content.substr(pos, 5) == "false") {
+            pos += 5;
+            return false;
+        }
+    } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
+        // Number
+        return parseNumber(content, pos);
+    } else if (ch == '[') {
+        // Array
+        return parseJSONArray(content, pos);
+    }
+    
+    return ConfigValue();  // Unknown type
+}
+
+ConfigValue Config::parseNumber(const std::string& content, size_t& pos) {
+    size_t start = pos;
+    bool decimal = false;
+    
+    if (content[pos] == '-') {
+        pos++;
+    }
+    
+    while (pos < content.size()) {
+        char ch = content[pos];
+        if (ch >= '0' && ch <= '9') {
+            pos++;
+        } else if (ch == '.' && !decimal) {
+            decimal = true;
+            pos++;
+        } else {
+            break;
+        }
+    }
+    
+    std::string numStr = content.substr(start, pos - start);
+    
+    // Try to parse as integer first
+    try {
+        size_t endPos;
+        int64_t intVal = std::stoll(numStr, &endPos);
+        if (endPos == numStr.size()) {
+            return intVal;
+        }
+    } catch (...) {}
+    
+    try {
+        size_t endPos;
+        double doubleVal = std::stod(numStr, &endPos);
+        if (endPos == numStr.size()) {
+            return doubleVal;
+        }
+    } catch (...) {}
+    
+    return numStr;  // Fallback to string
+}
+
+ConfigValue Config::parseJSONArray(const std::string& content, size_t& pos) {
+    pos++;  // Skip '['
+    
+    std::vector<ConfigValue> array;
+    
+    while (pos < content.size()) {
+        skipWhitespace(content, pos);
+        
+        if (content[pos] == ']') {
+            pos++;  // Skip ']'
+            break;
+        }
+        
+        ConfigValue value = parseJSONValue(content, pos);
+        if (value.index() == -1) {
+            break;  // Error
+        }
+        
+        array.push_back(value);
+        
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;  // Skip ','
+        } else if (pos < content.size() && content[pos] == ']') {
+            pos++;  // Skip ']'
+            break;
+        }
+    }
+    
+    return array;
+}
+
+void Config::skipWhitespace(const std::string& content, size_t& pos) {
+    while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+        pos++;
+    }
+}
+
+std::string Config::valueToJSONString(const ConfigValue& value) const {
+    std::string result;
+    
+    std::visit([&](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            result = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = std::to_string(val);
+            // Remove trailing zeros from decimal
+            if (result.find('.') != std::string::npos) {
+                result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                if (result.back() == '.') {
+                    result.pop_back();
+                }
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = "\"" + escapeString(val) + "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(val[i]);
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                std::string str = std::to_string(val[i]);
+                // Remove trailing zeros
+                if (str.find('.') != std::string::npos) {
+                    str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                    if (str.back() == '.') {
+                        str.pop_back();
+                    }
+                }
+                result += str;
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "\"" + escapeString(val[i]) + "\"";
+            }
+            result += "]";
+        } else {
+            result = "null";
+        }
+    }, value);
+    
+    return result;
+}
+
+std::string Config::escapeString(const std::string& str) const {
+    std::string result;
+    for (char ch : str) {
+        switch (ch) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default: result += ch; break;
+        }
+    }
+    return result;
+}
+
+bool Config::parseJSONFile(const std::string& filepath) {
+    // Simple JSON parser implementation
+    // This is a basic implementation that handles:
+    // - Key-value objects
+    // - Strings (quoted)
+    // - Numbers (integers and floats)
+    // - Booleans (true/false)
+    // - Arrays of numbers, strings, booleans
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Simple state machine parser
+    size_t pos = 0;
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size() || content[pos] != '{') {
+        return false;  // Not a JSON object
+    }
+    
+    pos++;  // Skip '{'
+    
+    while (pos < content.size()) {
+        skipWhitespace(content, pos);
+        
+        if (content[pos] == '}') {
+            pos++;  // Skip '}'
+            break;
+        }
+        
+        // Parse key
+        std::string key = parseString(content, pos);
+        if (key.empty()) {
+            break;  // Error
+        }
+        
+        skipWhitespace(content, pos);
+        if (pos >= content.size() || content[pos] != ':') {
+            break;  // Expected ':'
+        }
+        
+        pos++;  // Skip ':'
+        skipWhitespace(content, pos);
+        
+        // Parse value
+        ConfigValue value = parseJSONValue(content, pos);
+        if (value.index() == -1) {
+            break;  // Error parsing value
+        }
+        
+        set(key, value, ConfigSource::File);
+        
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;  // Skip ','
+        } else if (pos < content.size() && content[pos] == '}') {
+            pos++;  // Skip '}'
+            break;
+        }
+    }
+    
+    return true;
+}
+
+std::string Config::parseString(const std::string& content, size_t& pos) {
+    std::string result;
+    
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size() || content[pos] != '\"') {
+        return "";  // Not a string
+    }
+    
+    pos++;  // Skip opening quote
+    
+    while (pos < content.size()) {
+        if (content[pos] == '\"') {
+            pos++;  // Skip closing quote
+            return result;
+        } else if (content[pos] == '\\' && pos + 1 < content.size()) {
+            // Handle escape sequences
+            pos += 2;  // Skip escape character and escaped char
+        } else {
+            result += content[pos];
+            pos++;
+        }
+    }
+    
+    return "";  // Unterminated string
+}
+
+ConfigValue Config::parseJSONValue(const std::string& content, size_t& pos) {
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) {
+        return ConfigValue();  // Empty
+    }
+    
+    char ch = content[pos];
+    
+    if (ch == '\"') {
+        // String
+        std::string value = parseString(content, pos);
+        return value;
+    } else if (ch == 't' || ch == 'f') {
+        // Boolean
+        if (content.substr(pos, 4) == "true") {
+            pos += 4;
+            return true;
+        } else if (content.substr(pos, 5) == "false") {
+            pos += 5;
+            return false;
+        }
+    } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
+        // Number
+        return parseNumber(content, pos);
+    } else if (ch == '[') {
+        // Array
+        return parseJSONArray(content, pos);
+    }
+    
+    return ConfigValue();  // Unknown type
+}
+
+ConfigValue Config::parseNumber(const std::string& content, size_t& pos) {
+    size_t start = pos;
+    bool decimal = false;
+    
+    if (content[pos] == '-') {
+        pos++;
+    }
+    
+    while (pos < content.size()) {
+        char ch = content[pos];
+        if (ch >= '0' && ch <= '9') {
+            pos++;
+        } else if (ch == '.' && !decimal) {
+            decimal = true;
+            pos++;
+        } else {
+            break;
+        }
+    }
+    
+    std::string numStr = content.substr(start, pos - start);
+    
+    // Try to parse as integer first
+    try {
+        size_t endPos;
+        int64_t intVal = std::stoll(numStr, &endPos);
+        if (endPos == numStr.size()) {
+            return intVal;
+        }
+    } catch (...) {}
+    
+    try {
+        size_t endPos;
+        double doubleVal = std::stod(numStr, &endPos);
+        if (endPos == numStr.size()) {
+            return doubleVal;
+        }
+    } catch (...) {}
+    
+    return numStr;  // Fallback to string
+}
+
+ConfigValue Config::parseJSONArray(const std::string& content, size_t& pos) {
+    pos++;  // Skip '['
+    
+    std::vector<ConfigValue> array;
+    
+    while (pos < content.size()) {
+        skipWhitespace(content, pos);
+        
+        if (content[pos] == ']') {
+            pos++;  // Skip ']'
+            break;
+        }
+        
+        ConfigValue value = parseJSONValue(content, pos);
+        if (value.index() == -1) {
+            break;  // Error
+        }
+        
+        array.push_back(value);
+        
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;  // Skip ','
+        } else if (pos < content.size() && content[pos] == ']') {
+            pos++;  // Skip ']'
+            break;
+        }
+    }
+    
+    return array;
+}
+
+void Config::skipWhitespace(const std::string& content, size_t& pos) {
+    while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+        pos++;
+    }
+}
+
+std::vector<std::string> Config::getJSONString() const {
+    std::vector<std::string> lines;
+    lines.push_back("{");
+    
+    bool first = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!first) {
+            lines.push_back(",");
+        }
+        first = false;
+        
+        lines.push_back("  \"" + entry.key + "\": ");
+        
+        lines.push_back(valueToJSONString(entry.value));
+    }
+    
+    lines.push_back("}");
+    
+    std::string result;
+    for (const auto& line : lines) {
+        result += line + "\n";
+    }
+    
+    return result;
+}
+
+std::string Config::valueToJSONString(const ConfigValue& value) {
+    std::string result;
+    
+    std::visit([&](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            result = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = std::to_string(val);
+            // Remove trailing zeros from decimal
+            if (result.find('.') != std::string::npos) {
+                result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                if (result.back() == '.') {
+                    result.pop_back();
+                }
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = "\"" + escapeString(val) + "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(val[i]);
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                std::string str = std::to_string(val[i]);
+                // Remove trailing zeros
+                if (str.find('.') != std::string::npos) {
+                    str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                    if (str.back() == '.') {
+                        str.pop_back();
+                    }
+                }
+                result += str;
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "\"" + escapeString(val[i]) + "\"";
+            }
+            result += "]";
+        } else {
+            result = "null";
+        }
+    }, value);
+    
+    return result;
+}
+
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    for (char ch : str) {
+        switch (ch) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default: result += ch; break;
+        }
+    }
+    return result;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

@@ -102,6 +102,18 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing and serialization
+    bool parseJSONFile(const std::string& filepath);
+    std::string valueToJSONString(const ConfigValue& value) const;
+    std::string escapeString(const std::string& str) const;
+    
+    // JSON value parsing helpers
+    static void skipWhitespace(const std::string& content, size_t& pos);
+    static std::string parseString(const std::string& content, size_t& pos);
+    static ConfigValue parseJSONValue(const std::string& content, size_t& pos);
+    static ConfigValue parseNumber(const std::string& content, size_t& pos);
+    static ConfigValue parseJSONArray(const std::string& content, size_t& pos);
 };
 
 } // namespace nlm
