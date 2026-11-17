@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <cerr>  // For std::cerr
 
 namespace nlm {
 
@@ -66,7 +67,7 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
@@ -79,7 +80,7 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
+
     // Check existence
     bool has(const std::string& key) const;
     
@@ -94,6 +95,10 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    void validateConfigValue(const std::string& key, const std::string& value, const std::string& filepath, int lineNum);
+    void validateAllConfigValues();
     
 private:
     struct Impl;
