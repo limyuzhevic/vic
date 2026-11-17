@@ -173,11 +173,29 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
-# Benchmark executable
-add_executable(nlm_benchmark
+# Enhanced benchmark executable with comprehensive profiling
+add_executable(nlm_benchmark_enhanced
     src/benchmark.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_benchmark_enhanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Configuration validation tool (Phase 8 enhancement)
+add_executable(nlm_config_validator
+    src/config_validator.cpp
+)
+target_link_libraries(nlm_config_validator PUBLIC nlm_core nlm_agent nlm_world)
+
+# Configuration tests (Phase 8 enhancement)
+add_executable(nlm_config_tests
+    tests/test_config_validation.cpp
+)
+target_link_libraries(nlm_config_tests PUBLIC nlm_core nlm_agent nlm_world)
+
+# Configuration validation tool (Phase 8 enhancement)
+add_executable(nlm_config_validator
+    src/config_validator.cpp
+)
+target_link_libraries(nlm_config_validator PUBLIC nlm_core nlm_agent nlm_world)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
@@ -206,7 +224,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_config_validator nlm_config_tests nlm_benchmark_enhanced
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
