@@ -1,0 +1,195 @@
+# NLM Advanced Configuration Examples
+# This file demonstrates various configuration patterns for different use cases
+
+# Basic Configuration for Beginners
+# -------------------------------
+{
+    "nlm_config": {
+        "random_seed": 42,
+        "simulation_timestep": 0.001,
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "log_level": "INFO",
+        "log_to_file": false,
+        
+        "plasticity": {
+            "learning_rate": 0.01,
+            "stdp_ltp_weight": 0.01,
+            "stdp_ltd_weight": 0.012
+        },
+        
+        "environment": {
+            "name": "GridWorld",
+            "width": 10,
+            "height": 10,
+            "vision_width": 8,
+            "vision_height": 8
+        }
+    }
+}
+
+# Performance Configuration for Research
+# ---------------------------------------
+{
+    "nlm_config": {
+        "random_seed": 12345,
+        "simulation_timestep": 0.0001,
+        "neuron_count": 5000,
+        "region_count": 4,
+        "connection_probability": 0.15,
+        "log_level": "DEBUG",
+        "log_to_file": true,
+        "log_filename": "nlm_research.log",
+        
+        "performance": {
+            "enable_performance_profiling": true,
+            "enable_timing_profile": true,
+            "enable_memory_profile": true,
+            "perf_output_file": "performance.prof",
+            "perf_sampling_interval": 0.05
+        },
+        
+        "plasticity": {
+            "learning_rate": 0.005,
+            "stdp_ltp_weight": 0.02,
+            "stdp_ltd_weight": 0.018,
+            "enable_metaplasticity": true,
+            "metaplasticity_threshold": 0.3
+        },
+        
+        "neuromodulation": {
+            "enable_dopamine_tracking": true,
+            "enable_novelty_detection": true,
+            "enable_curiosity_module": true,
+            "novelty_threshold": 0.2
+        },
+        
+        "memory": {
+            "enable_episodic_memory": true,
+            "enable_working_memory": true,
+            "enable_associative_memory": true,
+            "episodic_capacity": 5000
+        },
+        
+        "development": {
+            "enable_development_phases": true,
+            "maturation_rate": 0.02,
+            "synaptogenesis_burst": 0.02,
+            "pruning_intensity": 0.01,
+            "development_phases": 8
+        }
+    }
+}
+
+# Experimental Configuration
+# --------------------------
+{
+    "nlm_config": {
+        "random_seed": 999,
+        "simulation_timestep": 0.001,
+        "neuron_count": 2000,
+        "region_count": 3,
+        "connection_probability": 0.08,
+        "log_level": "INFO",
+        "log_to_file": true,
+        "log_filename": "experiment.log",
+        
+        "plasticity": {
+            "learning_rate": 0.015,
+            "stdp_ltp_weight": 0.025,
+            "stdp_ltd_weight": 0.023
+        },
+        
+        "experiments": {
+            "enable_experimental_features": true,
+            "enable_data_collection": true,
+            "enable_statistical_analysis": true,
+            "experiment_results_dir": "experiment_results/"
+        },
+        
+        "checkpointing": {
+            "enable_checkpoint_restore": true,
+            "enable_auto_checkpoint": true,
+            "checkpoint_interval": 5.0,
+            "max_checkpoint_files": 20,
+            "checkpoint_file": "checkpoints/experiment_"
+        }
+    }
+}
+
+# Minimal Configuration for Testing
+# ---------------------------------
+{
+    "nlm_config": {
+        "random_seed": 1,
+        "simulation_timestep": 0.01,
+        "neuron_count": 100,
+        "region_count": 1,
+        "connection_probability": 0.05,
+        "log_level": "ERROR",
+        "log_to_file": false,
+        
+        "plasticity": {
+            "learning_rate": 0.001,
+            "stdp_ltp_weight": 0.005,
+            "stdp_ltd_weight": 0.0045
+        },
+        
+        "development": {
+            "enable_development_phases": false,
+            "enable_metaplasticity": false
+        }
+    }
+}
+
+# JSON Schema for validation
+# --------------------------
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NLM Configuration Schema",
+    "type": "object",
+    "properties": {
+        "nlm_config": {
+            "type": "object",
+            "properties": {
+                "random_seed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                },
+                "simulation_timestep": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "neuron_count": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 100000
+                },
+                "region_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                },
+                "connection_probability": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "log_level": {
+                    "type": "string",
+                    "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "FATAL"]
+                },
+                "log_to_file": {
+                    "type": "boolean"
+                },
+                "log_filename": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "required": ["nlm_config"]
+}
