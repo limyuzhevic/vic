@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +66,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +95,18 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // File format detection
+    static bool hasExtension(const std::string& filename, const std::string& ext);
+    static ConfigSource detectFileFormat(const std::string& filepath);
+    
+    // JSON/YAML loading helpers
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +114,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const std::string& key, const std::string& value);
+    
+    // Conversion helpers
+    static std::string jsonToString(const nlohmann::json& j);
+    static std::string yamlToString(const YAML::Node& node);
 };
 
 } // namespace nlm

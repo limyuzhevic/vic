@@ -7,6 +7,10 @@
 
 namespace nlm {
 
+// Simulation timestep constant (1ms = 0.001 seconds)
+constexpr double SIMULATION_TIMESTEP_SECONDS = 0.001;
+constexpr TimestepDuration DEFAULT_TIMESTEP = SIMULATION_TIMESTEP_SECONDS;
+
 // Strongly-typed identifiers for safety
 
 // Neuron identifier
@@ -100,6 +104,9 @@ using FiringRate = float;
 // Connection delay in simulation steps
 using Delay = uint32_t;
 
+// Development time step constant
+constexpr double DEVELOPMENT_TIME_STEP = 0.001;  // seconds
+
 // Typed enums for neuron types
 enum class NeuronType : uint8_t {
     Excitatory,
@@ -132,7 +139,7 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
-// Developmental state
+// Developmental stage
 enum class DevelopmentalStage : uint8_t {
     Initial,
     CriticalPeriod,
@@ -198,6 +205,32 @@ constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// Configuration constants
+namespace ConfigConstants {
+    // Default configuration values
+    constexpr const char* DEFAULT_RANDOM_SEED = "42";
+    constexpr double DEFAULT_SIMULATION_TIMESTEP = 0.001;
+    constexpr int64_t DEFAULT_NEURON_COUNT = 1000;
+    constexpr int64_t DEFAULT_REGION_COUNT = 1;
+    constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.1f;
+    constexpr float DEFAULT_SYNAPSE_GENERATION_RATE = 0.0001f;
+    constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+    constexpr float DEFAULT_SYNAPTIC_WEIGHT_MIN = 0.0f;
+    constexpr float DEFAULT_SYNAPTIC_WEIGHT_MAX = 1.0f;
+    constexpr float DEFAULT_INCOMING_EXCITATORY_CAP = 3.0f;
+    constexpr int64_t DEFAULT_REPLAY_INTERVAL = 100;
+    constexpr int64_t DEFAULT_CONSOLIDATION_INTERVAL = 1000;
+    constexpr int DEFAULT_MAX_EPISODES = 1000;
+    constexpr float DEFAULT_WORKING_MEMORY_CAPACITY_RATIO = 0.1f;
+    constexpr int DEFAULT_PLANNING_DEPTH = 5;
+    constexpr float DEFAULT_INHIBITION_STRENGTH = 0.5f;
+    constexpr float DEFAULT_EXCITATION_STRENGTH = 1.5f;
+    constexpr float DEFAULT_DOPAMINE_BASELINE = 0.0f;
+    constexpr float DEFAULT_NOVELTY_THRESHOLD = 0.5f;
+    constexpr float DEFAULT_CURIOUSITY_BASELINE = 0.0f;
+    constexpr float DEFAULT_PREDICTION_ERROR_WEIGHT = 1.0f;
+}
 
 } // namespace nlm
 
