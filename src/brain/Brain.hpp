@@ -49,6 +49,30 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// This header defines the main Brain interface for the NLM artificial brain project.
+// The Brain class coordinates all neural subsystems including:
+// - Biological neuron dynamics (LIF neurons with event-driven spiking)
+// - Synaptic transmission and plasticity rules (STDP, Hebbian, neuromodulated)
+// - Multi-layered memory systems (working, episodic, associative)
+// - Predictive processing and Bayesian inference
+// - Cognitive functions (planning, attention, concept formation)
+// - Neuromodulation (reward, curiosity, novelty detection)
+// - Developmental processes (synaptogenesis, pruning, maturation)
+// - Real-time interaction with sensory and motor systems
+// 
+// The Brain uses a p-impl pattern for encapsulation, with the actual implementation
+// in Brain.cpp. This allows for efficient compilation and forward declaration of
+// complex internal types.
+// 
+// Key Features:
+// - Real-time simulation with configurable timestep
+// - Event-driven spike propagation with synaptic delays
+// - Full checkpoint/restart capability for persistent learning
+// - Integration with external sandbox environments for reward-based learning
+// - Scalability for large neural networks (thousands of neurons)
+// - Support for both CPU and GPU acceleration (Phase 5+ features)
+// and integrated memory, prediction, cognition, and neuromodulation systems
 
 class Brain {
 public:

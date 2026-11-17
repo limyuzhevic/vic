@@ -72,18 +72,21 @@ public:
     size_t getVisionHeight() const { return visionHeight_; }
     float getHeight() const { return height_; }
     
-    // Energy settings
-    float getMaxEnergy() const { return maxEnergy_; }
-    void setMaxEnergy(float e) { maxEnergy_ = e; }
-    float getEnergyDecayRate() const { return energyDecayRate_; }
-    void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    // Performance metrics
+    size_t getResourcesConsumed() const { return resourcesConsumed_; }
+    size_t getHazardsHit() const { return hazardsHit_; }
+    float getLastReward() const { return lastReward_; }
     
-    // Time
-    double getSimulationTime() const { return simTime_; }
+    // Statistics
+    void logStatistics() const;
     
-    // Seed for reproducibility
-    void setRandomSeed(uint64_t seed);
-    uint64_t getRandomSeed() const { return rngSeed_; }
+    // Interaction debugging
+    void setInteractionDebug(bool enabled) { debugInteractions_ = enabled; }
+
+    // Reward tracking
+    float getTotalReward() const;
+    float getAverageReward() const;
+    void resetRewardCounters();
     
 private:
     // Generate vision from current view

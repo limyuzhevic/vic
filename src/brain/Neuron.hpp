@@ -51,6 +51,35 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+// 
+// This is the fundamental computational unit of the NLM brain. Each neuron
+// maintains its own membrane potential state and responds to synaptic inputs
+// according to biologically-inspired LIF dynamics.
+// 
+// Neuron State:
+// - Membrane potential (mV): Sub-threshold integration variable
+// - Resting potential: Baseline potential when no inputs received
+// - Threshold: Firing threshold for spike generation
+// - Refractory period: Absolute refractory period after spike
+// - Synaptic conductances: Total excitatory/inhibitory input
+// - Firing rate: Rate-based output for plasticity calculations
+// - Adaptation variable: Spike-frequency adaptation mechanism
+// - Last spike time: For spike timing-dependent plasticity (STDP)
+// 
+// Key Features:
+// - Biophysical LIF dynamics with adaptive threshold
+// - Support for multiple input types (excitatory, inhibitory, modulatory)
+// - Event-driven spike generation and propagation
+// - Comprehensive plasticity support (STDP, Hebbian, reward-modulated)
+// - Developmental plasticity with age-dependent rates
+// - Integration with brain-level learning mechanisms
+// 
+// The neuron model incorporates:
+// - Membrane capacitance and leakage dynamics
+// - Synaptic conductance summation
+// - Spike-frequency adaptation for realistic firing patterns
+// - Refractory period to prevent unrealistic firing rates
+// - Input filtering and integration over time
 class Neuron {
 public:
     // Create neuron with ID

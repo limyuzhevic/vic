@@ -18,16 +18,21 @@ static float urand(uint64_t& state, float min, float max) {
 }
 
 SimpleWorld::SimpleWorld()
-    : width_(20.0f)
+: width_(20.0f)
     , height_(20.0f)
     , visionWidth_(16)
     , visionHeight_(16)
     , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
+    , energyDecayRate_(0.02f)
     , resourceEnergyGain_(30.0f)
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    , totalReward_(0.0f)
+    , lastReward_(0.0f)
+    , resourcesConsumed_(0)
+    , hazardsHit_(0)
+    , debugInteractions_(false)
 {
     agent_.reset();
 }
@@ -60,14 +65,14 @@ void SimpleWorld::reset() {
     for (int i = 0; i < 5; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 20.0f, 0.4f);
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -25.0f, 0.3f);
     }
     
     generateVision();
@@ -118,8 +123,8 @@ uint64_t SimpleWorld::nextRandom() {
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
     ActionResult result;
-    const float moveSpeed = 3.0f;
-    const float turnSpeed = 2.0f;
+    float moveSpeed = 4.0f;
+    const float turnSpeed = 1.8f;
     
     // Only allow one action per action interval (0.1 s of world
     // time). Phase 6 note: this gate itself is unchanged — what
@@ -243,6 +248,15 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
     }
     
+    // Track movement reward
+    totalReward_ += result.reward;
+    lastReward_ = result.reward;
+    
+    if (debugInteractions_) {
+        std::cout << "[WORLD] Action " << static_cast<int>(cmd) << ": " << 
+            (result.success ? "SUCCESS" : "FAILED") << " (reward: " << result.reward << ")\n";
+    }
+    
     return result;
 }
 
@@ -269,11 +283,13 @@ ActionResult SimpleWorld::interact() {
                 result.reward = obj.value;  // Positive reward
                 result.success = true;
                 result.message = "consumed_resource";
+                resourcesConsumed_++;
             } else if (obj.type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
+                hazardsHit_++;
             }
             
             // Only interact with one object at a time
@@ -285,7 +301,16 @@ ActionResult SimpleWorld::interact() {
         result.message = "no_object";
     }
     
+    // Track reward
+    totalReward_ += result.reward;
+    lastReward_ = result.reward;
+    
+    if (debugInteractions_) {
+        std::cout << "[WORLD] Interact: " << result.message << " (reward: " << result.reward << ")\n";
+    }
+    
     return result;
+}
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
@@ -431,5 +456,26 @@ void SimpleWorld::checkCollisions() {
         agent_.health -= 0.01f;  // Passive damage
     }
 }
+
+    // Log statistics
+    void logStatistics() const {
+        std::cout << "World Statistics:\n";
+        std::cout << "  Resources consumed: " << resourcesConsumed_ << "\n";
+        std::cout << "  Hazards hit: " << hazardsHit_ << "\n";
+        std::cout << "  Last reward: " << lastReward_ << "\n";
+        std::cout << "  Total reward: " << totalReward_ << "\n";
+        std::cout << "  Average reward: " << (totalReward_ / (resourcesConsumed_ + hazardsHit_ + 1)) << "\n";
+        std::cout << "  Agent energy: " << agent_.energy << "/" << maxEnergy_ << "\n";
+        std::cout << "  Agent health: " << agent_.health << "\n";
+    }
+    
+    // Interaction debugging
+    void setInteractionDebug(bool enabled) { debugInteractions_ = enabled; }
+
+    // Reward tracking
+    float getTotalReward() const { return totalReward_; }
+    float getAverageReward() const { return (resourcesConsumed_ + hazardsHit_ > 0) ? totalReward_ / (resourcesConsumed_ + hazardsHit_) : 0.0f; }
+    void resetRewardCounters() { totalReward_ = 0.0f; lastReward_ = 0.0f; resourcesConsumed_ = 0; hazardsHit_ = 0; }
+};
 
 } // namespace nlm

@@ -10,6 +10,37 @@ class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
+// 
+// This is the fundamental communication mechanism in the NLM brain. Synapses
+// transmit spikes from pre-synaptic to post-synaptic neurons with realistic
+// dynamics including synaptic delays, short-term plasticity, and eligibility traces
+// for learning.
+// 
+// Synapse State:
+// - Weight: Synaptic efficacy (learning parameter)
+// - Delay: Transmission delay in simulation steps
+// - Type: Excitatory or inhibitory (functional type)
+// - Plasticity flags: Which plasticity rules are enabled
+// - Eligibility trace: For reward-modulated learning
+// - Efficacy: Use-dependent modulation for short-term plasticity
+// - Short-term depression/facilitation: Dynamic synaptic modifications
+// - Spike histories: For STDP and other spike timing-dependent processes
+// 
+// Key Features:
+// - Realistic synaptic transmission with biophysical constraints
+// - Multiple plasticity mechanisms (STDP, Hebbian, neuromodulated)
+// - Short-term plasticity (STP) for dynamic gain control
+// - Eligibility traces for credit assignment in reinforcement learning
+// - Delayed spike propagation for realistic neural timing
+// - Integration with brain-level learning and development systems
+// 
+// The synapse model supports:
+// - Spike-timing dependent plasticity (STDP) for temporal learning
+// - Reward-modulated plasticity for reinforcement learning
+// - Hebbian co-activation learning for pattern association
+// - Structural plasticity for connection creation/removal
+// - Short-term dynamics for burst detection and filtering
+// - Online learning during ongoing neural activity
 
 class Synapse {
 public:
