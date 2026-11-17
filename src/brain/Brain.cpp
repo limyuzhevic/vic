@@ -23,7 +23,77 @@
 #include <cstring>
 #include <sstream>
 
+// ===== ERROR HANDLING SYSTEM =====
 namespace nlm {
+
+// Global error handling functions
+static std::string g_lastErrorMessage;
+static Brain::ErrorCode g_lastErrorCode = Brain::ErrorCode::SUCCESS;
+static size_t g_errorCount = 0;
+
+template<typename T>
+bool validateNotNull(const T& value, const std::string& errorMsg = "Value is null", 
+                    Brain::ErrorCode errorCode = Brain::ErrorCode::VALIDATION_FAILED) {
+    if (!value) {
+        g_lastErrorMessage = errorMsg;
+        g_lastErrorCode = errorCode;
+        ++g_errorCount;
+        NLM_LOG_ERROR(errorMsg);
+        return false;
+    }
+    return true;
+}
+
+template<typename T>
+bool validateNotNull(T* value, const std::string& errorMsg = "Pointer is null", 
+                    Brain::ErrorCode errorCode = Brain::ErrorCode::VALIDATION_FAILED) {
+    if (!value) {
+        g_lastErrorMessage = errorMsg;
+        g_lastErrorCode = errorCode;
+        ++g_errorCount;
+        NLM_LOG_ERROR(errorMsg);
+        return false;
+    }
+    return true;
+}
+
+template<typename T>
+bool validateRange(const T& value, const T& min, const T& max, 
+                  const std::string& errorMsg = "Value out of range",
+                  Brain::ErrorCode errorCode = Brain::ErrorCode::VALIDATION_FAILED) {
+    if (value < min || value > max) {
+        g_lastErrorMessage = errorMsg + " (" + std::to_string(value) + ")";
+        g_lastErrorCode = errorCode;
+        ++g_errorCount;
+        NLM_LOG_ERROR(errorMsg);
+        return false;
+    }
+    return true;
+}
+
+void logValidationError(const std::string& component, const std::string& error) {
+    g_lastErrorMessage = component + ": " + error;
+    g_lastErrorCode = Brain::ErrorCode::VALIDATION_FAILED;
+    ++g_errorCount;
+    NLM_LOG_WARNING(component + " - " + error);
+}
+
+// Performance monitoring integration
+static float g_lastStepDuration = 0.0f;
+static bool g_performanceMonitoringEnabled = false;
+static size_t g_performanceStepCount = 0;
+
+void updatePerformanceMetrics(float duration, bool success) {
+    if (g_performanceMonitoringEnabled) {
+        g_lastStepDuration = duration;
+        ++g_performanceStepCount;
+        if (!success) {
+            ++g_errorCount;
+        }
+    }
+}
+
+// ===== BRAIN CLASS IMPLEMENTATION =====
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -67,7 +137,7 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
@@ -90,6 +160,29 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // ===== ERROR RECOVERY AND VALIDATION =====
+    bool hasErrors() const { return g_errorCount > 0; }
+    size_t getErrorCount() const { return g_errorCount; }
+    std::string getLastError() const { return g_lastErrorMessage; }
+    Brain::ErrorCode getLastErrorCode() const { return g_lastErrorCode; }
+    void clearErrors() { g_errorCount = 0; g_lastErrorMessage.clear(); }
+    
+    // ===== COMPONENT VALIDATION =====
+    bool validateComponent(const std::string& name, bool condition, 
+                          const std::string& errorMsg = "Validation failed") {
+        if (!condition) {
+            logValidationError(name, errorMsg);
+            return false;
+        }
+        return true;
+    }
+    
+    // ===== LIFECYCLE STATE =====
+    Brain::LifecycleState lifecycleState;
+    bool isPaused;
+    float pauseTime;
+    size_t pauseStep;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -104,13 +197,24 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+        , lifecycleState(Brain::LifecycleState::NOT_INITIALIZED)
+        , isPaused(false)
+        , pauseTime(0.0f)
+        , pauseStep(0) {
+        // Initialize error handling
+        clearErrors();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Validate configuration
+        if (!validateComponent("Configuration", config, "Configuration is null")) {
+            g_lastErrorMessage = "Configuration initialization failed";
+        }
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -163,6 +267,9 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Update lifecycle state
+        lifecycleState = Brain::LifecycleState::INITIALIZING;
     }
     
     DevelopmentalStage developmentalStage;
@@ -187,7 +294,20 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
+    // ===== VALIDATION AND ERROR HANDLING =====
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Validate configuration exists
+    if (!validateNotNull(pImpl->config, BRAIN_CONFIG_ERROR)) {
+        NLM_LOG_ERROR("Brain initialization aborted - missing configuration");
+        return false;
+    }
+    
+    // Validate random generator
+    if (!validateNotNull(pImpl->rng, "Random generator initialization failed")) {
+        NLM_LOG_ERROR("Brain initialization aborted - missing random generator");
+        return false;
+    }
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.

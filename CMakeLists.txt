@@ -11,75 +11,88 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Enable warnings with error checking
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library with enhanced error handling and validation
 add_library(nlm_core STATIC
-    # Core
+    # Core infrastructure
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    
+    # Neural engine (Phase 2-6 core components)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
-    # Dynamics
+    
+    # Neural dynamics and spike propagation
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
-    # Plasticity
+    
+    # Plasticity systems (STDP, Hebbian, Structural)
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
-    # Development
+    
+    # Development system
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
+    
+    # Neuromodulation systems
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
+    
+    # Memory systems
     src/memory/Memory.cpp
     src/performance/CheckpointSystem.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
+    
+    # Cognition systems
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
-    # Sensory
+    
+    # Sensory processing
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
-    # Prediction
+    
+    # Prediction systems
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
-    # Motor
+    
+    # Motor system
     src/motor/MotorSystem.cpp
-    # Environment
+    
+    # Environment interface
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/motor/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
+    
+    # Experiments (Phase 3-6)
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -87,6 +100,22 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+)
+
+# Configure core library with enhanced error handling and performance monitoring
+target_compile_definitions(nlm_core PUBLIC
+    NLM_PHASE6_INTEGRATED
+    NLM_ERROR_HANDLING_ENABLED
+    NLM_PERFORMANCE_MONITORING
+    NLM_ERROR_RECOVERY_ENABLED
+)
+
+# Configure compilation for enhanced debugging and optimization
+target_compile_options(nlm_core PRIVATE
+    $<$<CONFIG:Debug>:-O0 -g -DDEBUG>
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
+    $<$<CONFIG:MinSizeRel>:-Os -DNDEBUG>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)

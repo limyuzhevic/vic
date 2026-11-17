@@ -49,6 +49,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Version 2.0 - Refactored for better maintainability and error handling
 
 class Brain {
 public:
@@ -63,7 +64,13 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Error handling
+    static constexpr const char* BRAIN_VALIDATION_ERROR = "Brain validation failed";
+    static constexpr const char* BRAIN_INITIALIZATION_ERROR = "Brain initialization failed";
+    static constexpr const char* BRAIN_CONFIG_ERROR = "Brain configuration error";
+    
     // Initialize brain with configuration
+    // Enhanced with comprehensive error handling and validation
     bool initialize();
     
     // Main simulation step
@@ -74,12 +81,15 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
+    // Enhanced with error validation
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
+    // Enhanced with neuron existence validation
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
     // Inject current into all neurons of a specific type
+    // Enhanced with population existence validation
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
