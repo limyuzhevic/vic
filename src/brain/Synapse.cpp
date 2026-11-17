@@ -34,14 +34,14 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
-    // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    // Weight bounds (tighter to prevent runaway excitation)
+    static constexpr float MIN_WEIGHT = -0.5f;
+    static constexpr float MAX_WEIGHT = 0.5f;
     
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    // Short-term plasticity parameters (tighter for better stability)
+    static constexpr float STP_FACILITATION_TAU = 50.0f;  // Reduced from 100ms
+    static constexpr float STP_DEPRESSION_TAU = 100.0f;   // Reduced from 200ms
+    static constexpr float STP_U_MAX = 0.8f;               // Reduced from 1.0
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
@@ -238,7 +238,7 @@ void Synapse::step(Timestamp currentTime) {
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    decayEligibilityTrace(0.01f);  // Faster decay for better control
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -259,20 +259,18 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
-    if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+    // Excitatory synapses: small positive weights
+        pImpl->weight = rng.uniformReal(0.05f, 0.15f);
         // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->weight = -rng.uniformReal(0.05f, 0.15f);
+        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     } else {
         // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        pImpl->weight = rng.uniformReal(-0.05f, 0.05f);
+        pImpl->efficacy = rng.uniformReal(0.95f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)

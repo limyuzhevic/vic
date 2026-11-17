@@ -12,8 +12,8 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltpWeight(0.005f), ltdWeight(0.006f), timeConstant(15.0f),
+             minWeight(-0.5f), maxWeight(0.5f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
