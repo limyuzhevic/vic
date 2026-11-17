@@ -271,22 +271,6 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
@@ -297,9 +281,13 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    // Note: PredictionSystem doesn't have initialize method currently
+    
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -589,7 +577,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -605,17 +592,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store reward in episode - from prediction error signal
+            if (pImpl->predictionError) {
+                episode.reward = pImpl->predictionError->getError();
+            } else if (pImpl->dopamine) {
+                episode.reward = pImpl->dopamine->getLevel();
+            } else {
+                // Fallback: use spike activity as proxy for reward
+                episode.reward = static_cast<float>(pImpl->totalSpikesThisStep) * 0.01f;
+            }
             
-            pImpl->episodicMemory->storeEpisode(episode);
+        pImpl->episodicMemory->storeEpisode(episode);
+        
+        // Store reward information for episodic memory
+        if (pImpl->predictionError) {
+            // Use prediction error as the primary reward signal for episodic memory
+            // This captures the surprise/surplus of the actual outcome
+            episode.reward = pImpl->predictionError->getError();
+        } else if (pImpl->dopamine) {
+            // Fallback to dopamine level if prediction error not available
+            // Dopamine represents reward prediction error
+            episode.reward = pImpl->dopamine->getLevel();
+        } else {
+            // Final fallback: use spike activity as proxy for reward
+            // This is a simplistic approach but preserves some information
+            episode.reward = static_cast<float>(pImpl->totalSpikesThisStep) * 0.01f;
         }
+        
+        // Also store in working memory for immediate access
+        if (pImpl->workingMemory) {
+            // Create a pattern representing the current episode's reward
+            std::vector<float> rewardPattern;
+            rewardPattern.push_back(episode.reward);
+            
+            // Store for a short time (1 second worth of memory)
+            pImpl->workingMemory->store(rewardPattern, std::abs(episode.reward));
+        }
+    }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Prediction system learns to predict sensory patterns
+        // This enables forward models and predictive coding
+        
+        // For each sensory neuron that is active, feed it into the prediction system
+        for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+            pImpl->predictionSystem->update(neuron, currentTime);
+        }
+        
+        // Update prediction error signal based on prediction system output
+        if (pImpl->predictionError) {
+            // The prediction error is the difference between expected and actual sensory input
+            // This drives curiosity and exploration
+            pImpl->predictionError->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -653,29 +685,70 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity.get();
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+        // Development affects neural excitability and neuromodulation levels
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        float neuromodulationFactor = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                neuromodulationFactor = 1.5f;  // High neuromodulation
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                neuromodulationFactor = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                neuromodulationFactor = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                neuromodulationFactor = 0.8f;  // Stable neuromodulation
+                break;
+        }
+        
+        // Apply neuromodulation development effects
+        if (pImpl->dopamine) {
+            float currentDopamine = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(currentDopamine * neuromodulationFactor);
+        }
+        
+        // Development affects attention thresholds
+        if (pImpl->attention) {
+            float attentionThreshold = 0.3f / neuromodulationFactor;  // Lower threshold in early development
+            pImpl->attention->setCompetitionThreshold(attentionThreshold);
+        }
+        
+        // Development affects plasticity rule parameters
+        float plasticityRate = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                plasticityRate = 1.5f;  // Higher plasticity
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                plasticityRate = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                plasticityRate = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                plasticityRate = 0.8f;  // Lower plasticity
+                break;
+        }
+        
+        // Apply to STDP
+        if (pImpl->stdp) {
+            pImpl->stdp->setLTPWeight(0.01f * plasticityRate);
+            pImpl->stdp->setLTDWeight(0.012f * plasticityRate);
+        }
+        
+        // Development affects memory consolidation
+        if (pImpl->episodicMemory) {
+            // Increase consolidation in early development
+            if (stage == DevelopmentalStage::Initial) {
+                // More frequent consolidation
+                pImpl->consolidationInterval = 500;  // Every 500 steps instead of 1000
+            } else {
+                // Normal consolidation
+                pImpl->consolidationInterval = 1000;
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
