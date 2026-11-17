@@ -1,5 +1,32 @@
 #pragma once
 
+/**
+ * @file AgentBrain.hpp
+ * @brief Agent brain interface connecting NLM brain to world
+ * 
+ * This file defines the AgentBrain class, which serves as the bridge between
+ * the neural brain and the external world. The AgentBrain handles sensory
+ * transduction (converting world states to brain inputs) and motor decoding
+ * (converting brain activity to world actions). It implements the core
+ * perception-action loop that enables the brain to interact with and learn
+ * from its environment.
+ * 
+ * @details The AgentBrain acts as an interface that:
+ * - Takes sensory percepts from the world and converts them to brain inputs
+ * - Processes sensory information and updates brain state
+ * - Decodes brain motor activity into actionable commands
+ * - Applies reward modulation based on outcomes
+ * - Maintains developmental state and plasticity
+ * - Provides diagnostic information about brain activity
+ * 
+ * The agent brain integrates multiple advanced systems:
+ * - **Neuromodulation**: Reward prediction, curiosity, novelty detection
+ * - **Cognition**: Planning, concept formation, self-modeling
+ * - **Development**: Age-dependent plasticity and maturation
+ * - **Social learning**: Observation and imitation of other agents
+ * - **Text as a sense**: Encoding teacher words for association learning
+ */
+
 #include "AgentBody.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "SensoryPercept.hpp"
@@ -13,119 +40,271 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+/**
+ * @brief AgentBrain: Connects NLM brain to the world
+ * 
+ * This class implements the perception-action loop that enables the artificial
+ * brain to interact with and learn from its environment. It handles the conversion
+ * between world states (sensory inputs) and brain activity, and between brain
+ * decisions (motor commands) and world effects.
+ * 
+ * @note The AgentBrain integrates multiple advanced cognitive and biological
+ *       systems including neuromodulation, prediction, planning, concept
+ *       formation, development, and social learning. This represents Phase 6
+ *       of the NLM project - final integration of all systems into a coherent
+ *       artificial brain.
+ */
 class AgentBrain {
 public:
+    /**
+     * @brief Constructor
+     * 
+     * @param brain Shared pointer to the neural brain that this agent interfaces with
+     */
     AgentBrain(std::shared_ptr<Brain> brain);
+    
+    /**
+     * @brief Destructor
+     */
     ~AgentBrain();
     
-    // Initialize with world
+    /**
+     * @brief Initialize agent with world
+     * 
+     * This method prepares the agent for operation with a specific world,
+     * setting up initial state and preparing sensory/motor interfaces.
+     * 
+     * @param world Reference to the world the agent will interact with
+     */
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    /**
+     * @brief Get expected sensory input size
+     * 
+     * @return Number of sensory values expected by the brain (vision, touch, internal, proprioception)
+     */
     size_t getSensoryInputSize() const;
     
-    // Get motor output size expected
+    /**
+     * @brief Get expected motor output size
+     * 
+     * @return Number of motor neurons expected by the brain
+     */
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    /**
+     * @brief Process sensory percept and inject into brain
+     * 
+     * This is the core perception step: take sensory information from the
+     * world, process it, and inject it into the brain for learning and decision
+     * making. This includes novelty detection, prediction, and memory updates.
+     * 
+     * @param percept Sensory data from the world (vision, touch, text, etc.)
+     */
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    /**
+     * @brief Decode brain motor activity into motor command
+     * 
+     * This is the core action selection step: analyze brain motor neuron activity,
+     * apply various biases (reflexes, learned preferences, curiosity, planning,
+     * concepts, self-model, social learning), and produce a motor command that
+     * will be applied to the world.
+     * 
+     * @return Motor command representing the brain's decision to act
+     */
     MotorCommand decodeMotorCommand();
-
-    // Diagnostic: per motor group, in decode order. `activity` is mean
-    // |membrane - resting| (the old decode metric); `firingRate` is mean
-    // firing rate in Hz (now derived from counted spikes). Decode uses
-    // firingRate, because a neuron that just spiked resets its membrane
-    // to rest, so membrane deviation at sampling time is 0 for exactly
-    // the neurons that fired — the old metric erased its own signal.
+    
+    /**
+     * @brief Diagnostic: per motor group, in decode order
+     * 
+     * Provides detailed information about each motor group's activity,
+     * including membrane potential deviation (old metric), firing rate (new metric),
+     * and refractory neuron count. The firing rate is now derived from counted
+     * spikes rather than membrane potential, because neurons that just spiked
+     * reset their membrane potential to resting, making membrane deviation
+     * useless for decoding at sampling time.
+     */
     struct MotorGroupActivity {
-        const char* name;
-        float activity;
-        size_t refractoryCount;  // neurons in Refractory state (recently spiked)
-        size_t size = 0;
-        float firingRate = 0.0f;
+        const char* name;              ///< Motor group name (for diagnostics)
+        float activity;               ///< Mean |membrane - resting| (old metric)
+        size_t refractoryCount;       ///< Number of neurons in Refractory state (recently spiked)
+        size_t size = 0;              ///< Total neurons in this group
+        float firingRate = 0.0f;      ///< Mean firing rate in Hz (new metric)
     };
+    
+    /**
+     * @brief Get motor group activities (diagnostic)
+     * 
+     * Returns activity information for all motor groups in decode order.
+     * Useful for understanding which motor patterns the brain is considering.
+     * 
+     * @return Vector of motor group activity information
+     */
     std::vector<MotorGroupActivity> getMotorGroupActivities() const;
     
-    // Apply neuromodulation based on reward
+    /**
+     * @brief Apply neuromodulation based on reward
+     * 
+     * This method implements reward-based learning: updates the brain's
+     * learned preferences, action quality predictions, and applies reward
+     * modulated plasticity to synapses. It also updates neuromodulatory systems
+     * (dopamine, curiosity, etc.).
+     * 
+     * @param reward Outcome reward (positive for good outcomes, negative for bad)
+     * @param predictedReward Expected reward (prediction error = reward - predicted)
+     */
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    /**
+     * @brief Update development system
+     * 
+     * Advances the brain's developmental stage based on accumulated time,
+     * affecting plasticity rates, neuron properties, and system parameters
+     * to simulate brain maturation and aging.
+     */
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    /**
+     * @brief Get current developmental stage
+     * 
+     * @return Current developmental stage (Initial, CriticalPeriod, Maturation, Adult, Aging)
+     */
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+    /**
+     * @brief Get neuromodulation level
+     * 
+     * @return Current neuromodulation level (typically dopamine level)
+     */
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
+    /**
+     * @brief Get curiosity level
+     * 
+     * @return Current curiosity level (0.0 to 1.0, drives exploration)
+     */
     float getCuriosityLevel() const;
     
-    // Get novelty level
+    /**
+     * @brief Get novelty level
+     * 
+     * @return Current novelty level (change detection sensitivity)
+     */
     float getNoveltyLevel() const;
     
-    // Get prediction error
+    /**
+     * @brief Get prediction error
+     * 
+     * @return Current prediction error (reward - predicted reward)
+     */
     float getPredictionError() const;
-
-    // Thought trace (Phase 5): a one-line, human-readable record of the
-    // most recent loop — what was perceived, what the planner suggested
-    // from learned action quality, what the brain actually decoded, and
-    // the outcome reward. The planner suggestion is advisory: the
-    // brain's motor decode still decides the action, so a trace where
-    // planned != acted is a real, reportable disagreement, not a script.
+    
+    /**
+     * @brief Get thought trace (Phase 5)
+     * 
+     * Returns a human-readable one-line record of the most recent loop turn,
+     * including what was perceived, what the planner suggested from learned
+     * action quality, what the brain actually decoded, and the outcome reward.
+     * The planner suggestion is advisory: the brain's motor decode still decides
+     * the action, so a trace where planned != acted is a real, reportable
+     * disagreement, not a script.
+     * 
+     * @return Human-readable thought trace string
+     */
     std::string getThoughtTrace() const;
-
-    // Learned preference trait, stored on the Brain so it survives a
-    // checkpoint reload (see Brain::getLearnedPreference).
+    
+    /**
+     * @brief Get learned preference trait
+     * 
+     * @return Learned preference (-1 to +1), stored on Brain so it survives
+     *         checkpoint reloads. This represents the agent's learned personality
+     *         from experience, not human-like personality.
+     */
     float getLearnedPreference() const;
-
-    // Phase 5 diagnostic counters (see private section): how often the
-    // vision-gated reflex bonus / hazard suppression / WTA pulse fired.
+    
+    /**
+     * @brief Phase 5 diagnostic counters
+     * 
+     * These counters track how often various mechanisms actually fired,
+     * so demo reports can tell a live mechanism from a dead one.
+     */
     int getReflexBonusCount() const { return reflexBonusCount_; }
     int getReflexSuppressCount() const { return reflexSuppressCount_; }
     int getWtaPulseCount() const { return wtaPulseCount_; }
-
-    // Phase 6: text-as-a-sense. Encode a teacher word into the sparse
-    // pattern of text-neuron indices it drives (see .cpp). The string
-    // itself is never passed to the brain; only this pattern is
-    // injected, so association must be learned by plasticity, not by
-    // string matching in the decision logic.
+    
+    /**
+     * @brief Phase 6 text-as-a-sense encoder
+     * 
+     * Encodes a teacher word into the sparse pattern of text-neuron indices
+     * it drives. The string itself is never passed to the brain; only this
+     * pattern is injected, so association must be learned by plasticity,
+     * not by string matching in the decision logic.
+     * 
+     * @param text Input text string to encode
+     * @return Vector of neuron indices that should be activated
+     */
     static std::vector<size_t> encodeText(const std::string& text);
-    // Internal (non-motor, non-sensory) firing rates, for the
-    // text-association recall probe: a learned association means the
-    // internal pattern evoked by text alone moves toward the pattern
-    // evoked by the paired visual scene.
+    
+    /**
+     * @brief Get internal firing rates (for text association recall probe)
+     * 
+     * Returns the firing rates of internal (hidden) neurons, which are used
+     * in the text-association recall probe: a learned association means the
+     * internal pattern evoked by text alone moves toward the pattern evoked
+     * by the paired visual scene.
+     */
     std::vector<float> getInternalFiringRates() const;
-    // Phase 6 thought/planning counters: how often the planner, a
-    // learned concept, the self-model, or a social observation
-    // actually changed the decoded action (not just advised it).
+    
+    /**
+     * @brief Phase 6 counters for planner/concept/self/social influence
+     */
     int getPlannerOverrideCount() const { return plannerOverrideCount_; }
     int getPlannerAgreementCount() const { return plannerAgreementCount_; }
     int getPlannerDecisionCount() const { return plannerDecisionCount_; }
     int getConceptBiasCount() const { return conceptBiasCount_; }
     int getSelfBiasCount() const { return selfBiasCount_; }
     int getSocialBiasCount() const { return socialBiasCount_; }
-    // Phase 6 wired systems, for demos/tests: concept count and the
-    // self-model's mean confidence, plus social observation. A second
-    // agent (teacher) is observed through observeOtherAgent; in a
-    // single-agent world this stays at zero and social bias stays off.
+    
+    /**
+     * @brief Phase 6 concept count and self-model confidence
+     */
     size_t getConceptCount() const;
     float getSelfModelConfidence() const;
+    
+    /**
+     * @brief Phase 6 social observation count
+     */
     size_t getSocialObservationCount() const;
+    
+    /**
+     * @brief Observe another agent's behavior
+     * 
+     * For social learning: observe a teacher/other agent's action and its
+     * effects on the world, allowing the brain to learn from social experience.
+     * 
+     * @param observed Motor command observed from another agent
+     * @param beforeVision Visual scene before the action
+     * @param afterVision Visual scene after the action
+     */
     void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
                            const std::vector<float>& afterVision);
     
-    // Reset agent for new episode
+    /**
+     * @brief Reset agent for new episode
+     */
     void reset();
     
-    // Get brain pointer
+    /**
+     * @brief Get brain pointer
+     * 
+     * @return Raw pointer to the underlying brain (use carefully)
+     */
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+    /**
+     * @brief Configuration methods for enabling/disabling subsystems
+     */
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -137,15 +316,19 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
+    /**
+     * @brief Motor decoding: convert neural activity to motor command
+     */
     MotorCommand decodeFromMotorNeurons();
     
-    // Motor command selection with curiosity/exploration
+    /**
+     * @brief Motor command selection with curiosity/exploration
+     */
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
-    std::shared_ptr<Brain> brain_;
+    std::shared_ptr<Brain> brain_;  ///< Underlying neural brain
     
-    // Motor neuron groups
+    // Motor neuron groups (Phase 5 organization)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -158,9 +341,6 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
-    // Internal (hidden) neurons, for the recall probe. Sensory neurons
-    // are the input layer; the association between a word and a scene
-    // lives in which internal neurons the two inputs jointly recruit.
     std::vector<Neuron*> internalNeurons_;
     
     // Neuromodulation state
@@ -180,88 +360,90 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Slowly adapting prediction of the visual scene, for novelty
-    // detection (see processSensoryInput). Not the previous frame:
-    // per-frame differencing cannot work here, because the world
-    // changes vision by only ~0-0.004 per action step while moving.
+    // Slowly adapting prediction of the visual scene (for novelty detection)
     std::vector<float> predictedVision_;
     float sensoryNoveltyDecay_;
+    
     // Strongest touch/proximity signal in the most recent percept
-    // (0 = nothing within touch range, 1 = touching). Used only for the
-    // innate proximity reflex in decodeFromMotorNeurons().
-    float maxTouch_ = 0.0f;
-    // Phase 5 vision-guided reflex features, derived from the same
-    // percept the brain already receives (no world label is leaked):
-    // forwardTouch_ is the strongest touch in the forward cone (touch
-    // sensors 0, 1, 7 of 8, i.e. -45..+45 degrees); forwardObjectVision_
-    // is the closest forward-cone vision value (centre rays 5..10 of
-    // 16) below the empty value 1.0. The world's vision encoding makes
-    // a close bright object ~0.65-0.8 (resource), a close dark object
-    // ~0.24-0.3 (hazard) and a close wall ~0.1-0.2 — so a value above
-    // 0.5 with forward touch is a resource cue, and a value below 0.35
-    // is a hazard/wall cue. Touch alone cannot tell them apart; vision
-    // in the same percept can, and only that is used here.
-    float forwardTouch_ = 0.0f;
-    float forwardObjectVision_ = 1.0f;
-    // Phase 5 winner-take-all state: the motor group that won the last
-    // decode, and by how much. On the next presentation its competitors
-    // receive a lateral-inhibition pulse (see processSensoryInput), so
-    // a decisive winner suppresses its rivals instead of every group
-    // saturating together at 70-90 Hz.
-    int lastWinnerGroup_ = -1;
-    float lastWinnerMargin_ = 0.0f;
-    int consecutiveWinnerCount_ = 0;
-    // Phase 5 action-diversity state, updated from final decoded
-    // actions: steps since the last turn, and how many times the same
-    // movement has repeated in a row. Used for a turn-diversity bias
-    // and a repetition-fatigue penalty in decode, not a pathfinder.
-    int stepsSinceTurn_ = 0;
-    int repeatCount_ = 0;
-    // Phase 5 diagnostic counters (not used for decisions): how often
-    // the vision-gated reflex bonus / hazard suppression / WTA pulse
-    // actually fired, so demo reports can tell a live mechanism from
-    // a dead one.
-    int reflexBonusCount_ = 0;
-    int reflexSuppressCount_ = 0;
-    int wtaPulseCount_ = 0;
-    // Last decoded command, for the interact no-repeat rule below.
-    MotorCommand lastDecoded_ = MotorCommand::Wait;
-    bool hasLastDecoded_ = false;
+    float maxTouch_;
+    
+    // Phase 5 vision-guided reflex features
+    float forwardTouch_;
+    float forwardObjectVision_;
+    
+    // Phase 5 winner-take-all state
+    int lastWinnerGroup_;
+    float lastWinnerMargin_;
+    int consecutiveWinnerCount_;
+    
+    // Phase 5 action-diversity state
+    int stepsSinceTurn_;
+    int repeatCount_;
+    
+    // Phase 5 diagnostic counters
+    int reflexBonusCount_;
+    int reflexSuppressCount_;
+    int wtaPulseCount_;
+    
+    // Last decoded command, for the interact no-repeat rule below
+    MotorCommand lastDecoded_;
+    bool hasLastDecoded_;
+    
     // Phase 6 wired cognition: the brain owns the planner and concept
-    // formation, but AgentBrain owns the self-model and social
-    // learning (Brain never owned them) and calls them from the loop,
-    // so they are no longer library-only classes. The self-model is
-    // fed every loop turn (previous percept -> current percept for
-    // the action just taken); social learning is fed only when a
-    // teacher/other agent is observed, via observeOtherAgent().
+    // formation, but AgentBrain owns the self-model and social learning
+    // (Brain never owned them) and calls them from the loop, so they are
+    // no longer library-only classes.
     SelfModel selfModel_;
     SocialLearning socialLearning_;
-    bool selfModelReady_ = false;
-    bool socialReady_ = false;
+    bool selfModelReady_;
+    bool socialReady_;
+    
     // Last percept's touch vector, kept so applyRewardModulation can
     // present the pattern that actually led to a reward to concept
     // formation (pattern -> action -> reward, in that order).
     std::vector<float> lastTouch_;
     std::string lastText_;
-    // Phase 6 counters for planner/concept/self/social influence.
-    int plannerOverrideCount_ = 0;
-    int plannerAgreementCount_ = 0;
-    int plannerDecisionCount_ = 0;
-    int conceptBiasCount_ = 0;
-    int selfBiasCount_ = 0;
-    int socialBiasCount_ = 0;
+    
+    // Phase 6 counters for planner/concept/self/social influence
+    int plannerOverrideCount_;
+    int plannerAgreementCount_;
+    int plannerDecisionCount_;
+    int conceptBiasCount_;
+    int selfBiasCount_;
+    int socialBiasCount_;
+    
     // Concept pattern for the current percept, in closeness form
     // (1 - vision, 0 = empty) plus touch, for concept bias lookup.
     std::vector<float> conceptPattern() const;
+    
     // Phase 5 thought trace: last perceived scene summary, last
     // planner suggestion (from learned action quality), last decoded
     // action, and its outcome reward. Filled across one loop turn.
     std::vector<float> lastVision_;
-    std::string thoughtPercept_ = "none";
-    MotorCommand thoughtPlanned_ = MotorCommand::Wait;
-    bool hasThoughtPlanned_ = false;
-    float thoughtReward_ = 0.0f;
-    bool hasThoughtOutcome_ = false;
+    std::string thoughtPercept_;
+    MotorCommand thoughtPlanned_;
+    bool hasThoughtPlanned_;
+    float thoughtReward_;
+    bool hasThoughtOutcome_;
+    
+    // Additional Phase 6 state
+    MotorCommand lastDecoded_ = MotorCommand::Wait;
+    bool hasLastDecoded_ = false;
+    float maxTouch_ = 0.0f;
+    float forwardTouch_ = 0.0f;
+    float forwardObjectVision_ = 1.0f;
+    int lastWinnerGroup_ = -1;
+    float lastWinnerMargin_ = 0.0f;
+    int consecutiveWinnerCount_ = 0;
+    int stepsSinceTurn_ = 0;
+    int repeatCount_ = 0;
+    int reflexBonusCount_ = 0;
+    int reflexSuppressCount_ = 0;
+    int wtaPulseCount_ = 0;
+    SelfModel selfModel_;
+    SocialLearning socialLearning_;
+    bool selfModelReady_ = false;
+    bool socialReady_ = false;
 };
 
 } // namespace nlm

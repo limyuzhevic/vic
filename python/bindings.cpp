@@ -253,17 +253,27 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
+        .def("getVision", [](const SensoryPercept& self) {
+              return self.getVision();
+          }, "Get vision data (returns copy for safety)")
         .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
         .def("getVisionWidth", &SensoryPercept::getVisionWidth)
         .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
+        .def("getTouch", [](const SensoryPercept& self) {
+              return self.getTouch();
+          }, "Get touch data (returns copy for safety)")
         .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
+        .def("getInternal", [](const SensoryPercept& self) {
+              return self.getInternal();
+          }, "Get internal signals (returns copy for safety)")
         .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("getProprioception", [](const SensoryPercept& self) {
+              return self.getProprioception();
+          }, "Get proprioception data (returns copy for safety)")
         .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
+        .def("getAudio", [](const SensoryPercept& self) {
+              return self.getAudio();
+          }, "Get audio data (returns copy for safety)")
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
@@ -278,10 +288,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("update", &SimpleWorld::update, py::arg("timestep"))
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
              py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+    .def("getSensoryPercept", [](const SimpleWorld& self) {
+              return self.getSensoryPercept();
+          }, "Get sensory percept (returns copy for safety)")
+        .def("getAgentBody", [](const SimpleWorld& self) {
+              return self.getAgentBody();
+          }, "Get agent body (returns copy for safety)")
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
@@ -325,17 +337,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         // getRegion is const/non-const overloaded; bind the mutable one.
-        .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
-             py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
+        .def("getRegion", [](Brain& self, RegionId id) {
+              NeuralRegion* region = self.getRegion(id);
+              return std::shared_ptr<NeuralRegion>(region, [](NeuralRegion*) {});  // No-op deleter to prevent double-free
+          }, py::arg("id"),
+              "Get a region by ID (returns shared_ptr for safety)")
         .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
+              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
+              "Get all region IDs")
+        .def("getRegions", [](const Brain& self) {
+              // Return a copy of regions to prevent external modification
+              auto regions = self.getRegions();
+              return std::vector<std::shared_ptr<NeuralRegion>>(regions.begin(), regions.end());
+          }, "Get all regions (returns copy for safety)")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -355,11 +370,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+        .def("getConfig", [](const Brain& self) {
+              auto config = self.getConfig();
+              return std::shared_ptr<const Config>(config, [](const Config*) {});
+          }, "Get the configuration (returns shared_ptr for safety)")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -393,8 +409,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              "Get the underlying brain (reference returned for efficiency)")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
