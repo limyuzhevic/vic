@@ -56,8 +56,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports .cfg, .json, .yaml, .yml)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJsonFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -66,12 +69,16 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
+    // Enhanced get methods with type conversion and validation
+    template<typename T>
+    std::optional<T> get(const std::string& key, const T& defaultValue) const;
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -79,6 +86,9 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Enhanced set methods with validation
+    void setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -95,6 +105,19 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration schema access
+    static std::string getDefaultSchema();
+    
+    // Type conversion utilities
+    static std::string configValueToString(const ConfigValue& value);
+    static bool configValueToBool(const ConfigValue& value, bool defaultValue = false);
+    static int configValueToInt(const ConfigValue& value, int defaultValue = 0);
+    static double configValueToDouble(const ConfigValue& value, double defaultValue = 0.0);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +125,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON support
+    bool loadFromJsonFileInternal(const std::string& filepath);
+    bool loadFromJsonStringInternal(const std::string& jsonStr);
+    std::string configValueToJsonInternal(const ConfigValue& value) const;
 };
 
 } // namespace nlm

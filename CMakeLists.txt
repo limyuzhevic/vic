@@ -21,7 +21,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Brain core library (simplified for maintainability)
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -72,16 +72,23 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Brain utility functions (for better organization)
+    src/brain/BrainUtils.cpp
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -135,6 +142,7 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/test_modules.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
