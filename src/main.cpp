@@ -28,6 +28,7 @@
 
 using namespace nlm;
 
+// Enhanced print banner with better formatting
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -48,116 +49,129 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+void runStdpVerification(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
     
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
-        
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+    // Use one real synapse and its own pre/post neurons. The old test
+    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
+    // usually unrelated to that pair, so its result said nothing about STDP.
+    auto& synapses = region->getSynapses();
+    if (synapses.empty()) {
+        NLM_LOG_INFO("  No synapses for STDP test");
+        return;
+    }
+    Synapse* syn = synapses[0].get();
+    syn->enablePlasticity(false, true, false);  // STDP only
+    float beforeWeight = syn->getWeight();
+    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
+    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
+                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    
+    for (int trial = 0; trial < 50; ++trial) {
+        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    }
+    
+    float delta = syn->getWeight() - beforeWeight;
+    NLM_LOG_INFO("  After correlated activity:");
+    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
+                 " (Δ=" + std::to_string(delta) + ")");
+    
+    float totalDelta = delta;
+    
+    NLM_LOG_INFO("");
+    if (totalDelta > 0.001f) {
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+    } else if (totalDelta < -0.001f) {
+        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+    } else {
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    }
+}
+
+// Enhanced configuration setup with better validation
+void setupConfiguration(std::shared_ptr<Config>& config, int argc, char** argv) {
+    // Try to load from file if provided
+    std::string configFile = "configs/default.cfg";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
             }
         }
-        
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
     }
-    
-    void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
-        }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
+
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
     }
-    
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
-        
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
-        }
-        
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
-        
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
-        
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
-        } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
-        }
+
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+
+    // Set default values for Phase 2 with better validation
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+
+    // STDP parameters with better defaults
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+}
+
+// Initialize simulation clock with better error handling
+void initializeSimulationClock(std::shared_ptr<Config>& config, SimulationClock& clock) {
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    clock = SimulationClock(timestep);
+    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+}
+
+// Initialize brain with better error reporting and validation
+bool initializeBrain(std::shared_ptr<Brain>& brain, std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Brain...");
+    brain = std::make_shared<Brain>(config);
+
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        return false;
     }
-};
+
+    brain->logStatus();
+    return true;
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -255,6 +269,56 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+}
+
+void runStdpVerification(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
+    
+    // Use one real synapse and its own pre/post neurons. The old test
+    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
+    // usually unrelated to that pair, so its result said nothing about STDP.
+    auto& synapses = region->getSynapses();
+    if (synapses.empty()) {
+        NLM_LOG_INFO("  No synapses for STDP test");
+        return;
+    }
+    Synapse* syn = synapses[0].get();
+    syn->enablePlasticity(false, true, false);  // STDP only
+    float beforeWeight = syn->getWeight();
+    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
+    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
+                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    
+    for (int trial = 0; trial < 50; ++trial) {
+        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    }
+    
+    float delta = syn->getWeight() - beforeWeight;
+    NLM_LOG_INFO("  After correlated activity:");
+    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
+                 " (Δ=" + std::to_string(delta) + ")");
+    
+    float totalDelta = delta;
+    
+    NLM_LOG_INFO("");
+    if (totalDelta > 0.001f) {
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+    } else if (totalDelta < -0.001f) {
+        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+    } else {
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    }
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
