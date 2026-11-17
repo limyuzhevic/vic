@@ -59,6 +59,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Parse JSON string
+    bool parseJSON(const std::string& json);
+    
+    // Parse JSON value (internal helper)
+    ConfigValue parseJSONValue(const std::string& json, size_t& pos);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -66,12 +72,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);

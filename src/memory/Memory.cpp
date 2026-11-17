@@ -1,5 +1,8 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <cmath>
+#include <unordered_map>
+#include <random>
 
 namespace nlm {
 
@@ -109,6 +112,303 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    if (pImpl->episodes.empty()) return;
+    
+    // Enhanced consolidation mechanism with multiple phases
+    
+    // 1. Synaptic consolidation: reactivate and strengthen recent memories
+    consolidateSynaptic(pImpl->episodes);
+    
+    // 2. Systems consolidation: transfer important memories to semantic memory
+    consolidateSystems(pImpl->episodes, relevanceThreshold);
+    
+    // 3. Reorganization: integrate related memories into coherent schemas
+    reorganizeSchemas(pImpl->episodes);
+    
+    // 4. Pruning: remove irrelevant or low-quality memories
+    pruneUnimportant(pImpl->episodes, relevanceThreshold);
+}
+
+void EpisodicMemory::consolidateSynaptic(const std::vector<EpisodicMemoryItem>& episodes) {
+    // Synaptic consolidation: reactivate and we
+    // This simulates hippocampal-neocortical interactions during sleep
+    
+    for (const auto& episode : episodes) {
+        // Reactivate recent episodes to We
+        float reactivationWeight = std::pow(2.0f, -episode.timeSince / 10.0f); // Exponential weighting
+        
+        // We
+        // Actual synaptic changes would modify hippocampal connections
+        // For simulation, we update the episode's importance
+        episode.relevance *= reactivationWeight;
+        episode.quality *= 0.95f; // Natural decay during consolidation
+    }
+}
+
+void EpisodicMemory::consolidateSystems(const std::vector<EpisodicMemoryItem>& episodes, float relevanceThreshold) {
+    // Systems consolidation: transfer high-quality memories to semantic memory
+    
+    for (const auto& episode : episodes) {
+        // Check transfer criteria
+        bool shouldTransfer = episode.relevance > relevanceThreshold && episode.quality > 0.8f;
+        
+        if (shouldTransfer) {
+            // Extract semantic features
+            std::string concept = extractConceptFromEpisode(episode);
+            float conceptStrength = episode.quality * episode.relevance;
+            
+            // Transfer to semantic memory (would update SemanticMemory)
+            // For simulation, we mark episode as transferred
+            episode.isSemantic = true;
+            
+            // Reduce episodic importance after transfer
+            episode.relevance *= 0.5f;
+            episode.quality *= 0.8f;
+        }
+    }
+}
+
+void EpisodicMemory::reorganizeSchemas(const std::vector<EpisodicMemoryItem>& episodes) {
+    // Schema reorganization: integrate related memories into coherent structures
+    
+    // Group episodes by temporal proximity and content similarity
+    std::vector<std::vector<EpisodicMemoryItem>> schemas;
+    
+    for (const auto& episode : episodes) {
+        // Find or create schema for this episode
+        size_t schemaIndex = findOrCreateSchema(schemas, episode);
+        
+        if (schemaIndex < schemas.size()) {
+            // Integrate episode into schema
+            integrateIntoSchema(schemas[schemaIndex], episode);
+        }
+    }
+    
+    // Update schema coherence and strength
+    for (auto& schema : schemas) {
+        updateSchemaCoherence(schema);
+        enhanceSchemaStrength(schema);
+    }
+}
+
+void EpisodicMemory::pruneUnimportant(const std::vector<EpisodicMemoryItem>& episodes, float relevanceThreshold) {
+    // Memory pruning: remove low-quality or irrelevant memories
+    
+    for (auto it = pImpl->episodes.begin(); it != pImpl->episodes.end();) {
+        const auto& episode = *it;
+        
+        // Prune criteria:
+        // 1. Very low relevance
+        // 2. Low quality
+        // 3. Very old and not well-consolidated
+        // 4. Redundant with newer memories
+        
+        bool shouldRemove = false;
+        
+        if (episode.relevance < relevanceThreshold * 0.5f) {
+            shouldRemove = true; // Very low relevance
+        } else if (episode.quality < 0.3f) {
+            shouldRemove = true; // Very low quality
+        } else if (episode.timeSince > 1000.0f && episode.consolidation < 0.5f) {
+            shouldRemove = true; // Old and not consolidated
+        } else if (isRedundant(episode)) {
+            shouldRemove = true; // Redundant memory
+        }
+        
+        if (shouldRemove) {
+            // Remove episode
+            it = pImpl->episodes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+float EpisodicMemory::getConsolidationEfficiency() const {
+    if (pImpl->episodes.empty()) return 0.0f;
+    
+    float totalQuality = 0.0f;
+    float totalRelevance = 0.0f;
+    
+    for (const auto& episode : pImpl->episodes) {
+        totalQuality += episode.quality;
+        totalRelevance += episode.relevance;
+    }
+    
+    float avgQuality = totalQuality / static_cast<float>(pImpl->episodes.size());
+    float avgRelevance = totalRelevance / static_cast<float>(pImpl->episodes.size());
+    
+    return (avgQuality + avgRelevance) * 0.5f;
+}
+
+void EpisodicMemory::updateMemoryTrace(EpisodicMemoryItem& episode, TimestepDuration dt) {
+    // Update memory trace with simulated replay
+    
+    // Memory decay
+    episode.decayRate = 0.001f + episode.intensity * 0.01f;
+    episode.quality *= (1.0f - episode.decayRate * dt);
+    episode.relevance *= (1.0f - episode.decayRate * 0.5f * dt);
+    
+    // Spontaneous replay during consolidation periods
+    if (dt > 0.01f) { // During longer simulation steps
+        float replayProbability = std::min(1.0f, episode.relevance * 0.1f);
+        if ((std::rand() / (RAND_MAX + 1.0f)) < replayProbability) {
+            // Reactivate memory
+            episode.reactivationCount++;
+            episode.consolidation *= 1.05f; // Enhance consolidation
+            
+            // Replay can strengthen memory
+            if (episode.reactivationCount > 3) {
+                episode.quality *= 1.02f;
+            }
+        }
+    }
+    
+    // Consolidation progress
+    if (episode.consolidation < 1.0f) {
+        episode.consolidation = std::min(1.0f, episode.consolidation + 0.01f * dt);
+    }
+}
+
+std::string EpisodicMemory::extractConceptFromEpisode(const EpisodicMemoryItem& episode) const {
+    // Extract semantic concept from episodic memory
+    // This is a simplified version - real implementation would use
+    // more sophisticated pattern matching and abstraction
+    
+    // For demonstration, extract key information based on episode content
+    if (episode.content.empty()) {
+        return "generic_event";
+    }
+    
+    // Simple heuristic: first word or few words as concept
+    size_t spacePos = episode.content.find(' ');
+    if (spacePos != std::string::npos) {
+        return episode.content.substr(0, spacePos);
+    }
+    
+    return episode.content;
+}
+
+size_t EpisodicMemory::findOrCreateSchema(std::vector<std::vector<EpisodicMemoryItem>>& schemas, const EpisodicMemoryItem& episode) const {
+    // Find existing schema that matches this episode, or create new one
+    
+    for (size_t i = 0; i < schemas.size(); ++i) {
+        if (schemaMatches(schemas[i], episode)) {
+            return i;
+        }
+    }
+    
+    // Create new schema
+    schemas.push_back(std::vector<EpisodicMemoryItem>{episode});
+    return schemas.size() - 1;
+}
+
+bool EpisodicMemory::schemaMatches(const std::vector<EpisodicMemoryItem>& schema, const EpisodicMemoryItem& episode) const {
+    // Check if episode fits into existing schema
+    
+    if (schema.empty()) return true;
+    
+    // Simple matching: compare temporal proximity and content similarity
+    const EpisodicMemoryItem& firstEpisode = schema.front();
+    
+    // Temporal proximity (within 10 time units)
+    if (std::abs(episode.timestamp - firstEpisode.timestamp) < 10.0f) {
+        return true;
+    }
+    
+    // Check concept matching
+    std::string episodeConcept = extractConceptFromEpisode(episode);
+    std::string schemaConcept = extractConceptFromEpisode(firstEpisode);
+    
+    return episodeConcept == schemaConcept;
+}
+
+void EpisodicMemory::integrateIntoSchema(std::vector<EpisodicMemoryItem>& schema, const EpisodicMemoryItem& episode) {
+    // Integrate episode into schema
+    
+    // Add to schema
+    schema.push_back(episode);
+    
+    // Limit schema size to prevent overgrowth
+    if (schema.size() > 50) {
+        // Remove oldest episodes
+        schema.erase(schema.begin());
+    }
+}
+
+void EpisodicMemory::updateSchemaCoherence(std::vector<EpisodicMemoryItem>& schema) {
+    // Update schema coherence based on episode relationships
+    
+    float coherence = 0.0f;
+    
+    for (size_t i = 1; i < schema.size(); ++i) {
+        // Calculate temporal coherence
+        float timeDiff = std::abs(schema[i].timestamp - schema[i-1].timestamp);
+        float temporalCoherence = std::exp(-timeDiff / 100.0f);
+        
+        // Calculate content coherence
+        std::string concept1 = extractConceptFromEpisode(schema[i-1]);
+        std::string concept2 = extractConceptFromEpisode(schema[i]);
+        float contentCoherence = (concept1 == concept2) ? 1.0f : 0.5f;
+        
+        coherence += temporalCoherence * 0.6f + contentCoherence * 0.4f;
+    }
+    
+    if (!schema.empty()) {
+        coherence /= static_cast<float>(schema.size() - 1);
+    }
+    
+    // Apply coherence to all episodes in schema
+    for (auto& ep : schema) {
+        ep.schemaCoherence = coherence;
+    }
+}
+
+void EpisodicMemory::enhanceSchemaStrength(std::vector<EpisodicMemoryItem>& schema) {
+    // Enhance overall schema strength
+    
+    float schemaStrength = 0.0f;
+    for (const auto& episode : schema) {
+        schemaStrength += episode.quality * episode.relevance * episode.schemaCoherence;
+    }
+    
+    if (!schema.empty()) {
+        schemaStrength /= static_cast<float>(schema.size());
+    }
+    
+    // Apply strength to episodes
+    for (auto& episode : schema) {
+        episode.schemaStrength = schemaStrength;
+        
+        // High schema strength can improve individual episode quality
+        if (episode.schemaStrength > 0.7f) {
+            episode.quality *= 1.01f;
+        }
+    }
+}
+
+bool EpisodicMemory::isRedundant(const EpisodicMemoryItem& episode) const {
+    // Check if episode is redundant with newer memories
+    
+    for (const auto& other : pImpl->episodes) {
+        if (&other == &episode) continue; // Skip self
+        
+        // Check if other episode is newer and similar
+        if (other.timestamp > episode.timestamp + 10.0f) { // Newer
+            // Check for similarity
+            std::string concept1 = extractConceptFromEpisode(episode);
+            std::string concept2 = extractConceptFromEpisode(other);
+            
+            if (concept1 == concept2) {
+                // Similar concept, check if it's better consolidated
+                if (other.consolidation > episode.consolidation * 1.5f) {
+                    return true; // Redundant
+                }
+            }
+        }
+    }
+    
+    return false;
 }
 
 // Semantic Memory Implementation

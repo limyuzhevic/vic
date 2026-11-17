@@ -133,7 +133,21 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Enhanced multi-level decay mechanism
+    
+    // 1. Fast decay: rapid decay of weak traces
+    fastDecay(dt);
+    
+    // 2. Slow decay: gradual decay of stable traces
+    slowDecay(dt);
+    
+    // 3. Competition-based decay: weak traces suffer from strong competition
+    competitionDecay(dt);
+    
+    // 4. Context-dependent decay: decay based on environmental context
+    contextDependentDecay(dt);
+    
+    // 5. Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
@@ -145,8 +159,8 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
+            // Check if trace is too old (prevents indefinite retention)
+            if (memoryTimestamps_[i] > 500) {  // Reduced from 1000
                 activation *= (1.0f - decayRate_);
             }
             
@@ -154,11 +168,115 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
+    // Decay weak traces (legacy fallback)
     decayWeakTraces();
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+}
+
+void NeuralWorkingMemory::fastDecay(TimestepDuration dt) {
+    // Fast decay: targets weak, unstable traces
+    float fastDecayRate = decayRate_ * 2.0f; // Twice as fast
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        float activation = memoryActivations_[i];
+        
+        // Very weak traces decay rapidly
+        if (activation < 0.1f) {
+            activation *= (1.0f - fastDecayRate * dt);
+            memoryActivations_[i] = activation;
+            
+            // Remove nearly extinct traces
+            if (activation < 0.01f) {
+                // Mark for removal in decayWeakTraces
+                activation = 0.0f;
+                memoryActivations_[i] = activation;
+            }
+        } else {
+            // Moderate decay for weak traces
+            activation *= (1.0f - decayRate_ * dt);
+            memoryActivations_[i] = activation;
+        }
+    }
+}
+
+void NeuralWorkingMemory::slowDecay(TimestepDuration dt) {
+    // Slow decay: affects stable, strong traces
+    float slowDecayRate = decayRate_ * 0.1f; // Much slower
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        float activation = memoryActivations_[i];
+        
+        // Only strong traces experience slow decay
+        if (activation > 0.3f) {
+            // Decays gradually, preserving memory integrity
+            activation *= (1.0f - slowDecayRate * dt);
+            memoryActivations_[i] = activation;
+        }
+    }
+}
+
+void NeuralWorkingMemory::competitionDecay(TimestepDuration dt) {
+    // Competition-based decay: weak traces suppressed by strong competition
+    if (memoryActivations_.empty()) return;
+    
+    // Find the strongest trace
+    float maxActivation = 0.0f;
+    size_t maxIndex = 0;
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > maxActivation) {
+            maxActivation = memoryActivations_[i];
+            maxIndex = i;
+        }
+    }
+    
+    if (maxActivation < 0.01f) return; // No significant trace
+    
+    // Apply competitive decay: weaker traces suffer more
+    float competitionFactor = 2.0f; // Strength of competition
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (i == maxIndex) continue; // Winner not penalized
+        
+        float activation = memoryActivations_[i];
+        if (activation < 0.05f) {
+            // Very weak traces heavily penalized by competition
+            float decay = (maxActivation - activation) * competitionFactor * dt;
+            activation *= (1.0f - decay);
+            memoryActivations_[i] = std::max(0.0f, activation);
+        }
+    }
+}
+
+void NeuralWorkingMemory::contextDependentDecay(TimestepDuration dt) {
+    // Context-dependent decay: decay depends on current brain state
+    if (!brain_) return;
+    
+    // Get overall brain activity level as context
+    float brainActivity = brain_->getGlobalActivityLevel();
+    
+    // In highly active environments, memory traces decay faster
+    float activityDependentDecay = decayRate_ * (1.0f + brainActivity * 0.5f);
+    
+    // Environmental novelty: novel environments cause faster memory decay
+    // This simulates adaptive forgetting in changing environments
+    float noveltyFactor = 1.0f + brainActivity * 0.3f; // Novelty proportional to activity
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        float activation = memoryActivations_[i];
+        
+        if (activation > 0.1f) {
+            // Moderate decay based on context
+            float totalDecay = activityDependentDecay * dt * noveltyFactor;
+            activation *= (1.0f - totalDecay);
+            memoryActivations_[i] = activation;
+        }
+    }
 }
 
 void NeuralWorkingMemory::clear() {

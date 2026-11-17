@@ -307,6 +307,16 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
+    
+    // Clear meta-cognitive state
+    activeConcepts_.clear();
+    novelPatterns_.clear();
+    recentNovelties_.clear();
+    
+    // Reset meta-data structures
+    for (auto& conceptObj : concepts_) {
+        conceptObj.metaData = ConceptMetaData();
+    }
 }
 
 // SpatialRepresentation Implementation

@@ -10,6 +10,33 @@
 
 namespace nlm {
 
+struct ConceptMetaData {
+    // Self-awareness metrics
+    float selfConfidence = 0.0f;      // How reliable is this concept?
+    float stabilityBoost = 0.0f;      // Extra stability from meta-cognition
+    
+    // Action selection metrics
+    float usefulnessScore = 0.0f;     // How useful is this concept for behavior?
+    float priority = 0.0f;            // Priority in action selection
+    float relevanceWeight = 1.0f;     // Weight in decision making
+    
+    // Learning metrics
+    float noveltyThreshold = 0.0f;    // Sensitivity to novelty
+    SimulationStep lastUpdated = 0;   // When was this updated?
+    
+    ConceptMetaData() : selfConfidence(0), stabilityBoost(0), usefulnessScore(0),
+                       priority(0), relevanceWeight(1), noveltyThreshold(0), lastUpdated(0) {}
+};
+
+// ConceptMetaData: Stores meta-cognitive information about concepts
+// NOT a higher-level theory of mind - just utility for action selection
+//
+// Key functions:
+// - Tracks concept reliability and confidence
+// - Determines concept usefulness for behavior
+// - Enables selective attention to important concepts
+// - Supports adaptive concept abstraction
+
 // ConceptInstance: Represents a single instance of a concept
 struct ConceptInstance {
     // The neural activity pattern representing this instance
@@ -59,8 +86,14 @@ struct DiscoveredConcept {
     // Average stability of instances
     float avgStability;
     
+    // Meta-cognitive data
+    ConceptMetaData metaData;
+    
+    // Abstraction level (0 = concrete, 1 = abstract)
+    float abstractionLevel;
+    
     DiscoveredConcept() 
-        : id(0), totalObservations(0), avgStability(0) {}
+        : id(0), totalObservations(0), avgStability(0), abstractionLevel(0) {}
 };
 
 // ConceptFormation: Discovers recurring patterns from experience
@@ -72,6 +105,13 @@ struct DiscoveredConcept {
 // - Instance tracking for stability measurement
 // - Category discovery based on shared properties
 // - No predefined labels or semantic categories
+//
+// Enhanced with meta-cognitive capabilities:
+// - Concept reliability tracking
+// - Active concept selection
+// - Meta-awareness and stability assessment
+// - Abstraction level adjustment
+// - Action selection strategy optimization
 
 class ConceptFormation {
 public:
@@ -116,7 +156,7 @@ public:
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+                       const std::vector<float>& features, float reward);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
@@ -139,6 +179,14 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Meta-cognitive enhancement methods
+    void enhanceWithMetaCognition();
+    void detectNovelty(const std::vector<float>& pattern);
+    void enhanceConceptAbstraction(size_t conceptId);
+    void updateMetaData(size_t conceptId);
+    void prepareForLearning();
+    void updateActionSelectionStrategy();
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
@@ -157,6 +205,11 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // Meta-cognitive state
+    std::vector<size_t> activeConcepts_;        // Currently active concepts for decision making
+    std::vector<std::vector<float>> novelPatterns_;    // Buffer of novel patterns
+    std::unordered_set<std::vector<float>> recentNovelties_;  // Recently observed novel patterns
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept

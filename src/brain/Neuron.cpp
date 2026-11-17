@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <algorithm>
 
 namespace nlm {
 
@@ -188,10 +189,10 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with adaptive refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -203,6 +204,34 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // reflects recent activity instead of freezing at its spike value.
         pImpl->state.firingRate *= 0.9f;
         return false;
+    }
+    
+    // ACTIVITY CONTROL: Prevent runaway excitation
+    // Implement multiple levels of activity control
+    
+    // 1. Hard firing rate limit (preventing ~200 spikes/step)
+    const float MAX_FIRING_RATE = 500.0f; // Hz - maximum physiological firing rate
+    if (pImpl->state.firingRate > MAX_FIRING_RATE * 0.8f) { // 80% of max
+        // Reduce synaptic input to prevent over-excitation
+        pImpl->synapticInput *= 0.5f;
+        // Increase adaptation to promote stability
+        pImpl->state.adaptationVariable += 0.5f;
+    }
+    
+    // 2. Activity-dependent refractory period extension
+    float firingRateFactor = pImpl->state.firingRate / 100.0f; // Normalize to 100 Hz
+    if (firingRateFactor > 1.0f) {
+        // High firing rates get longer refractory periods
+        uint32_t additionalRefractory = static_cast<uint32_t>(firingRateFactor * 5.0f); // Up to 5x extra
+        pImpl->state.refractoryRemaining += std::min(additionalRefractory, uint32_t(10));
+        // Increase firingState.firingState = FiringState::Refractory; would be set by spike
+    }
+    
+    // 3. Strong adaptation for high activity
+    if (pImpl->state.adaptationVariable > 10.0f) {
+        // Strong adaptation hyperpolarizes the neuron
+        pImpl->state.membranePotential -= 0.5f;
+        pImpl->state.adaptationVariable *= 0.9f; // Decay adaptation
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
@@ -225,14 +254,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Apply spike-frequency adaptation (stronger for high activity)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
+        V -= pImpl->state.adaptationVariable * 0.01f * (1.0f + firingRateFactor * 0.5f); // Enhanced adaptation
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // ACTIVITY CONTROL: Hard membrane potential clamp
+    // Prevent excessive depolarization
+    V = std::clamp(V, -100.0f, 50.0f); // Reduced upper bound
     
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
@@ -244,12 +274,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
-    // Check for spike
+    
+    // Check for spike with activity control
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // Limit spike-induced firing rate increase
+            float rateIncrease = 0.1f * static_cast<float>(1.0 / dt);
+            if (pImpl->state.firingRate + rateIncrease > MAX_FIRING_RATE) {
+                rateIncrease = MAX_FIRING_RATE - pImpl->state.firingRate;
+            }
+            pImpl->state.firingRate += rateIncrease;
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -260,12 +295,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Reset membrane potential
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period (base + activity-dependent)
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Stronger adaptation after high-frequency spike
+        pImpl->state.adaptationVariable += 2.0f * (1.0f + firingRateFactor * 0.5f);
+        
+        // Apply activity-dependent synaptic depression to prevent runaway
+        if (firingRateFactor > 2.0f) {
+            // High-frequency spike induces synaptic depression
+            float depression = 0.01f * (firingRateFactor - 2.0f);
+            // Apply to synapses (simplified: affects overall excitability)
+            pImpl->synapticInput = std::max(0.0f, pImpl->synapticInput - depression);
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }

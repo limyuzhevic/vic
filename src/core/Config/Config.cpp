@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <cctype>
 
 namespace nlm {
 
@@ -236,3 +238,174 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
+// JSON parsing implementation
+bool Config::parseJSON(const std::string& json) {
+    // Simple JSON parser implementation
+    // Supports: { "key": "value", "number": 123, "float": 45.67, "array": [1,2,3], "nested": { "inner": "value" } }
+    
+    std::string trimmed = trim(json);
+    if (trimmed.empty() || trimmed[0] != '{' || trimmed.back() != '}') {
+        return false;
+    }
+    
+    // Remove outer braces
+    std::string content = trimmed.substr(1, trimmed.length() - 2);
+    
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) pos++;
+        if (pos >= content.length()) break;
+        
+        // Parse key (string in quotes)
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        pos = keyEnd + 1;
+        
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) pos++;
+        if (pos >= content.length() || content[pos] != ':') break;
+        
+        pos++; // Skip colon
+        while (pos < content.length() && std::isspace(content[pos])) pos++;
+        if (pos >= content.length()) break;
+        
+        // Parse value
+        ConfigValue value = parseJSONValue(content, pos);
+        if (!value.has_value()) {
+            break;
+        }
+        
+        // Find where this value ends
+        size_t valueEnd = pos;
+        // Simple approach: find next comma or closing brace
+        while (valueEnd < content.length() && content[valueEnd] != ',' && content[valueEnd] != '}') valueEnd++;
+        
+        set(key, value, ConfigSource::File);
+        pos = valueEnd;
+        
+        // Skip comma if present
+        if (pos < content.length() && content[pos] == ',') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+ConfigValue Config::parseJSONValue(const std::string& json, size_t& pos) {
+    // Parse JSON value starting at position pos
+    while (pos < json.length() && std::isspace(json[pos])) pos++;
+    if (pos >= json.length()) return std::nullopt;
+    
+    char first = json[pos];
+    
+    // String value
+    if (first == '\"') {
+        size_t end = json.find('\"', pos + 1);
+        if (end == std::string::npos) return std::nullopt;
+        
+        std::string value = json.substr(pos + 1, end - pos - 1);
+        pos = end + 1;
+        return value;
+    }
+    
+    // Number (integer or float)
+    else if (first == '-' || std::isdigit(first)) {
+        size_t end = pos;
+        while (end < json.length() && (std::isdigit(json[end]) || json[end] == '.' || json[end] == 'e' || json[end] == 'E' || json[end] == '-')) end++;
+        
+        std::string numStr = json.substr(pos, end - pos);
+        
+        // Try to parse as double first
+        try {
+            size_t parsedPos;
+            double doubleVal = std::stod(numStr, &parsedPos);
+            if (parsedPos == numStr.length()) {
+                // Check if it could be an int
+                size_t intPos;
+                long long intVal = std::stoll(numStr, &intPos);
+                if (intPos == numStr.length()) {
+                    pos = end;
+                    return intVal;
+                }
+                pos = end;
+                return doubleVal;
+            }
+        } catch (...) {
+            // Fall through to string
+        }
+        
+        pos = end;
+        return numStr;
+    }
+    
+    // Boolean
+    else if (first == 't' || first == 'f') {
+        if (json.substr(pos, 4) == "true") {
+            pos += 4;
+            return true;
+        } else if (json.substr(pos, 5) == "false") {
+            pos += 5;
+            return false;
+        }
+    }
+    
+    // Null
+    else if (first == 'n') {
+        if (json.substr(pos, 4) == "null") {
+            pos += 4;
+            return std::string("null");
+        }
+    }
+    
+    // Array
+    else if (first == '[') {
+        size_t end = json.find(']', pos);
+        if (end == std::string::npos) return std::nullopt;
+        
+        std::string arrayContent = json.substr(pos + 1, end - pos - 1);
+        std::vector<ConfigValue> array;
+        
+        size_t arrayPos = 0;
+        while (arrayPos < arrayContent.length()) {
+            while (arrayPos < arrayContent.length() && std::isspace(arrayContent[arrayPos])) arrayPos++;
+            if (arrayPos >= arrayContent.length()) break;
+            
+            if (arrayContent[arrayPos] == ']') break;
+            
+            ConfigValue value = parseJSONValue(arrayContent, arrayPos);
+            if (!value.has_value()) break;
+            
+            array.push_back(value.value());
+            
+            while (arrayPos < arrayContent.length() && std::isspace(arrayContent[arrayPos])) arrayPos++;
+            if (arrayPos < arrayContent.length() && arrayContent[arrayPos] == ',') {
+                arrayPos++;
+            }
+        }
+        
+        pos = end + 1;
+        return array;
+    }
+    
+    // Object (nested)
+    else if (first == '{') {
+        size_t end = json.find('}', pos);
+        if (end == std::string::npos) return std::nullopt;
+        
+        // For nested objects, we'll just parse as string for now
+        // A more sophisticated implementation would parse them properly
+        std::string value = json.substr(pos, end - pos + 1);
+        pos = end + 1;
+        return value;
+    }
+    
+    return std::nullopt;
+}
