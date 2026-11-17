@@ -1,0 +1,1 @@
+#error This is a test error to demonstrate the improved error handling in the Python bindings. Invalid input detected.

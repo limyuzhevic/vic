@@ -362,9 +362,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Compute novelty as prediction error against a slowly adapting
     // expectation of the scene (habituation). Phase 4: the old code
     // differenced consecutive frames, which had two fatal problems.
-    // (1) It divided by previousVision_.size() = 16*16 = 256 while the
-    // world's vision is only 16 rays, dividing every real change by
-    // 16. (2) Even correctly normalised, per-step vision change while
+    // FIXED BUG (1): It divided by previousVision_.size() = 16*16 = 256 while the
+    // world's vision is only 16 rays, dividing every real change by 16.
+    // FIXED BUG (2): Even correctly normalised, per-step vision change while
     // moving is only ~0-0.004 (the agent moves <=0.3 units per
     // executed action and most actions are throttled), so novelty was
     // ~0 on every step after step 0 and curiosity never fired. A slow
@@ -380,7 +380,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         for (size_t i = 0; i < vision.size(); ++i) {
             totalDiff += std::abs(vision[i] - predictedVision_[i]);
         }
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // FIXED BUG: Use actual vision size (16 rays) for normalization, not 256
+        size_t visionSize = std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / visionSize;
         noveltyLevel_ *= sensoryNoveltyDecay_;
         // Adapt the prediction toward the current scene.
         constexpr float kPredictionAlpha = 0.05f;

@@ -144,20 +144,36 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load configuration from file: " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
+             "Load configuration from a file")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            try {
+                std::vector<char*> argv;
+                argv.reserve(args.size());
+                for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+                return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load configuration from arguments: " + std::string(e.what()));
+            }
         }, py::arg("args"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to save configuration to file: " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
+           "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -168,7 +184,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

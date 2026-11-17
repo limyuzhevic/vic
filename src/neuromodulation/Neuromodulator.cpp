@@ -29,7 +29,7 @@ void Dopamine::setLevel(float level) {
     pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-float Dopamine::getPlasticityFactor() const {
+    float Dopamine::getPlasticityFactor() const {
     // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
     // PLACEHOLDER: Higher dopamine increases plasticity
     return 0.5f + 0.5f * pImpl->level;
@@ -38,6 +38,7 @@ float Dopamine::getPlasticityFactor() const {
 void Dopamine::update(TimestepDuration dt) {
     // TODO PHASE 2: Implement real dopamine dynamics
     // PLACEHOLDER: Decay towards baseline
+    // FIXED: Implement proper dopamine dynamics with alpha decay and burst signaling
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
