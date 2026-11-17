@@ -56,6 +56,10 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
+    // Validation functions
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     

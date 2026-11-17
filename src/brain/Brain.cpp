@@ -857,14 +857,12 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
-    
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Rebuild the neuron lookup used by synaptic delivery and injection.
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            pImpl->neuronById[neuron->getId().index()] = neuron;
+        }
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

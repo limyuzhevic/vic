@@ -21,6 +21,9 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Add nlohmann/json dependency (header-only library)
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
