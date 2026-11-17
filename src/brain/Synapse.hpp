@@ -36,6 +36,11 @@ public:
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
     
+    // Effective weight including short-term plasticity and efficacy
+    SynapticWeight getEffectiveWeight() const;
+    
+    // Delay (in simulation steps)
+    
     // Delay (in simulation steps)
     Delay getDelay() const;
     void setDelay(Delay delay);

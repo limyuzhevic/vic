@@ -34,6 +34,9 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
+    // Effective synaptic strength including STP and efficacy
+    float effectiveWeight;
+    
     // Weight bounds
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
@@ -56,6 +59,7 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->effectiveWeight = 0.0f;
     pImpl->shortTermDepression = 1.0f;
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
@@ -91,6 +95,11 @@ NeuronId Synapse::getDestinationNeuron() const {
 
 SynapticWeight Synapse::getWeight() const {
     return pImpl->weight;
+}
+
+SynapticWeight Synapse::getEffectiveWeight() const {
+    // Return the pre-computed effective weight
+    return pImpl->effectiveWeight;
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
@@ -214,11 +223,6 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
@@ -240,8 +244,22 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
+    // Update synaptic efficacy based on usage (use-dependent modulation)
+    // Efficacy increases with activity but has an upper bound
+    pImpl->efficacy = std::min(pImpl->efficacy + 0.001f * dt, 2.0f);
+    
+    // Decay efficacy back to baseline
+    pImpl->efficacy *= std::exp(-dt / 1000.0f);  // Slow decay
+    
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Apply short-term plasticity to effective synaptic strength
+    float u = pImpl->shortTermFacilitation * pImpl->shortTermDepression;
+    float effectiveWeight = pImpl->weight * pImpl->efficacy * u;
+    
+    // Store effective weight for transmission
+    pImpl->effectiveWeight = effectiveWeight;
 }
 
 void Synapse::reset() {
