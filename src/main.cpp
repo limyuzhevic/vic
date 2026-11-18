@@ -25,6 +25,108 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <unordered_map>
+#include <filesystem>
+
+// Add more advanced command-line options for debugging and analysis
+void printAdvancedHelp() {
+    std::cout << R"(
+    ADVANCED NLM PHASE 2 - COMMAND LINE OPTIONS
+    ================================================
+    
+    BASIC OPTIONS:
+      --help                    Show help message
+      --config file.cfg         Load configuration from file
+      --experiment TYPE         Run specific experiment (basic/connectivity/plasticity/stdp)
+      --steps N                 Number of simulation steps
+      --debug                   Enable debug logging
+    
+    ADVANCED ADVANCED OPTIONS:
+      --checkpoint DIR          Enable checkpointing to DIR
+      --checkpoint-interval N   Checkpoint every N steps
+      --memory-inspect          Inspect memory system state
+      --memory-capacity N       Set memory capacity
+      --memory-decay-rate RATE   Set memory decay rate
+      --development-stage STAGE  Set development stage (Initial/CriticalPeriod/Maturation/Adult/Aging)
+      --development-age AGE     Set developmental age
+      --neuromodulation LEVEL   Set neuromodulation level
+      --plasticity-mod MOD      Set plasticity modification factor
+      --validate-config         Validate configuration file format
+      --benchmark                Run benchmark tests
+      --analyze-cycles          Analyze synaptic plasticity cycles
+      --memory-profile          Profile memory usage patterns
+      --neuron-inspect ID       Inspect specific neuron
+      --synapse-inspect SRC DST Inspect specific synapse
+      --brain-state-export FILE Export brain state to file
+      --brain-state-import FILE Import brain state from file
+      --save-checkpoint NAME    Save immediate checkpoint with name
+      --load-checkpoint NAME    Load checkpoint with name
+      --list-checkpoints        List available checkpoints
+      --delete-checkpoint NAME  Delete checkpoint with name
+      --experiment-dir DIR       Directory for experiment outputs
+      --log-level LEVEL         Set logging level (ERROR/WARNING/INFO/DEBUG)
+    
+    MEMORY SYSTEM ACCESS OPTIONS (for advanced analysis):
+      --working-memory-info     Show working memory statistics
+      --episodic-memory-info   Show episodic memory statistics
+      --associative-memory-info Show associative memory statistics
+      --working-memory-neurons  List working memory neurons
+      --working-memory-activity ID Get working memory activity
+      --retrieve-similar PATTERN Retrieve similar memory patterns
+      --temporal-memory-range START END Retrieve temporal memory range
+    
+    DEVELOPMENT SYSTEM OPTIONS:
+      --developmental-stage-info    Show developmental stage information
+      --critical-period-progress    Show critical period progress
+      --plasticity-modifier-info     Show current plasticity modifier
+      --advstage STAGE             Advance to specific developmental stage
+      --age SECONDS                Set developmental age
+      --stage-age SECONDS          Set age in current stage
+    
+    NEUROMODULATION OPTIONS:
+      --dopamine-level LEVEL       Set dopamine level
+      --curiosity-level LEVEL      Set curiosity level
+      --novelty-level LEVEL        Set novelty level
+      --prediction-error LEVEL     Set prediction error level
+      --neuromodulation-info        Show neuromodulation state
+    
+    PLASTICITY SYSTEM OPTIONS:
+      --plasticity-enable-all      Enable all plasticity types
+      --plasticity-disable-all     Disable all plasticity types
+      --stdp-enable               Enable STDP
+      --stdp-disable              Disable STDP
+      --hebbian-enable            Enable Hebbian
+      --hebbian-disable           Disable Hebbian
+      --structural-enable         Enable structural plasticity
+      --structural-disable        Disable structural plasticity
+      --plasticity-stats           Show plasticity statistics
+    
+    CHECKPOINT SYSTEM OPTIONS:
+      --checkpoint-stats           Show checkpoint system statistics
+      --checkpoint-validate FILE   Validate checkpoint file
+      --checkpoint-verify PATH    Verify checkpoint integrity
+    
+    CONFIGURATION ANALYSIS:
+      --config-validate           Validate configuration syntax
+      --config-suggest            Suggest configuration optimizations
+      --config-stats              Show configuration statistics
+      --config-dump              Dump configuration to file
+    
+    EXPERIMENT CONTROL:
+      --experiment-seed SEED       Set random seed for experiment
+      --experiment-trace          Enable detailed experiment tracing
+      --experiment-continuous      Run experiment until interrupted
+      --experiment-output FILE    Output experiment results to file
+    
+    SYSTEM HEALTH:
+      --system-health            Show overall system health
+      --neuron-count             Show neuron statistics
+      --synapse-count            Show synapse statistics
+      --activity-stats           Show activity statistics
+      --performance-metrics       Show performance metrics
+    
+    "
 
 using namespace nlm;
 
@@ -393,10 +495,39 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Check for advanced commands before running basic tests
+    bool runAdvancedMode = false;
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--advanced" || arg == "--advanced-mode" || arg == "--expert") {
+            runAdvancedMode = true;
+            NLM_LOG_INFO("Advanced/NLP mode enabled - enhanced command-line options available");
+            break;
+        }
+    }
+    
+    if (runAdvancedMode) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== NLM ADVANCED MODE ===");
+        NLM_LOG_INFO("Running enhanced diagnostics and analysis tools...");
+        
+        // Advanced memory system analysis
+        runAdvancedMemoryAnalysis(brain);
+        
+        // Advanced development system inspection
+        runAdvancedDevelopmentInspection(brain);
+        
+        // Advanced plasticity system analysis
+        runAdvancedPlasticityAnalysis(brain);
+        
+        // Advanced checkpoint system inspection
+        runAdvancedCheckpointAnalysis(brain);
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Advanced mode analysis complete ===");
+        NLM_LOG_INFO("");
+    }
     
     // Reset brain for plasticity experiment
     brain->reset();

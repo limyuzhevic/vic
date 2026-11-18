@@ -13,6 +13,11 @@
 
 namespace nlm {
 
+// Forward declarations for memory systems
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -135,6 +140,11 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Memory system access
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ && brain_->getWorkingMemory() ? brain_->getWorkingMemory() : nullptr; }
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ && brain_->getEpisodicMemory() ? brain_->getEpisodicMemory() : nullptr; }
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ && brain_->getAssociativeMemory() ? brain_->getAssociativeMemory() : nullptr; }
     
 private:
     // Motor decoding: convert neural activity to motor command

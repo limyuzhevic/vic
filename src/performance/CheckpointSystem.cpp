@@ -1,12 +1,5 @@
 #include "CheckpointSystem.hpp"
 
-#include <algorithm>
-#include <chrono>
-#include <cstring>
-#include <ctime>
-#include <filesystem>
-#include <fstream>
-
 // Phase 4: real checkpoint implementation. The previous file was stubs
 // (create/open returned false), so Brain::save/load always failed and
 // Phase 6 reported checkpointing NOT WORKING. This is a simple,
@@ -27,6 +20,83 @@
 
 namespace nlm {
 namespace {
+
+template <typename T>
+void appendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
+    uint64_t count = static_cast<uint64_t>(v.size());
+    const uint8_t* countBytes = reinterpret_cast<const uint8_t*>(&count);
+    out.insert(out.end(), countBytes, countBytes + sizeof(count));
+    if (!v.empty()) {
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(v.data());
+        out.insert(out.end(), data, data + v.size() * sizeof(T));
+    }
+}
+
+template <typename T>
+bool readVec(const uint8_t*& p, const uint8_t* end, std::vector<T>& v) {
+    if (static_cast<size_t>(end - p) < sizeof(uint64_t)) return false;
+    uint64_t count = 0;
+    std::memcpy(&count, p, sizeof(count));
+    p += sizeof(uint64_t);
+    size_t bytes = static_cast<size_t>(count) * sizeof(T);
+    if (static_cast<size_t>(end - p) < bytes) return false;
+    v.resize(static_cast<size_t>(count));
+    if (bytes > 0) std::memcpy(v.data(), p, bytes);
+    p += bytes;
+    return true;
+}
+
+std::vector<uint8_t> serializeNeurons(const NeuronCheckpointData& d) {
+    std::vector<uint8_t> out;
+    appendVec(out, d.membranePotential);
+    appendVec(out, d.restingPotential);
+    appendVec(out, d.threshold);
+    appendVec(out, d.resetPotential);
+    appendVec(out, d.leakConductance);
+    appendVec(out, d.firingState);
+    appendVec(out, d.refractoryRemaining);
+    appendVec(out, d.refractoryPeriod);
+    appendVec(out, d.lastSpikeTime);
+    appendVec(out, d.firingRate);
+    appendVec(out, d.neuronType);
+    appendVec(out, d.regionId);
+    appendVec(out, d.populationId);
+    return out;
+}
+
+bool parseNeurons(const std::vector<uint8_t>& payload, NeuronCheckpointData& d) {
+    const uint8_t* p = payload.data();
+    const uint8_t* end = p + payload.size();
+    return readVec(p, end, d.membranePotential) &&
+           readVec(p, end, d.restingPotential) &&
+           readVec(p, end, d.threshold) &&
+           readVec(p, end, d.resetPotential) &&
+           readVec(p, end, d.leakConductance) &&
+           readVec(p, end, d.firingState) &&
+           readVec(p, end, d.refractoryRemaining) &&
+           readVec(p, end, d.refractoryPeriod) &&
+           readVec(p, end, d.lastSpikeTime) &&
+           readVec(p, end, d.firingRate) &&
+           readVec(p, end, d.neuronType) &&
+           readVec(p, end, d.regionId) &&
+           readVec(p, end, d.populationId) &&
+           p == end;
+}
+
+std::vector<uint8_t> serializeSynapses(const SynapseCheckpointData& d) {
+    std::vector<uint8_t> out;
+    appendVec(out, d.sourceNeuron);
+    appendVec(out, d.destinationNeuron);
+    appendVec(out, d.weight);
+    appendVec(out, d.delay);
+    appendVec(out, d.synapseType);
+    appendVec(out, d.plasticityFlags);
+    appendVec(out, d.eligibilityTrace);
+    appendVec(out, d.efficacy);
+    appendVec(out, d.shortTermDepression);
+    appendVec(out, d.shortTermFacilitation);
+    return out;
+}
 
 template <typename T>
 void appendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
@@ -393,19 +463,7 @@ bool CheckpointWriter::finalize() {
     return true;
 }
 
-void CheckpointWriter::abort() {
-    close();
-    if (!filepath_.empty()) {
-        std::error_code ec;
-        std::filesystem::remove(filepath_, ec);
-    }
-}
-
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
-
-// ---------------- CheckpointManager ----------------
+// ---------------- CheckpointWriter ----------------
 
 CheckpointManager::CheckpointManager()
     : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
