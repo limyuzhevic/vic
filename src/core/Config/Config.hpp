@@ -7,6 +7,9 @@
 #include <optional>
 #include <algorithm>
 
+// Include logger for error handling
+#include "../Logger/Logger.hpp"
+
 namespace nlm {
 
 // Forward declarations
@@ -66,12 +69,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);

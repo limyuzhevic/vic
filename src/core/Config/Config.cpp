@@ -21,14 +21,18 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // For now, we'll keep the existing implementation but add better error logging
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +53,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid configuration line in " + filepath + ": line " + 
+                           std::to_string(lineNumber) + " - " + line);
         }
     }
     
@@ -81,12 +88,29 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Properly serialize the value based on its type
+        std::visit([&](const auto& value) {
+            file << entry.key << " = ";
+            if constexpr (std::is_same_v<decltype(value), std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<decltype(value), bool>) {
+                file << (value ? "true" : "false");
+            } else {
+                file << value;
+            }
+        }, entry.value);
+        file << "\n\n";
+    }
+    
+    if (!file) {
+        NLM_LOG_ERROR("Failed to write configuration to file: " + filepath);
+        return false;
     }
     
     return true;
