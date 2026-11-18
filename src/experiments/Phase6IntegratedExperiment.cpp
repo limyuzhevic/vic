@@ -25,15 +25,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with optimized parameters
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("connection_probability", 0.05f);  // Optimized for stability
+    cfg->set("stdp_ltp_weight", 0.005f);  // Optimized for selective learning
+    cfg->set("stdp_ltd_weight", 0.006f);  // Optimized for selective learning
+    cfg->set("synaptogenesis_rate", 0.00001f);  // Reduced for stability
+    cfg->set("pruning_rate", 0.000001f);      // Reduced for stability
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

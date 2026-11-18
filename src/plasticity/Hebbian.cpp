@@ -10,7 +10,7 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
+    Impl() : learningRate(0.005f), maxWeight(1.0f), minWeight(-1.0f),  // Optimized learning rate
              covarianceThreshold(0.0f) {}
 };
 

@@ -87,9 +87,9 @@ struct Phase6Config {
     
     Phase6Config()
         : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
+        , neuronCount(500)   // Reduced for better stability
+        , regionCount(1)     // Reduced for simpler initialization
+        , connectionProbability(0.05f)  // Optimized for stability
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)

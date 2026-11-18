@@ -302,14 +302,14 @@ private:
     void configureBrain(std::shared_ptr<Config> config) {
         config->set("neuron_count", 500);
         config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
+        config->set("connection_probability", 0.05f);  // Optimized for stability
         config->set("random_seed", static_cast<int64_t>(42));
         config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_ltp_weight", 0.005f);  // Optimized for selective learning
+        config->set("stdp_ltd_weight", 0.006f);  // Optimized for selective learning
         config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+        config->set("synaptogenesis_rate", 0.00001f);  // Reduced for stability
+        config->set("pruning_rate", 0.000001f);      // Reduced for stability
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

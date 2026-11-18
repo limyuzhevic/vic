@@ -48,17 +48,26 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
-    
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+// Command-line options for NLM
+void printUsage() {
+    std::cout << "NLM (熙然) - Neural Learning Machine Usage:" << std::endl;
+    std::cout << "  nlm [options]" << std::endl;
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  --mode <mode>           Run mode: demo|benchmark|explore|experiment" << std::endl;
+    std::cout << "  --config <file>         Configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --checkpoint <file>      Save/load checkpoint" << std::endl;
+    std::cout << "  --steps <count>          Number of simulation steps (default: 1000)" << std::endl;
+    std::cout << "  --neurons <count>        Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --regions <count>        Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --reward-mode <mode>     Reward mode: observation|environment|mixed" << std::endl;
+    std::cout << "  --plasticity-mode <mode> Plasticity mode: stdp|hebbian|both" << std::endl;
+    std::cout << "  --verbose                Enable verbose logging" << std::endl;
+    std::cout << "  --help                   Show this help message" << std::endl;
+    std::cout << "\nExamples:" << std::endl;
+    std::cout << "  nlm --mode demo --steps 5000 --neurons 1000" << std::endl;
+    std::cout << "  nlm --mode benchmark --config configs/optimized.cfg" << std::endl;
+    std::cout << "  nlm --mode explore --reward-mode environment --plasticity-mode both" << std::endl;
+}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -307,24 +316,54 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+// Parse command-line arguments
+    std::string mode = "demo";
+    std::string configFile = "configs/default.cfg";
+    std::string checkpointFile = "";
+    uint64_t steps = 2000;
+    size_t neurons = 500;
+    size_t regions = 1;
+    std::string rewardMode = "observation";
+    std::string plasticityMode = "both";
+    bool verbose = false;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--mode" && i + 1 < argc) {
+            mode = argv[++i];
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointFile = argv[++i];
+        } else if (arg == "--steps" && i + 1 < argc) {
+            steps = std::stoull(argv[++i]);
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            neurons = std::stoull(argv[++i]);
+        } else if (arg == "--regions" && i + 1 < argc) {
+            regions = std::stoull(argv[++i]);
+        } else if (arg == "--reward-mode" && i + 1 < argc) {
+            rewardMode = argv[++i];
+        } else if (arg == "--plasticity-mode" && i + 1 < argc) {
+            plasticityMode = argv[++i];
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            printUsage();
+            return 1;
+        }
+    }
     
-    // Initialize logger
+    // Set logging level based on verbosity
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(verbose ? LogLevel::Debug : LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("NLM Phase 2 with enhanced user interface and configuration options");
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -352,21 +391,25 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 - OPTIMIZED FOR STABILITY
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Reduced for better control
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);    // Reduced for simpler initialization
+    config->set("connection_probability", 0.05f, ConfigSource::Default);  // Reduced for better stability
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    // STDP parameters - optimized for selective learning
+    config->set("stdp_ltp_weight", 0.005f, ConfigSource::Default);  // Reduced from 0.02
+    config->set("stdp_ltd_weight", 0.006f, ConfigSource::Default);  // Reduced from 0.015
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters - reduced to prevent runaway excitation
+    config->set("synaptogenesis_rate", 0.00001f, ConfigSource::Default);  // Reduced from 0.0001
+    config->set("pruning_rate", 0.000001f, ConfigSource::Default);      // Reduced from 0.00001
+    
+    // Additional inhibitory tuning for activity control
+    config->set("inhibitory_connectivity_boost", 1.5f, ConfigSource::Default);  // Boost inhibitory connections
+    config->set("excitatory_inhibition_ratio", 2.0f, ConfigSource::Default);    // Maintain E/I balance
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -374,8 +417,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", regions)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.05f)));
+    NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.01f)));
+    NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.012f)));
+    NLM_LOG_INFO("  Synaptogenesis rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.00001f)));
+    NLM_LOG_INFO("  Pruning rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.000001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

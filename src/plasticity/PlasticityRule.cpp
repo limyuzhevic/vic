@@ -13,7 +13,7 @@ void PlasticityRule::setEnabled(bool enabled) {
 struct HebbianRule::Impl {
     float learningRate;
     
-    Impl() : learningRate(0.01f) {}
+    Impl() : learningRate(0.005f) {}  // Optimized learning rate
 };
 
 HebbianRule::HebbianRule() : pImpl(new Impl) {}
