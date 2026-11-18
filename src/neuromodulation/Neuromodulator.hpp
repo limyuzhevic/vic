@@ -1,11 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <string>
-#include <vector>
-
-namespace nlm {
-
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
@@ -84,6 +76,42 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+};
+
+// Advanced neuromodulation system manager
+class NeuromodulationManager {
+public:
+    NeuromodulationManager();
+    ~NeuromodulationManager();
+    
+    // Register neuromodulators
+    void registerNeuromodulator(std::unique_ptr<Neuromodulator> modulator);
+    Neuromodulator* getNeuromodulator(const std::string& name) const;
+    
+    // Update all neuromodulators
+    void updateAll(TimestepDuration dt);
+    
+    // Get combined neuromodulatory effects
+    float getTotalPlasticityFactor() const;
+    float getAttentionLevel() const;
+    float getArousalLevel() const;
+    float getMoodLevel() const;
+    
+    // Signal events to neuromodulators
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
+    void signalNovelty(float novelty);
+    void signalStress(float stress);
+    
+    // Get neuromodulator state for learning
+    float getDopamineLevel() const;
+    float getAChLevel() const;
+    float getNELevel() const;
+    float get5HTLevel() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

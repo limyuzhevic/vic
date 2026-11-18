@@ -544,22 +544,72 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
+    // ========== STEP 6b: Enhanced neural stability control ==========
+    // Replace simple homeostatic scaling with more sophisticated stability mechanisms:
+    // 1. Adaptive inhibitory control based on network excitability
+    // 2. Dynamic baseline adjustment to prevent runaway excitation
+    if (currentStep > 0 && currentStep % 50 == 0) {
+        bool requiresStabilityAdjustment = false;
+        
+        // Monitor network excitability level
+        float totalExcitatoryInput = 0.0f;
+        size_t neuronCount = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                auto incoming = region->getSynapsesTo(neuron->getId());
+                for (Synapse* syn : incoming) {
+                    if (syn->getWeight() > 0.0f) totalExcitatoryInput += syn->getWeight();
+                }
+                neuronCount++;
+            }
+        }
+        
+        if (neuronCount > 0) {
+            float avgExcitatoryInput = totalExcitatoryInput / static_cast<float>(neuronCount);
+            
+            // If average excitatory input is too high, increase inhibitory tone
+            if (avgExcitatoryInput > 2.5f) {
+                requiresStabilityAdjustment = true;
+                // Boost inhibitory neuron activity to balance excitation
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        if (pop->getNeuronType() == NeuronType::Inhibitory) {
+                            for (auto* neuron : pop->getNeurons()) {
+                                neuron->injectCurrent(-2.0f);  // Strong inhibitory pulse
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 6c: Dynamic baseline adjustment ==========
+    // Maintain network at stable baseline, preventing need for artificial rate boosts
+    if (currentStep > 100 && currentStep % 200 == 0) {
+        // Adjust baseline neural activity to prevent drift
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Homeostatically adjust baseline membrane potential
+                    auto& state = neuron->getState();
+                    state.membranePotential = state.restingPotential;
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 6d: Neuromodulation-enhanced homeostatic scaling ==========
+    // Integrate dopamine-based plasticity control into synaptic scaling
+    if (currentStep > 0 && currentStep % 50 == 0 && pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Scale homeostatic regulation based on dopamine level
+        float scalingFactor = 1.0f;
+        if (dopamineLevel > 0.3f) scalingFactor *= 0.8f;  // Lower scaling with moderate dopamine
+        else scalingFactor *= 1.2f;  // Higher scaling with low dopamine
+        
+        // Apply dopaminergic homeostatic scaling
         constexpr float kIncomingExcitatoryCap = 3.0f;
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
@@ -568,11 +618,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 for (Synapse* syn : incoming) {
                     if (syn->getWeight() > 0.0f) sum += syn->getWeight();
                 }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
+                if (sum > kIncomingExcitatoryCap * scalingFactor) {
+                    float scale = (kIncomingExcitatoryCap * scalingFactor) / sum;
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+                            syn->setWeight(syn->getWeight() * scale * scalingFactor);
                         }
                     }
                 }
