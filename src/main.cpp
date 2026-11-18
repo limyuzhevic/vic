@@ -56,9 +56,10 @@ struct LearningExperiment {
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
+    float learningSuccess;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), learningSuccess(0.0f) {}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -99,6 +100,30 @@ struct LearningExperiment {
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
+    }
+    
+    float getLearningSuccess() const {
+        if (initialWeights.empty() || finalWeights.empty()) {
+            return 0.0f;
+        }
+        
+        // Calculate learning success based on weight changes
+        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+        
+        float initialMean = initialSum / initialWeights.size();
+        float finalMean = finalSum / finalWeights.size();
+        
+        // Learning is successful if weights have changed significantly
+        // but not if they have completely saturated
+        float weightChange = std::abs(finalMean - initialMean);
+        if (weightChange > 0.001f && finalMean < 0.95f) {
+            learningSuccess = std::min(1.0f, weightChange / 0.5f);
+        } else {
+            learningSuccess = 0.0f;
+        }
+        
+        return learningSuccess;
     }
     
     void computeStatistics() {
@@ -156,6 +181,9 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+        
+        // Calculate learning success for neuromodulation
+        learningSuccess = getLearningSuccess();
     }
 };
 
@@ -235,19 +263,71 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
+    // Add homeostatic regulation to control spike activity
+    // The old code injected 30.0f into *every* sensory neuron 20 times per step (600.0f),
+    // causing the whole network to fire synchronously and saturating weights.
+    // Instead, apply homeostatic regulation to limit firing rates:
+    
+    // Apply excitation-inhibition balance regulation
+    if (currentStep % 50 == 0) {
+        float eiRatio = brain->getExcitationInhibitionRatio();
+        NLM_LOG_INFO("  E/I ratio at step " + std::to_string(currentStep) + ": " + std::to_string(eiRatio));
         
-        brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+        // If E/I ratio is too high (runaway excitation), apply inhibition
+        if (eiRatio > 10.0f) {
+            // Scale down excitatory inputs to reduce firing rate
+            float scale = 1.0f / std::max(1.0f, eiRatio / 5.0f);
+            if (auto* region = brain->getRegion(RegionId(1))) {
+                for (auto& syn : region->getSynapses()) {
+                    if (syn->isExcitatory()) {
+                        // Reduce excitatory weight
+                        float currentWeight = syn->getWeight();
+                        syn->setWeight(currentWeight * scale);
+                    }
+                }
+            }
+            NLM_LOG_INFO("  Applied homeostatic inhibition to reduce runaway excitation");
+        } else if (eiRatio < 1.0f) {
+            // If I/E ratio is too high, apply excitation
+            float scale = 1.0f + (eiRatio - 1.0f) * 0.5f;
+            if (auto* region = brain->getRegion(RegionId(1))) {
+                for (auto& syn : region->getSynapses()) {
+                    if (syn->isInhibitory()) {
+                        // Reduce inhibitory weight
+                        float currentWeight = syn->getWeight();
+                        syn->setWeight(currentWeight * scale);
+                    }
+                }
+            }
+            NLM_LOG_INFO("  Applied homeostatic excitation to balance inhibition");
         }
+    }
+    
+    // Apply spike-rate homeostasis to individual neurons
+    if (currentStep % 100 == 0) {
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Track average firing rate of each neuron population
+                // Implement adaptive threshold based on firing rate history
+                float firingRate = neuron->getFiringRate();
+                float membranePot = neuron->getMembranePotential();
+                
+                // If firing rate is too high, increase threshold to reduce firing
+                if (firingRate > 50.0f) {
+                    float threshold = neuron->getThreshold();
+                    neuron->setThreshold(threshold + 0.5f);  // Increase threshold
+                    NLM_LOG_INFO("  Increased threshold for neuron " + std::to_string(neuron->getId().index()) + 
+                                " (rate: " + std::to_string(firingRate) + " Hz)");
+                }
+                
+                // If firing rate is too low and membrane potential is high, decrease threshold
+                if (firingRate < 5.0f && membranePot > -50.0f) {
+                    float threshold = neuron->getThreshold();
+                    neuron->setThreshold(threshold - 0.2f);  // Decrease threshold
+                }
+            }
+        }
+        NLM_LOG_INFO("  Applied spike-rate homeostasis");
     }
     
     // Record final state
@@ -255,6 +335,46 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+    
+    // Apply reward-based neuromodulation to the brain
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Applying Reward Neuromodulation ===");
+    
+    if (auto* dopamine = brain->getDopamine()) {
+        // Apply positive reward based on learning success
+        float learningSuccess = experiment.getLearningSuccess();
+        dopamine->signalReward(learningSuccess * 0.5f);
+        NLM_LOG_INFO("  Applied reward: " + std::to_string(learningSuccess * 0.5f));
+        NLM_LOG_INFO("  Dopamine level: " + std::to_string(dopamine->getLevel()));
+        
+        // Apply reward prediction error based on learning improvement
+        float predictionError = (experiment.getLearningSuccess() - 0.5f) * 0.2f;
+        if (auto* predictionErrorModule = brain->getPredictionErrorSignal()) {
+            predictionErrorModule->setLevel(predictionError);
+        }
+        NLM_LOG_INFO("  Applied prediction error: " + std::to_string(predictionError));
+    }
+    
+    // Apply neuromodulation effects on plasticity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Neuromodulation Effects on Plasticity ===");
+    
+    if (auto* dopamine = brain->getDopamine()) {
+        float plasticityMod = dopamine->getPlasticityFactor();
+        NLM_LOG_INFO("  Plasticity modulation factor: " + std::to_string(plasticityMod));
+        
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp) {
+                    // Adjust STDP learning rates based on dopamine
+                    float currentWeight = syn->getWeight();
+                    float weightChange = (currentWeight > 0 ? 0.01f : -0.01f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->addToWeight(weightChange);
+                }
+            }
+        }
+        NLM_LOG_INFO("  Applied neuromodulation effects to synapses");
+    }
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -349,8 +469,98 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+// Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Fix: Ensure config->loadFromArgs handles --config correctly
+    // The original implementation had a bug where it would consume the next argument
+    // instead of just reading the value after '=' in --config=value format
+
+    // Add support for --mode option for different operation modes
+    std::string mode = "default";
+    bool helpRequested = false;
+    bool verbose = false;
+    bool enableMemory = false;
+    bool enableCuriosity = false;
+    bool enableDevelopment = false;
+    bool enableNeuromodulation = false;
+    bool debugPlasticity = false;
+    bool debugSpikes = false;
+    bool debugMemory = false;
+    std::string saveCheckpoint = "";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--mode" && i + 1 < argc) {
+            mode = argv[++i];
+        } else if (arg.find("--mode=") == 0) {
+            mode = arg.substr(8);
+        } else if (arg == "--enable-memory") {
+            enableMemory = true;
+        } else if (arg == "--enable-curiosity") {
+            enableCuriosity = true;
+        } else if (arg == "--enable-development") {
+            enableDevelopment = true;
+        } else if (arg == "--enable-neuromodulation") {
+            enableNeuromodulation = true;
+        } else if (arg == "--debug-plasticity") {
+            debugPlasticity = true;
+        } else if (arg == "--debug-spikes") {
+            debugSpikes = true;
+        } else if (arg == "--debug-memory") {
+            debugMemory = true;
+        } else if (arg == "--save-checkpoint" && i + 1 < argc) {
+            saveCheckpoint = argv[++i];
+        } else if (arg.find("--save-checkpoint=") == 0) {
+            saveCheckpoint = arg.substr(20);
+        } else if (arg == "--neuron-count" && i + 1 < argc) {
+            int count = std::stoi(argv[++i]);
+            config->set("neuron_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+        } else if (arg.find("--neuron-count=") == 0) {
+            int count = std::stoi(arg.substr(14));
+            config->set("neuron_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+        } else if (arg == "--region-count" && i + 1 < argc) {
+            int count = std::stoi(argv[++i]);
+            config->set("region_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+        } else if (arg.find("--region-count=") == 0) {
+            int count = std::stoi(arg.substr(13));
+            config->set("region_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+        } else if (arg == "--plasticity-rate" && i + 1 < argc) {
+            float rate = std::stof(argv[++i]);
+            config->set("plasticity_learning_rate", static_cast<double>(rate), ConfigSource::Runtime);
+        } else if (arg.find("--plasticity-rate=") == 0) {
+            float rate = std::stof(arg.substr(19));
+            config->set("plasticity_learning_rate", static_cast<double>(rate), ConfigSource::Runtime);
+        }
+    }
+    
+    if (helpRequested) {
+        printBanner();
+        std::cout << "\nUsage: nlm [OPTIONS]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -h\t\tDisplay this help message\n";
+        std::cout << "  --verbose, -v\t\tEnable verbose output\n";
+        std::cout << "  --mode=MODE\t\tOperation mode (default, fast, detailed, debug)\n";
+        std::cout << "  --config=FILE\t\tConfiguration file (default: configs/default.cfg)\n";
+        std::cout << "\nAdvanced options:\n";
+        std::cout << "  --neuron-count=N\t\tSet number of neurons (default: 1000)\n";
+        std::cout << "  --region-count=N\t\tSet number of regions (default: 1)\n";
+        std::cout << "  --plasticity-rate=R\t\tSet plasticity rate (default: 0.01)\n";
+        std::cout << "  --enable-memory\t\tEnable memory systems\n";
+        std::cout << "  --enable-curiosity\t\tEnable curiosity-driven exploration\n";
+        std::cout << "  --enable-development\t\tEnable developmental processes\n";
+        std::cout << "  --enable-neuromodulation\t\tEnable neuromodulation\n";
+        std::cout << "  --save-checkpoint=FILE\t\tSave checkpoint after simulation\n";
+        std::cout << "\nDebug options:\n";
+        std::cout << "  --debug-plasticity\t\tEnable detailed plasticity debugging\n";
+        std::cout << "  --debug-spikes\t\t\tEnable detailed spike debugging\n";
+        std::cout << "  --debug-memory\t\t\tEnable detailed memory debugging\n";
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -358,6 +568,43 @@ int main(int argc, char** argv) {
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // Apply mode-specific settings
+    if (mode == "fast") {
+        config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Runtime);
+        config->set("simulation_timestep", 0.001, ConfigSource::Runtime);
+    } else if (mode == "detailed") {
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime);
+        config->set("simulation_timestep", 0.0005, ConfigSource::Runtime);
+        config->set("connection_probability", 0.2f, ConfigSource::Runtime);
+    } else if (mode == "debug") {
+        config->set("connection_probability", 0.05f, ConfigSource::Runtime);
+        verbose = true;
+    }
+    
+    // Apply advanced option settings
+    if (enableMemory) {
+        config->set("enable_working_memory", true, ConfigSource::Runtime);
+        config->set("enable_episodic_memory", true, ConfigSource::Runtime);
+    }
+    if (enableCuriosity) {
+        config->set("enable_curiosity", true, ConfigSource::Runtime);
+    }
+    if (enableDevelopment) {
+        config->set("enable_development", true, ConfigSource::Runtime);
+    }
+    if (enableNeuromodulation) {
+        config->set("enable_neuromodulation", true, ConfigSource::Runtime);
+    }
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

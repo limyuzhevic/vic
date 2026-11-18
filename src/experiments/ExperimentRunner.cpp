@@ -113,8 +113,41 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Implement results saving for Phase 2
+    // Save experiment metadata and statistics to file
+    try {
+        // Create a simple text-based results file
+        std::ofstream outfile(filepath);
+        if (!outfile.is_open()) {
+            NLM_LOG_ERROR("Failed to open results file: " + filepath);
+            return false;
+        }
+        
+        outfile << "NLM Experiment Results\n";
+        outfile << "======================\n\n";
+        
+        outfile << "Total Experiments: " << pImpl->experiments.size() << "\n";
+        outfile << "Global Seed: " << pImpl->globalSeed << "\n\n";
+        
+        // Save each experiment's results
+        for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+            const auto& exp = pImpl->experiments[i];
+            outfile << "Experiment " << (i + 1) << ": " << exp->getName() << "\n";
+            outfile << "  Seed: " << exp->getSeed() << "\n";
+            outfile << "  Start Step: " << exp->getStartStep() << "\n";
+            outfile << "  End Step: " << exp->getEndStep() << "\n";
+            outfile << "  Total Reward: " << exp->getMetric("total_reward") << "\n";
+            outfile << "  Average Firing Rate: " << exp->getMetric("average_firing_rate") << "\n\n";
+        }
+        
+        outfile.close();
+        NLM_LOG_INFO("Experiment results saved to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving experiment results: ") + e.what());
+        return false;
+    }
 }
 
 } // namespace nlm
