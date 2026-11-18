@@ -150,6 +150,137 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+bool Config::validate(const std::vector<ValidationError>& errors) const {
+    // Validate basic structure
+    if (pImpl->entries.empty()) {
+        ValidationError error;
+        error.type = ValidationErrorType::MissingRequired;
+        error.message = "Configuration is empty";
+        error.key = "";
+        errors.push_back(error);
+        return false;
+    }
+    
+    // Check for duplicate keys
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (std::find(keys.begin(), keys.end(), entry.key) != keys.end()) {
+            ValidationError error;
+            error.type = ValidationErrorType::DuplicateKey;
+            error.message = "Duplicate key found: " + entry.key;
+            error.key = entry.key;
+            errors.push_back(error);
+            return false;
+        }
+        keys.push_back(entry.key);
+    }
+    
+    return true;
+}
+
+std::vector<ValidationError> Config::validateAll() const {
+    std::vector<ValidationError> errors;
+    validate(errors);
+    return errors;
+}
+
+bool Config::isValid(const std::string& key) const {
+    return has(key);
+}
+
+bool Config::hasValidValue(const std::string& key, const std::string& expectedType) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    
+    // Basic type validation
+    if (expectedType == "string" && std::holds_alternative<std::string>(it->value)) {
+        return true;
+    } else if (expectedType == "int" && std::holds_alternative<int>(it->value)) {
+        return true;
+    } else if (expectedType == "double" && std::holds_alternative<double>(it->value)) {
+        return true;
+    } else if (expectedType == "bool" && std::holds_alternative<bool>(it->value)) {
+        return true;
+    } else if (expectedType == "int64_t" && std::holds_alternative<int64_t>(it->value)) {
+        return true;
+    }
+    
+    return false;
+}
+
+std::string Config::getSafeString(const std::string& key, const std::string& defaultValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return defaultValue;
+    }
+    
+    if (std::holds_alternative<std::string>(it->value)) {
+        return std::get<std::string>(it->value);
+    }
+    
+    return defaultValue;
+}
+
+int Config::getSafeInt(const std::string& key, int defaultValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return defaultValue;
+    }
+    
+    if (std::holds_alternative<int>(it->value)) {
+        return std::get<int>(it->value);
+    }
+    
+    return defaultValue;
+}
+
+double Config::getSafeDouble(const std::string& key, double defaultValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return defaultValue;
+    }
+    
+    if (std::holds_alternative<double>(it->value)) {
+        return std::get<double>(it->value);
+    }
+    
+    return defaultValue;
+}
+
+bool Config::getSafeBool(const std::string& key, bool defaultValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return defaultValue;
+    }
+    
+    if (std::holds_alternative<bool>(it->value)) {
+        return std::get<bool>(it->value);
+    }
+    
+    return defaultValue;
+}
+
+bool Config::migrateFrom(const Config& oldConfig) {
+    // Migration logic: replace old config entries with new ones
+    // for (const auto& oldEntry : oldConfig.pImpl->entries) {
+    //     // Apply migration rules here
+    //     set(oldEntry.key, oldEntry.value, oldEntry.source);
+    // }
+    return true;
+}
+
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";

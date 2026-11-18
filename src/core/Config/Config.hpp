@@ -1,16 +1,5 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-#include <algorithm>
-
-namespace nlm {
-
 // Forward declarations
-class Config;
+    class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -44,6 +33,24 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Validation error types
+enum class ValidationErrorType {
+    InvalidRange,
+    InvalidFormat,
+    MissingRequired,
+    DuplicateKey,
+    OutOfBounds,
+    TypeMismatch
+};
+
+struct ValidationError {
+    ValidationErrorType type;
+    std::string message;
+    std::string key;
+    ConfigValue expectedValue;
+    ConfigValue actualValue;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -71,7 +78,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +102,21 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and error handling
+    bool validate(const std::vector<ValidationError>& errors = {}) const;
+    std::vector<ValidationError> validateAll() const;
+    bool isValid(const std::string& key) const;
+    bool hasValidValue(const std::string& key, const std::string& expectedType) const;
+    
+    // Safe getters with validation
+    std::string getSafeString(const std::string& key, const std::string& defaultValue = "") const;
+    int getSafeInt(const std::string& key, int defaultValue = 0) const;
+    double getSafeDouble(const std::string& key, double defaultValue = 0.0) const;
+    bool getSafeBool(const std::string& key, bool defaultValue = false) const;
+    
+    // Configuration migration
+    bool migrateFrom(const Config& oldConfig);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +124,6 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidKey(const std::string& key);
+    static bool isValidRange(const std::string& key, const ConfigValue& value);
 };
-
-} // namespace nlm
