@@ -428,6 +428,191 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Module version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    m.attr("__description__") = "Neural Learning Machine - Python bindings for spiking neural network simulation";
+    
+    // Convenience functions for common operations
+    m.def("run_simple_simulation", [](int num_steps, float timestep) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int step = 0; step < num_steps; ++step) {
+            brain->step(step, step * timestep);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), 
+                              brain->getAverageFiringRate(),
+                              brain->getFiringNeuronCount());
+    }, py::arg("num_steps") = 100, py::arg("timestep") = 0.001f,
+       "Run a simple simulation with default settings");
+    
+    m.def("create_demo_brain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(500));
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a demo brain with optimized settings for learning demonstrations");
+    
+    // Additional utility functions
+    m.def("create_learning_demo_brain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(3000));
+        config->set("region_count", static_cast<int64_t>(2));
+        config->set("connection_probability", 0.08f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("synaptogenesis_rate", 0.00003f);
+        config->set("pruning_rate", 0.000005f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a brain optimized for learning demonstrations with more neurons and plasticity");
+    
+    m.def("getBrainStatistics", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about the brain");
+    
+    m.def("runPhase2Demo", []() {
+        // Phase 2 specific demo: Basic neural computation and learning
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(500));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.015f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Record initial state
+        size_t initial_spikes = brain->getTotalSpikeCount();
+        
+        // Run basic connectivity test
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (!neurons.empty()) {
+                // Inject current into first 10 neurons
+                for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+                    neurons[i]->injectCurrent(50.0f);
+                }
+                
+                // Run a few steps
+                for (SimulationStep step = 0; step < 50; ++step) {
+                    brain->step(step, step * 0.001);
+                }
+            }
+        }
+        
+        // Run plasticity experiment
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);
+            }
+            
+            // Apply repeated input pattern
+            std::vector<NeuronId> patternNeurons;
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                    patternNeurons.push_back(neuron->getId());
+                }
+            }
+            
+            for (SimulationStep step = 0; step < 200; ++step) {
+                for (NeuronId id : patternNeurons) {
+                    brain->injectCurrent(id, 30.0f);
+                }
+                brain->step(step, step * 0.001);
+                
+                if (step % 50 == 0) {
+                    NLM_LOG_INFO("Step " + std::to_string(step) + 
+                                " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                                " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                }
+            }
+        }
+        
+        // Record final statistics
+        auto total_spikes = brain->getTotalSpikeCount();
+        auto firing_rate = brain->getAverageFiringRate();
+        auto active_count = brain->getActiveNeuronCount();
+        
+        py::dict results;
+        results["total_spikes"] = total_spikes;
+        results["average_firing_rate"] = firing_rate;
+        results["active_neurons"] = active_count;
+        results["demo_type"] = "Phase 2 Neural Computation";
+        results["spikes_per_step"] = total_spikes / 200.0f;
+        
+        return results;
+    }, "Run Phase 2 demonstration showing basic neural computation and learning");
+    
+    // Error and logging utilities
+    m.def("getLoggingLevels", []() {
+        py::dict levels;
+        levels["debug"] = 0;
+        levels["info"] = 1;
+        levels["warning"] = 2;
+        levels["error"] = 3;
+        return levels;
+    }, "Get available logging levels");
+    
+    m.def("validateConfiguration", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        if (!config->has("neuron_count")) {
+            errors.push_back("Missing required configuration: neuron_count");
+        }
+        
+        if (!config->has("region_count")) {
+            errors.push_back("Missing required configuration: region_count");
+        }
+        
+        // Validate configuration ranges
+        auto neuron_count = config->get<int64_t>("neuron_count");
+        if (neuron_count && (*neuron_count <= 0 || *neuron_count > 100000)) {
+            errors.push_back("Invalid neuron_count: must be between 1 and 100000");
+        }
+        
+        auto region_count = config->get<int64_t>("region_count");
+        if (region_count && (*region_count <= 0 || *region_count > 1000)) {
+            errors.push_back("Invalid region_count: must be between 1 and 1000");
+        }
+        
+        auto conn_prob = config->get<float>("connection_probability");
+        if (conn_prob && (*conn_prob < 0.0f || *conn_prob > 1.0f)) {
+            errors.push_back("Invalid connection_probability: must be between 0.0 and 1.0");
+        }
+        
+        if (errors.empty()) {
+            return py::dict("valid", true, "errors", py::list());
+        } else {
+            py::list error_list;
+            for (const auto& error : errors) {
+                error_list.append(error);
+            }
+            return py::dict("valid", false, "errors", error_list);
+        }
+    }, py::arg("config"), "Validate configuration and return validation results");
 }
 
 } // namespace nlm
