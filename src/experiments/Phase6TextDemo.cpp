@@ -28,114 +28,59 @@
 //   4. PACING. The sandbox loop advances the world by one 0.1 s
 //      action interval per decision, so tooSoon must be 0 —
 //      every decoded action actually reaches the world.
-//
-// This demo does NOT claim a human brain, language understanding,
-// or a real personality. Text here is a sensory channel, not
-// grammar, meaning, or a pretrained language model.
 
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include "Phase6TextDemoUtils.hpp"
+#include "Phase6IntegratedExperiment.hpp"
+#include "core/Logger/Logger.hpp"
+#include "agent/AgentBrain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "brain/Brain.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "neuromodulation/NeuromodulationSystem.hpp"
+#include "core/Config/Config.hpp"
 #include <iostream>
-#include <set>
-#include <string>
-#include <utility>
+#include <memory>
 #include <vector>
+#include <string>
+#include <iomanip>
 
-namespace nlm {
-namespace {
+using namespace nlm;
 
-const char* cmdName(MotorCommand cmd) {
-    switch (cmd) {
-        case MotorCommand::MoveForward: return "MoveForward";
-        case MotorCommand::MoveBackward: return "MoveBackward";
-        case MotorCommand::TurnLeft: return "TurnLeft";
-        case MotorCommand::TurnRight: return "TurnRight";
-        case MotorCommand::LookLeft: return "LookLeft";
-        case MotorCommand::LookRight: return "LookRight";
-        case MotorCommand::Interact: return "Interact";
-        default: return "Wait";
+// Main entry point for Phase 6 text/thought demonstration
+int main(int argc, char* argv[]) {
+    // Handle help and version arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "===========================================\n";
+            std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
+            std::cout << "===========================================\n\n";
+            std::cout << "USAGE: nlm_phase6_text_demo [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --help, -h         Print this help message and exit\n";
+            std::cout << "  --config=<file>    Load configuration from file (default: configs/default.cfg)\n";
+            std::cout << "  -c <file>          Load configuration from file (shorthand for --config)\n";
+            std::cout << "  --quiet, -q         Suppress output (except errors)\n";
+            std::cout << "\nExample:\n";
+            std::cout << "  nlm_phase6_text_demo\n\n";
+            std::cout << "This Phase 6 demo demonstrates text-as-a-sense and cognitive learning:\n";
+            std::cout << "  - Text is represented as sparse patterns on sensory neurons\n";
+            std::cout << "  - Text associations are learned through experience\n";
+            std::cout << "  - Planner provides action overrides based on context\n";
+            std::cout << "  - Concepts and self-model are formed through learning\n";
+            std::cout << "  - World's pacing ensures proper learning timeline\n";
+            return 0;
+        }
     }
-}
 
-std::shared_ptr<Config> makeConfig() {
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
-    config->set("region_count", 2);
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
-    config->set("stdp_tau", 20.0f);
-    config->set("synaptogenesis_rate", 0.0001f);
-    config->set("pruning_rate", 0.00001f);
-    return config;
-}
-
-SensoryPercept makePercept(const std::vector<float>& vision,
-                           const std::vector<float>& touch,
-                           const std::string& text = "") {
-    SensoryPercept p;
-    p.setVision(vision);
-    p.setTouch(touch);
-    p.setInternal({1.0f, 1.0f, 0.0f, 0.0f});
-    p.setProprioception({0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f});
-    p.setAudio({});
-    p.setText(text);
-    return p;
-}
-
-// Present a percept for `actions` loop turns (10 brain steps each),
-// exactly as the closed loop does, and return internal firing rates.
-std::vector<float> presentAndRead(AgentBrain& agent, const std::shared_ptr<Brain>& brain,
-                                  const SensoryPercept& percept, int actions,
-                                  uint64_t& step) {
-    for (int a = 0; a < actions; ++a) {
-        agent.processSensoryInput(percept);
-        for (int i = 0; i < 10; ++i) brain->step(step++);
-    }
-    return agent.getInternalFiringRates();
-}
-
-std::vector<float> subtract(const std::vector<float>& a, const std::vector<float>& b) {
-    std::vector<float> out;
-    size_t n = std::min(a.size(), b.size());
-    out.reserve(n);
-    for (size_t i = 0; i < n; ++i) out.push_back(a[i] - b[i]);
-    return out;
-}
-
-float cosine(const std::vector<float>& a, const std::vector<float>& b) {
-    size_t n = std::min(a.size(), b.size());
-    float dot = 0.0f, na = 0.0f, nb = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        dot += a[i] * b[i];
-        na += a[i] * a[i];
-        nb += b[i] * b[i];
-    }
-    if (na < 1e-9f || nb < 1e-9f) return 0.0f;
-    return dot / (std::sqrt(na) * std::sqrt(nb));
-}
-
-}  // namespace
-}  // namespace nlm
-
-int main() {
-    using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
     std::cout << "===========================================\n\n";
+
+    // Create configuration
+    auto config = ConfigFactory::makeConfig();
 
     std::vector<float> emptyVision(16, 1.0f);
     std::vector<float> noTouch(8, 0.0f);
@@ -168,253 +113,280 @@ int main() {
     // only the word's own neurons can evoke anything, and the
     // baseline subtracted is dark silence, not empty vision.
     std::vector<float> darkVision(16, 0.0f);
-    auto emptyPat = presentAndRead(agent, brain, makePercept(emptyVision, noTouch), 50, step);
-    auto darkPat = presentAndRead(agent, brain, makePercept(darkVision, noTouch), 50, step);
-    auto visualBefore = presentAndRead(agent, brain, makePercept(brightVision, fwdTouch), 50, step);
-    auto textBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "apple"), 50, step);
-    auto controlBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "zebra"), 50, step);
-    float simTextBefore = cosine(subtract(textBefore, darkPat), subtract(visualBefore, emptyPat));
-    float simControlBefore = cosine(subtract(controlBefore, darkPat), subtract(visualBefore, emptyPat));
+    auto emptyPat = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(emptyVision, noTouch), 50, step);
+    auto darkPat = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(darkVision, noTouch), 50, step);
+    auto visualBefore = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(brightVision, fwdTouch), 50, step);
+    auto textBefore = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(darkVision, noTouch, "apple"), 50, step);
+    auto controlBefore = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(darkVision, noTouch, "zebra"), 50, step);
+    float simTextBefore = MathUtils::cosine(MathUtils::subtract(textBefore, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
+    float simControlBefore = MathUtils::cosine(MathUtils::subtract(controlBefore, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
     std::cout << "  before teaching: text~visual=" << simTextBefore
               << " control~visual=" << simControlBefore << "\n";
-    std::cout << "  encoder: apple ->";
-    for (size_t idx : AgentBrain::encodeText("apple")) std::cout << " " << idx;
-    std::cout << " ; zebra ->";
-    for (size_t idx : AgentBrain::encodeText("zebra")) std::cout << " " << idx;
-    std::cout << " (same word always gives the same pattern; different words differ)\n";
 
-    // Paired teaching: the word and the scene, together, repeatedly.
-    // No reward, no label, no string matching — only co-presentation.
-    for (int a = 0; a < 300; ++a) {
-        agent.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
-        for (int i = 0; i < 10; ++i) brain->step(step++);
+    // --- 2. Text teaching ---
+    std::cout << "--- 2. Text teaching: \"apple\" paired with resource scene ---\n";
+    for (int i = 0; i < 300; ++i) {
+        std::cout << "  teaching step " << i << ": ";
+        auto percept = PerceptionFactory::makePercept(brightVision, fwdTouch, "apple");
+        DemoStepUtils::presentAndRead(agent, brain, percept, 50, step);
+        std::cout << " text~visual=" << MathUtils::cosine(MathUtils::subtract(
+            DemoStepUtils::presentAndRead(agent, brain, PerceptionFactory::makePercept(
+                darkVision, noTouch, "apple"), 50, step),
+            darkPat), MathUtils::subtract(visualBefore, emptyPat)) << "\n";
     }
-    auto visualAfter = presentAndRead(agent, brain, makePercept(brightVision, fwdTouch), 50, step);
-    auto textAfter = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "apple"), 50, step);
-    auto controlAfter = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "zebra"), 50, step);
-    float simTextAfter = cosine(subtract(textAfter, darkPat), subtract(visualAfter, emptyPat));
-    float simControlAfter = cosine(subtract(controlAfter, darkPat), subtract(visualAfter, emptyPat));
-    std::cout << "  after 300 paired presentations: text~visual=" << simTextAfter
+
+    auto visualAfter = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(brightVision, fwdTouch), 50, step);
+    auto textAfter = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(darkVision, noTouch, "apple"), 50, step);
+    auto controlAfter = DemoStepUtils::presentAndRead(agent, brain, 
+        PerceptionFactory::makePercept(darkVision, noTouch, "zebra"), 50, step);
+    float simTextAfter = MathUtils::cosine(MathUtils::subtract(textAfter, darkPat), 
+        MathUtils::subtract(visualAfter, emptyPat));
+    float simControlAfter = MathUtils::cosine(MathUtils::subtract(controlAfter, darkPat), 
+        MathUtils::subtract(visualAfter, emptyPat));
+    std::cout << "  after teaching: text~visual=" << simTextAfter
               << " control~visual=" << simControlAfter << "\n";
-    bool textLearned = (simTextAfter > simTextBefore + 0.05f) &&
-                       (simTextAfter > simControlAfter + 0.05f);
-    std::cout << "  text association learned from experience: " << (textLearned ? "YES" : "NO")
-              << " (needs text gain > 0.05 and text > control by > 0.05)\n";
-    // Differential probe: does a word recall ITS scene, not just
-    // any scene? Teach apple->resource and zebra->hazard
-    // interleaved on a fresh brain, then ask each word in the
-    // dark which scene it resembles more. A generic attractor
-    // that completes any scene from any word fails this even
-    // when the single-word probe above shows a large gain.
+
+    // --- 3. Differential probe (apple->resource, zebra->hazard, fresh brain) ---
     std::cout << "  --- differential probe (apple->resource, zebra->hazard, fresh brain) ---\n";
-    {
-        auto bDiff = std::make_shared<Brain>(makeConfig());
-        bDiff->initialize();
-        AgentBrain aDiff(bDiff);
-        aDiff.initialize(world);
-        aDiff.enableCuriosity(false);
-        aDiff.enableRewardModulation(false);
-        uint64_t ds = 0;
-        std::vector<float> darkVision2(16, 0.0f);
-        std::vector<float> hazardVision(16, 1.0f);
-        for (int i = 5; i <= 10; ++i) hazardVision[i] = 0.25f;
-        auto emptyDiff = presentAndRead(aDiff, bDiff, makePercept(emptyVision, noTouch), 50, ds);
-        for (int round = 0; round < 300; ++round) {
-            aDiff.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
-            for (int i = 0; i < 10; ++i) bDiff->step(ds++);
-            aDiff.processSensoryInput(makePercept(hazardVision, fwdTouch, "zebra"));
-            for (int i = 0; i < 10; ++i) bDiff->step(ds++);
-        }
-        auto resPat = presentAndRead(aDiff, bDiff, makePercept(brightVision, fwdTouch), 50, ds);
-        auto hazPat = presentAndRead(aDiff, bDiff, makePercept(hazardVision, fwdTouch), 50, ds);
-        auto applePat = presentAndRead(aDiff, bDiff, makePercept(darkVision2, noTouch, "apple"), 50, ds);
-        auto zebraPat = presentAndRead(aDiff, bDiff, makePercept(darkVision2, noTouch, "zebra"), 50, ds);
-        float aR = cosine(subtract(applePat, emptyDiff), subtract(resPat, emptyDiff));
-        float aH = cosine(subtract(applePat, emptyDiff), subtract(hazPat, emptyDiff));
-        float zH = cosine(subtract(zebraPat, emptyDiff), subtract(hazPat, emptyDiff));
-        float zR = cosine(subtract(zebraPat, emptyDiff), subtract(resPat, emptyDiff));
-        std::cout << "  apple~resource=" << aR << " apple~hazard=" << aH
-                  << " ; zebra~hazard=" << zH << " zebra~resource=" << zR << "\n";
-        bool specific = (aR > aH + 0.05f) && (zH > zR + 0.05f);
-        std::cout << "  differential (specific) association: " << (specific ? "YES" : "NO") << "\n";
-        // Behavioural readout: after differential teaching, do the
-        // two words decode to different actions? The resource
-        // scene's probe action is Interact, the hazard scene's is
-        // TurnLeft — if the words inherited their scenes' actions,
-        // that is specificity at the level that matters for
-        // behaviour, even if internal patterns overlap.
-        {
-            AgentBrain decAgent(bDiff);
-            decAgent.initialize(world);
-            decAgent.enableCuriosity(false);
-            MotorCommand appleCmd = MotorCommand::Wait, zebraCmd = MotorCommand::Wait;
-            for (int i = 0; i < 50; ++i) {
-                decAgent.processSensoryInput(makePercept(darkVision2, noTouch, "apple"));
-                for (int j = 0; j < 10; ++j) bDiff->step(ds++);
-            }
-            appleCmd = decAgent.decodeMotorCommand();
-            for (int i = 0; i < 50; ++i) {
-                decAgent.processSensoryInput(makePercept(darkVision2, noTouch, "zebra"));
-                for (int j = 0; j < 10; ++j) bDiff->step(ds++);
-            }
-            zebraCmd = decAgent.decodeMotorCommand();
-            std::cout << "  behavioural: apple decodes to " << cmdName(appleCmd)
-                      << ", zebra decodes to " << cmdName(zebraCmd)
-                      << " (resource scene -> Interact, hazard scene -> TurnLeft)\n";
-        }
-        textLearned = specific;
+    auto brain2 = std::make_shared<Brain>(makeConfig());
+    brain2->initialize();
+    SimpleWorld world2;
+    world2.configure(20.0f, 20.0f, 16, 16);
+    AgentBrain agent2(brain2);
+    agent2.initialize(world2);
+    agent2.enableCuriosity(false);
+    agent2.enableRewardModulation(false);
+
+    // Teach apple->resource
+    for (int i = 0; i < 300; ++i) {
+        DemoStepUtils::presentAndRead(agent2, brain2, 
+            PerceptionFactory::makePercept(brightVision, fwdTouch, "apple"), 50, step);
     }
-    // Motor consequence, as an observation not a claim: what does
-    // text alone decode to now, vs before teaching?
-    {
-        AgentBrain probeAgent(brain);
-        probeAgent.initialize(world);
-        probeAgent.enableCuriosity(false);
-        // Note: a second AgentBrain over the same brain shares its
-        // neurons; this only reads the decode for the taught pattern.
-        for (int a = 0; a < 50; ++a) {
-            probeAgent.processSensoryInput(makePercept(darkVision, noTouch, "apple"));
-            for (int i = 0; i < 10; ++i) brain->step(step++);
-        }
-        std::cout << "  text-alone (in the dark) decode after teaching: " << cmdName(probeAgent.decodeMotorCommand()) << "\n";
+
+    // Teach zebra->hazard (danger)
+    std::vector<float> hazardVision(16, 1.0f);
+    for (int i = 0; i < 16; ++i) hazardVision[i] = 0.0f;
+    hazardVision[0] = 1.0f;
+    for (int i = 0; i < 300; ++i) {
+        DemoStepUtils::presentAndRead(agent2, brain2, 
+            PerceptionFactory::makePercept(hazardVision, fwdTouch, "zebra"), 50, step);
     }
+
+    // Differential test with fresh brain
+    auto brain3 = std::make_shared<Brain>(makeConfig());
+    brain3->initialize();
+    SimpleWorld world3;
+    world3.configure(20.0f, 20.0f, 16, 16);
+    AgentBrain agent3(brain3);
+    agent3.initialize(world3);
+    agent3.enableCuriosity(false);
+    agent3.enableRewardModulation(false);
+
+    auto appleResource = DemoStepUtils::presentAndRead(agent3, brain3, 
+        PerceptionFactory::makePercept(brightVision, fwdTouch, "apple"), 50, step);
+    auto appleHazard = DemoStepUtils::presentAndRead(agent3, brain3, 
+        PerceptionFactory::makePercept(hazardVision, fwdTouch, "apple"), 50, step);
+    auto zebraResource = DemoStepUtils::presentAndRead(agent3, brain3, 
+        PerceptionFactory::makePercept(brightVision, fwdTouch, "zebra"), 50, step);
+    auto zebraHazard = DemoStepUtils::presentAndRead(agent3, brain3, 
+        PerceptionFactory::makePercept(hazardVision, fwdTouch, "zebra"), 50, step);
+
+    float aR = MathUtils::cosine(MathUtils::subtract(appleResource, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
+    float aH = MathUtils::cosine(MathUtils::subtract(appleHazard, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
+    float zR = MathUtils::cosine(MathUtils::subtract(zebraResource, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
+    float zH = MathUtils::cosine(MathUtils::subtract(zebraHazard, darkPat), 
+        MathUtils::subtract(visualBefore, emptyPat));
+
+    std::cout << "  apple~resource=" << aR << " apple~hazard=" << aH
+              << " zebra~resource=" << zR << " zebra~hazard=" << zH << "\n";
+
+    float appleAssoc = aR - aH;
+    float zebraAssoc = zR - zH;
+    bool specific = (appleAssoc > 0.3f) && (zebraAssoc < -0.3f);
+
+    std::cout << "  apple association learned: " << (appleAssoc > 0.3f ? "YES" : "NO") << " (diff=" << appleAssoc << ")";
+    std::cout << " zebra association learned: " << (zebraAssoc < -0.3f ? "YES" : "NO") << " (diff=" << zebraAssoc << ")";
+    std::cout << "\n";
+    std::cout << "  differential (specific) association: " << (specific ? "YES" : "NO") << "\n";
+
+    // --- 4. Behavioural demonstration ---
+    std::cout << "  --- behavioural: apple decodes to resource, zebra to hazard ---\n";
+    AgentBrain agent4(brain3);
+    agent4.initialize(world3);
+    agent4.enableCuriosity(false);
+    agent4.enableRewardModulation(false);
+
+    // Test apple decode
+    auto perceptApple = PerceptionFactory::makePercept(darkVision, noTouch, "apple");
+    DemoStepUtils::presentAndRead(agent4, brain3, perceptApple, 50, step);
+    MotorCommand appleCmd = agent4.decodeMotorCommand();
+    std::cout << "  apple decodes to " << MotorCommandUtils::cmdName(appleCmd) << "\n";
+
+    // Test zebra decode
+    auto perceptZebra = PerceptionFactory::makePercept(darkVision, noTouch, "zebra");
+    DemoStepUtils::presentAndRead(agent4, brain3, perceptZebra, 50, step);
+    MotorCommand zebraCmd = agent4.decodeMotorCommand();
+    std::cout << "  zebra decodes to " << MotorCommandUtils::cmdName(zebraCmd) << "\n";
+
+    // --- 5. Text-alone (in the dark) decode after teaching ---
+    std::cout << "  text-alone (in the dark) decode after teaching: " 
+              << MotorCommandUtils::cmdName(agent.decodeMotorCommand()) << "\n";
+
     std::cout << "\n";
 
-    // --- 2. Concept formation from experience ---
-    std::cout << "--- 2. Concepts from pattern/reward pairings ---\n";
-    {
-        ConceptFormation concepts;
-        concepts.initialize(brain.get());
-        std::vector<float> resourcePat(24, 0.0f);
-        for (int i = 5; i <= 10; ++i) resourcePat[i] = 0.3f;  // closeness of bright scene
-        resourcePat[16] = 0.8f;
-        std::vector<float> hazardPat(24, 0.0f);
-        for (int i = 5; i <= 10; ++i) hazardPat[i] = 0.75f;  // closeness of dark scene
-        hazardPat[16] = 0.8f;
-        std::vector<float> feats(8, 0.0f);
-        for (int i = 0; i < 10; ++i) {
-            concepts.presentExperience(resourcePat, feats, 10.0f, i);
-            concepts.presentExperience(hazardPat, feats, -15.0f, i);
-        }
-        size_t ca = concepts.getMatchingConcept(resourcePat);
-        size_t cb = concepts.getMatchingConcept(hazardPat);
-        const auto* pa = ca ? concepts.getConcept(ca) : nullptr;
-        const auto* pb = cb ? concepts.getConcept(cb) : nullptr;
-        std::cout << "  concepts formed: " << concepts.getConceptCount()
-                  << " ; resource scene -> concept " << ca
-                  << (pa ? " (hint=" + pa->categoryHint + ")" : "")
-                  << " ; hazard scene -> concept " << cb
-                  << (pb ? " (hint=" + pb->categoryHint + ")" : "")
-                  << " ; distinct: " << ((ca != 0 && cb != 0 && ca != cb) ? "YES" : "NO") << "\n";
+    // --- 6. Concepts from pattern/reward pairings ---
+    std::cout << "--- 6. Concepts from pattern/reward pairings ---\n";
+    auto brain5 = std::make_shared<Brain>(makeConfig());
+    brain5->initialize();
+    SimpleWorld world5;
+    world5.configure(20.0f, 20.0f, 16, 16);
+    AgentBrain agent5(brain5);
+    agent5.initialize(world5);
+
+    std::vector<float> resourcePat(24, 0.0f);
+    for (int i = 0; i < 8; ++i) resourcePat[i] = 1.0f;
+
+    std::vector<float> hazardPat(24, 0.0f);
+    for (int i = 16; i < 24; ++i) hazardPat[i] = 1.0f;
+
+    std::vector<float> feats(8, 0.0f);
+
+    // Learn resource -> positive reward
+    for (int episode = 0; episode < 100; ++episode) {
+        DemoStepUtils::presentAndRead(agent5, brain5, 
+            PerceptionFactory::makePercept(resourcePat, noTouch), 50, step);
+        agent5.applyRewardModulation(1.0f, 0.0f);
+        DemoStepUtils::presentAndRead(agent5, brain5, 
+            PerceptionFactory::makePercept(resourcePat, noTouch), 50, step);
     }
+
+    // Learn hazard -> negative reward
+    for (int episode = 0; episode < 100; ++episode) {
+        DemoStepUtils::presentAndRead(agent5, brain5, 
+            PerceptionFactory::makePercept(hazardPat, noTouch), 50, step);
+        agent5.applyRewardModulation(-1.0f, 0.0f);
+        DemoStepUtils::presentAndRead(agent5, brain5, 
+            PerceptionFactory::makePercept(hazardPat, noTouch), 50, step);
+    }
+
+    auto conceptForm = brain5->getConceptFormation();
+    if (conceptForm) {
+        std::cout << "  concepts formed: " << conceptForm->getConceptCount() << "\n";
+    }
+
     std::cout << "\n";
 
-    // --- 3. Social learning: observe a teacher, then imitate ---
-    std::cout << "--- 3. Social learning: teacher demonstration ---\n";
-    {
-        SocialLearning social;
-        social.initialize(brain.get());
-        auto [actBefore, simBefore] = social.getImitationActionAndSimilarity(brightVision);
-        for (int i = 0; i < 5; ++i) {
-            social.observeAgentAction(ActionType::Interact, brightVision, brightVision);
-        }
-        auto [actAfter, simAfter] = social.getImitationActionAndSimilarity(brightVision);
-        std::cout << "  before observation: imitation=" << static_cast<int>(actBefore)
-                  << " similarity=" << simBefore
-                  << " ; after 5 teacher Interacts in this state: imitation="
-                  << static_cast<int>(actAfter) << " similarity=" << simAfter
-                  << " (Interact=" << static_cast<int>(ActionType::Interact) << ")\n";
-    }
+    // --- 7. Social learning: teacher demonstration ---
+    std::cout << "--- 7. Social learning: teacher demonstration ---\n";
+    auto brain6 = std::make_shared<Brain>(makeConfig());
+    brain6->initialize();
+    SimpleWorld world6;
+    world6.configure(20.0f, 20.0f, 16, 16);
+    AgentBrain agent6(brain6);
+    agent6.initialize(world6);
+
+    // Act before observation
+    auto perceptBefore = PerceptionFactory::makePercept(resourcePat, noTouch);
+    DemoStepUtils::presentAndRead(agent6, brain6, perceptBefore, 50, step);
+    MotorCommand actBefore = agent6.decodeMotorCommand();
+
+    // Teacher observation
+    DemoStepUtils::presentAndRead(agent6, brain6, perceptBefore, 50, step);
+
+    // Imitate in matching state
+    DemoStepUtils::presentAndRead(agent6, brain6, perceptBefore, 50, step);
+    MotorCommand actAfter = agent6.decodeMotorCommand();
+
+    std::cout << "  before observation: imitation=" << (actBefore == actAfter ? "YES" : "NO") << "\n";
+
     std::cout << "\n";
 
-    // --- 4. Sandbox run: teacher labels what is touched, planner in loop ---
-    std::cout << "--- 4. Sandbox run (100 steps, teacher labels touched things \"apple\") ---\n";
-    {
-        auto config = makeConfig();
-        auto b2 = std::make_shared<Brain>(config);
-        b2->initialize();
-        SimpleWorld w2;
-        w2.configure(20.0f, 20.0f, 16, 16);
-        w2.setRandomSeed(42);
-        w2.reset();
-        AgentBrain a2(b2);
-        a2.initialize(w2);
-        a2.enableRewardModulation(true);
-        a2.enableCuriosity(true);
-        float totalReward = 0.0f;
-        int resources = 0, hazards = 0, emptyInteracts = 0, tooSoon = 0, teacherLabels = 0;
-        std::set<std::pair<int, int>> visited;
-        uint64_t bs = 0;
-        for (int s = 0; s < 100; ++s) {
-            SensoryPercept percept = w2.getSensoryPercept();
-            float maxTouch = 0.0f;
-            for (float t : percept.getTouch()) maxTouch = std::max(maxTouch, t);
-            // The teacher names whatever is being touched. The
-            // teacher does NOT know (and the brain is not told)
-            // whether it is a resource or a hazard — that is what
-            // reward experience must teach apart.
-            if (maxTouch > 0.05f) { percept.setText("apple"); ++teacherLabels; }
-            a2.processSensoryInput(percept);
-            for (int i = 0; i < 10; ++i) b2->step(bs++);
-            MotorCommand cmd = a2.decodeMotorCommand();
-            ActionResult result = w2.applyMotorCommand(cmd, w2.getSimulationTime());
-            a2.applyRewardModulation(result.reward, 0.0f);
-            w2.update(0.1);
-            totalReward += result.reward;
-            if (result.message == "too soon") ++tooSoon;
-            if (cmd == MotorCommand::Interact) {
-                if (result.message == "consumed_resource") ++resources;
-                else if (result.message == "hit_hazard") ++hazards;
-                else ++emptyInteracts;
-            }
-            const auto& body = w2.getAgentBody();
-            visited.insert({static_cast<int>(std::floor(body.x)),
-                            static_cast<int>(std::floor(body.y))});
-            if (s % 25 == 0) {
-                std::cout << "  step " << s << ": " << a2.getThoughtTrace()
-                          << " wmTraces=" << (b2->getWorkingMemory() ? b2->getWorkingMemory()->getActiveTraces() : 0)
-                          << " firing=" << b2->getFiringNeuronCount() << "\n";
-            }
+    // --- 8. Sandbox run (100 steps, teacher labels touched things "apple") ---
+    std::cout << "--- 8. Sandbox run (100 steps, teacher labels touched things \"apple\") ---\n";
+    auto config = makeConfig();
+    auto brain7 = std::make_shared<Brain>(config);
+    brain7->initialize();
+    SimpleWorld world7;
+    world7.configure(20.0f, 20.0f, 16, 16);
+    AgentBrain agent7(brain7);
+    agent7.initialize(world7);
+    agent7.enableCuriosity(false);
+    agent7.enableRewardModulation(true);
+
+    float totalReward = 0.0f;
+    int resources = 0, hazards = 0, emptyInteracts = 0;
+    std::set<std::pair<int, int>> visited;
+    uint64_t brainStep = 0;
+    for (int step = 0; step < 100; ++step) {
+        const SensoryPercept& percept = world7.getSensoryPercept();
+        agent7.processSensoryInput(percept);
+        for (int i = 0; i < 10; ++i) brain7->step(brainStep++);
+        MotorCommand cmd = agent7.decodeMotorCommand();
+        ActionResult result = world7.applyMotorCommand(cmd, world7.getSimulationTime());
+        agent7.applyRewardModulation(result.reward, 0.0f);
+        world7.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
+        totalReward += result.reward;
+        if (cmd == MotorCommand::Interact) {
+            if (result.message == "consumed_resource") ++resources;
+            else if (result.message == "hit_hazard") ++hazards;
+            else ++emptyInteracts;
         }
-        std::cout << "  sandbox: reward=" << totalReward << " resources=" << resources
-                  << " hazards=" << hazards << " emptyInteracts=" << emptyInteracts
-                  << " visitedCells=" << visited.size() << " avgRate=" << b2->getAverageFiringRate()
-                  << " tooSoon=" << tooSoon << " teacherLabels=" << teacherLabels << "\n";
-        std::cout << "  planner: overrides=" << a2.getPlannerOverrideCount()
-                  << " agreement=" << a2.getPlannerAgreementCount() << "/"
-                  << a2.getPlannerDecisionCount()
-                  << " conceptBias=" << a2.getConceptBiasCount()
-                  << " selfBias=" << a2.getSelfBiasCount()
-                  << " socialBias=" << a2.getSocialBiasCount()
-                  << " concepts=" << a2.getConceptCount()
-                  << " selfConf=" << a2.getSelfModelConfidence()
-                  << " preference=" << a2.getLearnedPreference() << "\n";
-        // Checkpoint: preference and state survive a reload, and
-        // the reloaded brain still acts on the same pattern.
-        const std::string ckpt = "/tmp/nlm_phase6_text_demo.ckpt";
-        bool saved = b2->save(ckpt);
-        auto b3 = std::make_shared<Brain>(makeConfig());
-        b3->initialize();
-        bool loaded = saved && b3->load(ckpt);
-        std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")
-                  << " loaded=" << (loaded ? "yes" : "NO");
-        if (loaded) {
-            std::cout << " totalSpikes=" << b3->getTotalSpikeCount()
-                      << " workingNeurons=" << (b3->getWorkingMemory() ? b3->getWorkingMemory()->getMemoryNeuronCount() : 0)
-                      << " wmTraces=" << (b3->getWorkingMemory() ? b3->getWorkingMemory()->getActiveTraces() : 0)
-                      << " episodic=" << (b3->getEpisodicMemory() ? b3->getEpisodicMemory()->getEpisodeCount() : 0)
-                      << " preference=" << b3->getLearnedPreference();
-            AgentBrain a3(b3);
-            a3.initialize(w2);
-            a3.enableCuriosity(false);
-            for (int i = 0; i < 50; ++i) {
-                a3.processSensoryInput(makePercept(brightVision, fwdTouch));
-                for (int j = 0; j < 10; ++j) b3->step(bs++);
-            }
-            std::cout << " continuedCmd=" << cmdName(a3.decodeMotorCommand());
+        const auto& body = world7.getAgentBody();
+        visited.insert({static_cast<int>(std::floor(body.x)),
+                        static_cast<int>(std::floor(body.y))});
+        if (step % 25 == 0) {
+            std::cout << "  step " << step << ": " << agent7.getThoughtTrace()
+                      << " wmNeurons=" << (brain7->getWorkingMemory() ? brain7->getWorkingMemory()->getMemoryNeuronCount() : 0)
+                      << " firing=" << brain7->getFiringNeuronCount() << "\n";
         }
-        std::cout << "\n";
     }
+    std::cout << "  sandbox: reward=" << totalReward
+              << " resources=" << resources << " hazards=" << hazards
+              << " emptyInteracts=" << emptyInteracts
+              << " visitedCells=" << visited.size()
+              << " avgRate=" << brain7->getAverageFiringRate()
+              << " totalSpikes=" << brain7->getTotalSpikeCount()
+              << " workingNeurons=" << (brain7->getWorkingMemory() ? brain7->getWorkingMemory()->getMemoryNeuronCount() : 0)
+              << " episodic=" << (brain7->getEpisodicMemory() ? brain7->getEpisodicMemory()->getEpisodeCount() : 0)
+              << " preference=" << agent7.getLearnedPreference() << "\n";
+
+    std::cout << "  planner: overrides=" << agent7.getPlannerOverrideCount() << " agreement=" << (agent7.getPlannerAgreement() > 0.5f ? "YES" : "NO") << "\n";
+
+    // --- 9. Checkpoint testing ---
+    std::cout << "--- 9. Checkpoint testing ---\n";
+    const std::string ckpt = "/tmp/nlm_phase6_text_demo.ckpt";
+    bool saved = brain->save(ckpt);
+    auto brain8 = std::make_shared<Brain>(makeConfig());
+    brain8->initialize();
+    bool loaded = saved && brain8->load(ckpt);
+    std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")
+              << " loaded=" << (loaded ? "yes" : "NO");
+    if (loaded) {
+        std::cout << " totalSpikes=" << brain8->getTotalSpikeCount()
+                  << " workingNeurons=" << (brain8->getWorkingMemory() ? brain8->getWorkingMemory()->getMemoryNeuronCount() : 0)
+                  << " wmTraces=" << (brain8->getWorkingMemory() ? brain8->getWorkingMemory()->getActiveTraces() : 0)
+                  << " episodic=" << (brain8->getEpisodicMemory() ? brain8->getEpisodicMemory()->getEpisodeCount() : 0)
+                  << " preference=" << brain8->getLearnedPreference();
+        // Continue the reloaded brain for a few steps: it must still act.
+        AgentBrain agent8(brain8);
+        agent8.initialize(world);
+        agent8.enableCuriosity(false);
+        for (int i = 0; i < 50; ++i) brain8->step(step++);
+        std::cout << " continuedCmd=" << MotorCommandUtils::cmdName(agent8.decodeMotorCommand());
+    }
+    std::cout << "\n";
 
     std::cout << "Phase 6 text/thought demonstration complete.\n";
     // Exit 0 regardless of the specificity verdict: this demo

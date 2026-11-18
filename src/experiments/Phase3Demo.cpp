@@ -342,6 +342,31 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Handle help and version arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "===========================================\n";
+            std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+            std::cout << "===========================================\n\n";
+            std::cout << "USAGE: nlm_phase3_demo [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --help, -h         Print this help message and exit\n";
+            std::cout << "  --config=<file>    Load configuration from file (default: configs/default.cfg)\n";
+            std::cout << "  -c <file>          Load configuration from file (shorthand for --config)\\n";
+            std::cout << "  --episodes=<n>    Number of episodes (default: 5)\n";
+            std::cout << "  -e <n>             Number of episodes (shorthand)\n";
+            std::cout << "  --steps=<n>        Steps per episode (default: 200)\n";
+            std::cout << "  -s <n>             Steps per episode (shorthand)\n";
+            std::cout << "  --quiet, -q         Suppress output (except errors)\n";
+            std::cout << "\nExample:\n";
+            std::cout << "  nlm_phase3_demo --episodes=10 --steps=500\n\n";
+            std::cout << "This Phase 3 demo demonstrates how an artificial brain experiences "
+              << "the world through sensory perception, takes actions, and learns from consequences.\n";
+            return 0;
+        }
+    }
+    
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     

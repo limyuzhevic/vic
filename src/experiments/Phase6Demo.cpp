@@ -12,6 +12,34 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Handle help and version arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "=== NLM Phase 6 Integration Demo ===\n";
+            std::cout << "\nUSAGE: nlm_phase6_demo [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --help, -h         Print this help message and exit\n";
+            std::cout << "  --config=<file>    Load configuration from file (default: configs/default.cfg)\n";
+            std::cout << "  -c <file>          Load configuration from file (shorthand for --config)\n";
+            std::cout << "  --quiet, -q         Suppress output (except errors)\n";
+            std::cout << "  --log-level=<level> Set log level (trace, debug, info, warning, error)\n";
+            std::cout << "  --iterations=<n>   Number of iterations for full experiment (default: 1)\n";
+            std::cout << "  -i <n>             Number of iterations (shorthand)\n";
+            std::cout << "\nExample:\n";
+            std::cout << "  nlm_phase6_demo --iterations=2 --log-level=info\n\n";
+            std::cout << "This Phase 6 demo runs a complete integration test of all brain systems:\n";
+            std::cout << "  - Working Memory integration\n";
+            std::cout << "  - Episodic Memory storage and recall\n";
+            std::cout << "  - Neuromodulation (dopamine, curiosity)\n";
+            std::cout << "  - Prediction and concept formation\n";
+            std::cout << "  - Attention and cognitive planning\n";
+            std::cout << "  - Development and structural plasticity\n";
+            std::cout << "  - Checkpointing and replay capabilities\n";
+            return 0;
+        }
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     

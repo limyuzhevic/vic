@@ -28,24 +28,25 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    printBanner();
+    std::cout << "\nUSAGE: nlm [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --config=<file>    Load configuration from file (default: configs/default.cfg)\n";
+    std::cout << "  -c <file>          Load configuration from file (shorthand for --config)\n";
+    std::cout << "  --help, -h         Print this help message and exit\n";
+    std::cout << "  --quiet, -q        Suppress output (except errors)\n";
+    std::cout << "  --log-level=<level> Set log level (trace, debug, info, warning, error)\n";
+    std::cout << "\nExample:\n";
+    std::cout << "  nlm --config=myconfig.cfg --log-level=debug\n\n";
+    std::cout << "The NLM brain simulation supports over 20 configurable parameters for "
+              << "customizing neural network behavior.\n";
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 - Real Neural Computation\n";
+    std::cout << "Version: 2.0.6 (Phase 6 Integrated)\n";
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -308,6 +309,19 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version arguments before any initialization
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+        if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
