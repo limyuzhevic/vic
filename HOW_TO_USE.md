@@ -42,16 +42,16 @@ ctest --output-on-failure
 
 ### Build Outputs
 
+### Build Outputs with New Enhanced Features
+
 After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | **Enhanced** main simulation executable (with CLI interface) |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -66,6 +66,34 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
+```
+
+#### Enhanced CLI Options (New in Phase 2.1):
+
+```bash
+# Basic usage (runs enhanced Phase 2 demo demo)
+./nlm
+
+# Show help with all options
+./nlm --help
+
+# Show version information
+./nlm --version
+
+# Run internal tests
+./nlm --tests
+
+# Run enhanced demo with custom configuration
+./nlm --config=myconfig.cfg
+
+# Run with debug logging
+./nlm --log=DEBUG
+
+# Run with custom neuron count (Multiplier)
+./nlm --neurons=2
+
+# Save demo state after run
+./nlm --output=nlm_demo_state.bin
 ```
 
 ---

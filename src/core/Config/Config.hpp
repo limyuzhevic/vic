@@ -92,8 +92,11 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate configuration parameters
+    void validate(const Config& config) const;
+    
+    // Check if configuration is valid (convenience method)
+    bool isValid() const;
     
 private:
     struct Impl;

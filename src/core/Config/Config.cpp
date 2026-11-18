@@ -86,7 +86,43 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper function to format ConfigValue as string
+        auto formatValue = [](const ConfigValue& val) -> std::string {
+            std::stringstream ss;
+            std::visit([&ss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    ss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) ss << ", ";
+                        ss << arg[i];
+                    }
+                    ss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) ss << ", ";
+                        ss << arg[i];
+                    }
+                    ss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) ss << ", ";
+                        ss << "\"" << arg[i] << "\"";
+                    }
+                    ss << "]";
+                } else {
+                    ss << arg;
+                }
+            }, val);
+            return ss.str();
+        };
+        
+        file << entry.key << " = " << formatValue(entry.value) << "\n";
     }
     
     return true;
@@ -227,12 +263,45 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+// Enhanced configuration validation
+void Config::validate(const Config& config) {
+    std::vector<std::string> errors;
+    
+    // Validate key configuration parameters
+    if (config.has("neuron_count")) {
+        int64_t neuronCount = config.getOr<int64_t>("neuron_count", 1);
+        if (neuronCount < 1) {
+            errors.push_back("neuron_count must be >= 1, got " + std::to_string(neuronCount));
+        } else if (neuronCount > 1000000) {
+            errors.push_back("neuron_count is very large (> 1,000,000), this may cause performance issues");
+        }
+    }
+    
+    if (config.has("simulation_timestep")) {
+        double timestep = config.getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            errors.push_back("simulation_timestep must be > 0, got " + std::to_string(timestep));
+        } else if (timestep > 0.1) {
+            errors.push_back("simulation_timestep is very large (> 0.1), may cause numerical instability");
+        }
+    }
+    
+    if (config.has("connection_probability")) {
+        float prob = config.getOr<float>("connection_probability", 0.1);
+        if (prob < 0.0 || prob > 1.0) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0, got " + std::to_string(prob));
+        }
+    }
+    
+    if (!errors.empty()) {
+        std::ostringstream oss;
+        oss << "Configuration validation failed:";
+        for (const auto& error : errors) {
+            oss << "\n  - " << error;
+        }
+        NLM_LOG_ERROR(oss.str());
+        return;
+    }
+    
+    NLM_LOG_INFO("Configuration validation passed");
+}
