@@ -407,6 +407,51 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    
+    // STDP plasticity rules
+    py::class_<STDP, std::shared_ptr<STDP>>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity)pbdoc")
+        .def(py::init<>())
+        .def("update", &STDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on spike timing differences")
+        .def("applyWeightChange", &STDP::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply weight change to synapse")
+        .def("getName", &STDP::getName)
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"))
+        .def("getLTPWeight", &STDP::getLTPWeight)
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"))
+        .def("getLTDWeight", &STDP::getLTDWeight)
+        .def("setTimeConstant", &STDP::setTimeConstant, py::arg("tau"))
+        .def("getTimeConstant", &STDP::getTimeConstant)
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"));
+    
+    py::class_<RewardModulatedSTDP, std::shared_ptr<RewardModulatedSTDP>>(m, "RewardModulatedSTDP", R"pbdoc(Reward-modulated STDP with eligibility traces)pbdoc")
+        .def(py::init<>())
+        .def("update", &RewardModulatedSTDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on spike timing and reward")
+        .def("applyWeightChange", &RewardModulatedSTDP::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply reward-modulated weight change")
+        .def("getName", &RewardModulatedSTDP::getName)
+        .def("setLearningRate", &RewardModulatedSTDP::setLearningRate, py::arg("rate"))
+        .def("getLearningRate", &RewardModulatedSTDP::getLearningRate)
+        .def("setDiscountFactor", &RewardModulatedSTDP::setDiscountFactor, py::arg("factor"))
+        .def("getDiscountFactor", &RewardModulatedSTDP::getDiscountFactor)
+        .def("setPredictionError", &RewardModulatedSTDP::setPredictionError, py::arg("error"))
+        .def("getPredictionError", &RewardModulatedSTDP::getPredictionError)
+        .def("reset", &RewardModulatedSTDP::reset);
+    
+    py::class_<TripletSTDP, std::shared_ptr<TripletSTDP>>(m, "TripletSTDP", R"pbdoc(Triplet STDP with spike interaction effects)pbdoc")
+        .def(py::init<>())
+        .def("update", &TripletSTDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights using triplet STDP rules")
+        .def("applyWeightChange", &TripletSTDP::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply triplet STDP weight change")
+        .def("getName", &TripletSTDP::getName)
+        .def("setAPlusPre", &TripletSTDP::setAPlusPre, py::arg("weight"))
+        .def("getAPlusPre", &TripletSTDP::getAPlusPre)
+        .def("setAMinusPost", &TripletSTDP::setAMinusPost, py::arg("weight"))
+        .def("getAMinusPost", &TripletSTDP::getAMinusPost)
+        .def("setATau", &TripletSTDP::setATau, py::arg("tau"))
+        .def("getATau", &TripletSTDP::getATau);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
