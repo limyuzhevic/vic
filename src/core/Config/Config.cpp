@@ -19,16 +19,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    NLM_LOG_DEBUG("Attempting to load configuration from: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARN("Configuration file not found: " + filepath);
+        NLM_LOG_WARN("Using default configuration.");
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    size_t invalidEntries = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,13 +55,25 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            validEntries++;
+        } else {
+            NLM_LOG_WARN("Invalid configuration format at line " + std::to_string(lineNumber) + ": " + line);
+            invalidEntries++;
         }
+    }
+    
+    NLM_LOG_INFO("Configuration loaded successfully from: " + filepath);
+    NLM_LOG_INFO("Valid entries: " + std::to_string(validEntries));
+    if (invalidEntries > 0) {
+        NLM_LOG_WARN("Invalid entries: " + std::to_string(invalidEntries));
     }
     
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_LOG_DEBUG("Parsing command line arguments...");
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,16 +83,38 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format (only letters, numbers, dashes, underscores)
+                if (!std::all_of(key.begin(), key.end(), [](char c) {
+                    return std::isalnum(c) || c == '-' || c == '_';
+                })) {
+                    NLM_LOG_WARN("Invalid key format in argument: --" + key + "=" + value);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Applied command line override: --" + key + "=" + value);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            if (!std::all_of(key.begin(), key.end(), [](char c) {
+                return std::isalnum(c) || c == '-' || c == '_';
+            })) {
+                NLM_LOG_WARN("Invalid key format in argument: -" + key + " " + value);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Applied command line override: -" + key + " " + value);
         }
     }
+    
+    NLM_LOG_DEBUG("Command line argument parsing completed");
     return true;
 }
 
