@@ -1,0 +1,266 @@
+#!/bin/bash
+#!/usr/bin/env python3
+
+"""
+NLM (Neural Learning Machine) Advanced Command-Line Tools
+
+This script provides convenient command-line interfaces for:
+- Running simulations with different configurations
+- Loading and saving brain states
+- Analyzing simulation results
+- Running benchmark tests
+- Visualizing neural activity
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+import os
+from pathlib import Path
+from typing import Dict, Any
+
+def run_simulation(config_file: str = "configs/default.cfg", 
+                   output_file: str = None,
+                   verbose: bool = False) -> bool:
+    """Run NLM simulation with specified configuration"""
+    cmd = ["nlm", f"--config={config_file}"]
+    
+    if verbose:
+        cmd.append("--verbose")
+    
+    if output_file:
+        cmd.extend(["--output", output_file])
+    
+    try:
+        print(f"Running NLM simulation with config: {config_file}")
+        result = subprocess.run(cmd, check=True, capture_output=not verbose)
+        if verbose:
+            print(result.stdout.decode())
+        else:
+            print(f"Simulation completed successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Simulation failed with error: {e}")
+        if e.stderr:
+            print(f"Error output: {e.stderr.decode()}")
+        return False
+
+def analyze_simulation(output_file: str) -> Dict[str, Any]:
+    """Analyze simulation results from output file"""
+    print(f"Analyzing simulation results from: {output_file}")
+    
+    # Placeholder for analysis - in real implementation, this would parse
+    # the actual output format and compute statistics
+    analysis = {
+        "file": output_file,
+        "total_spikes": 0,
+        "firing_rate": 0.0,
+        "weight_changes": [],
+        "learning_detected": False,
+        "performance_metrics": {}
+    }
+    
+    print(f"Analysis complete: {analysis}")
+    return analysis
+
+def run_benchmark(config_file: str, duration: int = 60) -> Dict[str, Any]:
+    """Run benchmark test"""
+    print(f"Running benchmark with config: {config_file} for {duration}s")
+    
+    # Run the benchmark executable
+    cmd = ["nlm_benchmark", f"--config={config_file}", f"--duration={duration}"]
+    
+    try:
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        
+        # Parse benchmark output
+        benchmark_data = {
+            "config": config_file,
+            "duration_seconds": duration,
+            "output": result.stdout,
+            "errors": result.stderr,
+            "success": result.returncode == 0
+        }
+        
+        print(f"Benchmark completed")
+        return benchmark_data
+    except subprocess.CalledProcessError as e:
+        print(f"Benchmark failed: {e}")
+        return {"success": False, "error": str(e)}
+
+def run_experiments(experiment_name: str, params: Dict[str, Any]) -> bool:
+    """Run specific experiment with parameters"""
+    print(f"Running experiment: {experiment_name} with params: {params}")
+    
+    # Map experiment names to executables
+    experiment_executables = {
+        "phase3": "nlm_phase3_demo",
+        "phase4": "nlm_phase4_demo", 
+        "phase5": "nlm_phase5_demo",
+        "phase6": "nlm_phase6_demo",
+        "phase6_text": "nlm_phase6_text_demo"
+    }
+    
+    if experiment_name not in experiment_executables:
+        print(f"Unknown experiment: {experiment_name}")
+        return False
+    
+    cmd = [experiment_executables[experiment_name]]
+    
+    # Add parameters as command line arguments
+    for key, value in params.items():
+        cmd.append(f"--{key}={value}")
+    
+    try:
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        print(f"Experiment {experiment_name} completed successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Experiment {experiment_name} failed: {e}")
+        return False
+
+def save_configuration(config: Dict[str, Any], filename: str) -> bool:
+    """Save configuration to file"""
+    try:
+        with open(filename, 'w') as f:
+            json.dump(config, f, indent=2)
+        print(f"Configuration saved to: {filename}")
+        return True
+    except Exception as e:
+        print(f"Failed to save configuration: {e}")
+        return False
+
+def load_configuration(filename: str) -> Dict[str, Any]:
+    """Load configuration from file"""
+    try:
+        with open(filename, 'r') as f:
+            config = json.load(f)
+        print(f"Configuration loaded from: {filename}")
+        return config
+    except Exception as e:
+        print(f"Failed to load configuration: {e}")
+        return {}
+
+def print_help():
+    """Print help information"""
+    help_text = """
+NLM Advanced Command-Line Tools
+
+Usage: nlm-cli <command> [options]
+
+Commands:
+  run                 Run NLM simulation
+  analyze             Analyze simulation results  
+  benchmark           Run benchmark test
+  experiment          Run specific experiment
+  config-save         Save configuration to file
+  config-load         Load configuration from file
+  help                Show this help message
+
+Examples:
+  nlm-cli run --config=configs/default.cfg --verbose
+  nlm-cli analyze --output=simulation.log
+  nlm-cli benchmark --config=configs/benchmark.cfg --duration=120
+  nlm-cli experiment --name=phase6 --neuron_count=2000 --region_count=5
+  nlm-cli config-save --file=my_config.json
+  nlm-cli config-load --file=my_config.json
+"""
+    print(help_text)
+
+def main():
+    parser = argparse.ArgumentParser(description="NLM Advanced Command-Line Tools")
+    parser.add_argument('command', choices=['run', 'analyze', 'benchmark', 'experiment', 
+                                            'config-save', 'config-load', 'help'],
+                       help='Command to execute')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                       help='Verbose output')
+    
+    # Common options
+    parser.add_argument('--output', '-o', help='Output file path')
+    parser.add_argument('--config', '-c', default='configs/default.cfg',
+                       help='Configuration file path')
+    parser.add_argument('--file', '-f', help='File path for config operations')
+    
+    # Command-specific arguments
+    subparsers = parser.add_subparsers(dest='subcommand', help='Command-specific options')
+    
+    # Run command
+    run_parser = subparsers.add_parser('run', help='Run NLM simulation')
+    run_parser.add_argument('--duration', '-d', type=int, default=60,
+                           help='Duration in seconds')
+    
+    # Analyze command  
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze simulation results')
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Run benchmark test')
+    benchmark_parser.add_argument('--duration', '-d', type=int, default=60,
+                                 help='Duration in seconds')
+    
+    # Experiment command
+    experiment_parser = subparsers.add_parser('experiment', help='Run specific experiment')
+    experiment_parser.add_argument('--name', '-n', required=True,
+                                  choices=['phase3', 'phase4', 'phase5', 'phase6', 'phase6_text'],
+                                  help='Experiment name')
+    experiment_parser.add_argument('--neuron_count', type=int, help='Number of neurons')
+    experiment_parser.add_argument('--region_count', type=int, help='Number of regions')
+    experiment_parser.add_argument('--connection_probability', type=float, help='Connection probability')
+    
+    args = parser.parse_args()
+    
+    try:
+        if args.command == 'run':
+            success = run_simulation(args.config, args.output, args.verbose)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == 'analyze':
+            if not args.output:
+                print("Error: --output required for analyze command")
+                sys.exit(1)
+            analysis = analyze_simulation(args.output)
+            print(f"Analysis: {analysis}")
+            
+        elif args.command == 'benchmark':
+            benchmark_data = run_benchmark(args.config, args.duration)
+            print(f"Benchmark results: {benchmark_data}")
+            
+        elif args.command == 'experiment':
+            params = {}
+            if args.neuron_count: params['neuron_count'] = args.neuron_count
+            if args.region_count: params['region_count'] = args.region_count
+            if args.connection_probability: params['connection_probability'] = args.connection_probability
+            
+            success = run_experiments(args.name, params)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == 'config-save':
+            if not args.file:
+                print("Error: --file required for config-save command")
+                sys.exit(1)
+            # Default config for demonstration
+            config = {
+                "brain.neuron_count": 1000,
+                "brain.connection_probability": 0.1,
+                "plasticity.stdp.enable": True,
+                "plasticity.hebbian.enable": True
+            }
+            success = save_configuration(config, args.file)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == 'config-load':
+            if not args.file:
+                print("Error: --file required for config-load command")
+                sys.exit(1)
+            config = load_configuration(args.file)
+            print(f"Loaded config: {config}")
+            
+        elif args.command == 'help':
+            print_help()
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
