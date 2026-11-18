@@ -84,6 +84,7 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Build (Default)
 ```bash
 mkdir build
 cd build
@@ -91,10 +92,34 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Bindings Build (via pip install)
+The project includes Python bindings that can be installed via pip:
+
+```bash
+# Install with Python bindings (recommended)
+pip install .
+
+# Or build the Python module manually:
+mkdir build_python
+cd build_python
+cmake ../python -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Building Both C++ and Python
+To build both the C++ binaries and Python bindings together:
+```bash
+mkdir build_all
+cd build_all
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
+make -j4
+```
+
 ## Running
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
+### C++ Executables
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
@@ -103,43 +128,102 @@ currently separate demos per phase, not a single unified binary:
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+### Python Usage
+After installing via pip, you can use the Python bindings:
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create a brain with the configuration
+brain = pynlm.createBrain(config)
+
+# Initialize the brain
+brain.initialize()
+
+# Run simulation steps
+for step in range(100):
+    brain.step(step)
+
+# Get statistics
+print(f"Neurons firing: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate()}")
+```
+
+### Example: Complete Agent Simulation
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+print(f"Final firing rate: {brain.getAverageFiringRate()}")
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
+├── CMakeLists.txt               # Main CMake configuration
+├── README.md                    # This file
+├── docs/                        # Technical documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── PHASE6_FINAL_AUDIT.md
+├── src/                         # C++ source code
+│   ├── core/                    # Core utilities
+│   ├── agent/                   # Agent-brain interface
+│   ├── world/                   # Simple world
+│   ├── performance/             # Checkpoints, pools, queues
+│   ├── brain/                   # Neural components (integrated)
+│   ├── dynamics/                # Neural dynamics
+│   ├── plasticity/              # Plasticity rules
+│   ├── development/             # Developmental system
+│   ├── neuromodulation/          # Neuromodulators (integrated)
+│   ├── memory/                  # Memory systems (integrated)
+│   ├── prediction/              # Prediction systems (integrated)
+│   ├── cognition/               # Cognitive mechanisms (integrated)
+│   ├── sensory/                 # Sensory processing
+│   ├── motor/                   # Motor system
+│   ├── environment/             # Environment interface
+│   ├── experiments/             # Experiment framework (Phase 6)
+│   └── visualization/           # Visualization
+├── python/                      # Python bindings
+│   ├── CMakeLists.txt           # Python bindings build configuration
+│   └── bindings.cpp             # Pybind11 bindings
+├── tests/                       # Unit tests
+└── configs/                     # Configuration files
 ```
 
 ## Phase Summary
