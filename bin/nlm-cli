@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# NLM Advanced Command Line Interface
+# Provides enhanced functionality for advanced users and automated experiments
+
+# Usage: nlm-cli [COMMAND] [OPTIONS]
+
+# Display help
+if [[ $# -eq 0 ]]; then
+    echo "NLM Advanced Command Line Interface"
+    echo "================================"
+    echo ""
+    echo "Available commands:"
+    echo "  help                    Display this help message"
+    echo "  run                     Run NLM with configuration"
+    echo "  config                  Display or modify configuration"
+    echo "  experiment              Run specific experiment types"
+    echo "  benchmark               Run performance benchmarks"
+    echo "  checkpoint              Checkpoint management"
+    echo "  debug                   Debug and analysis tools"
+    echo ""
+    echo "Examples:"
+    echo "  nlm-cli run --config configs/advanced_nlm.cfg --steps 5000"
+    echo "  nlm-cli experiment learning --config configs/learning.cfg"
+    echo "  nlm-cli benchmark --sizes 500,1000,2000"
+    echo ""
+    exit 0
+fi
+
+# Load configuration
+CONFIG_FILE="${2:-configs/default.cfg}"
+
+# Function to display help for a command
+cmd_help() {
+    case $1 in
+        "run")
+            echo "Usage: nlm-cli run [OPTIONS]"
+            echo "Run NLM with enhanced configuration"
+            echo ""
+            echo "Options:"
+            echo "  --config <file>        Configuration file (default: configs/default.cfg)"
+            echo "  --steps <num>          Number of simulation steps (default: 1000)"
+            echo "  --neurons <num>        Number of neurons (default: 500)"
+            echo "  --regions <num>        Number of regions (default: 1)"
+            echo "  --enable-learning       Enable learning mechanisms"
+            echo "  --enable-memory        Enable memory systems"
+            echo "  --enable-neuromod       Enable neuromodulation"
+            echo "  --enable-development    Enable developmental processes"
+            echo "  --checkpoint <dir>      Directory for checkpoints (default: ./checkpoints)"
+            echo "  --log-level <level>    Log level (DEBUG, INFO, WARNING, ERROR)"
+            echo "  --help                 Display help"
+            ;;
+        "experiment")
+            echo "Usage: nlm-cli experiment [TYPE] [OPTIONS]"
+            echo "Run specific experiment types"
+            echo ""
+            echo "Experiment types:"
+            echo "  learning             Learning and plasticity experiments"
+            echo "  integration          Integration tests for all systems"
+            echo "  adaptation           Adaptation to changing environments"
+            echo "  memory               Memory system experiments"
+            echo "  neuromodulation       Neuromodulation experiments"
+            echo ""
+            echo "Options:"
+            echo "  --config <file>        Configuration file"
+            echo "  --steps <num>          Number of steps (default: 2000)"
+            echo "  --neurons <num>        Number of neurons (default: 1000)"
+            echo "  --help                 Display help"
+            ;;
+        "benchmark")
+            echo "Usage: nlm-cli benchmark [OPTIONS]"
+            echo "Run performance benchmarks"
+            echo ""
+            echo "Options:"
+            echo "  --sizes <list>         Neuron sizes to test (comma-separated, default: 500,1000,2000)"
+            echo "  --steps <num>          Steps per benchmark (default: 1000)"
+            echo "  --output <file>        Output file for results"
+            echo "  --help                 Display help"
+            ;;
+        "checkpoint")
+            echo "Usage: nlm-cli checkpoint [COMMAND] [OPTIONS]"
+            echo "Checkpoint management"
+            echo ""
+            echo "Commands:"
+            echo "  save                   Save current brain state"
+            echo "  load                   Load brain state"
+            echo "  list                   List available checkpoints"
+            echo "  delete                 Delete checkpoint"
+            echo "  prune                  Prune old checkpoints"
+            echo ""
+            echo "Options:"
+            echo "  --path <dir>           Checkpoint directory (default: ./checkpoints)"
+            echo "  --name <name>          Checkpoint name"
+            echo "  --help                 Display help"
+            ;;
+        "debug")
+            echo "Usage: nlm-cli debug [OPTIONS]"
+            echo "Debug and analysis tools"
+            echo ""
+            echo "Options:"
+            echo "  --trace-level <level>  0-3: no trace to full trace (default: 0)"
+            echo "  --profile              Enable performance profiling"
+            echo "  --memory-profiling     Enable memory profiling"
+            echo "  --step-profiling       Enable step-by-step profiling"
+            echo "  --output <file>        Output file for debug data"
+            echo "  --help                 Display help"
+            ;;
+        *)
+            echo "Unknown command: $1"
+            echo "Run 'nlm-cli help' for available commands"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to run NLM with enhanced options
+run_nlm() {
+    local config_file="${1:-$CONFIG_FILE}"
+    local steps="${2:-1000}"
+    local neurons="${3:-500}"
+    local regions="${4:-1}"
+    local enable_learning="${5:-false}"
+    local enable_memory="${6:-true}"
+    local enable_neuromod="${7:-true}"
+    local enable_development="${8:-true}"
+    local checkpoint_dir="${9:-./checkpoints}"
+    local log_level="${10:-INFO}"
+    
+    echo "Running NLM with advanced configuration..."
+    echo "Config: $config_file"
+    echo "Steps: $steps"
+    echo "Neurons: $neurons"
+    echo "Regions: $regions"
+    
+    # Build NLM command with advanced options
+    local cmd="./nlm"
+    
+    # Add advanced options
+    cmd+=" --config $config_file"
+    cmd+=" --steps $steps"
+    cmd+=" --neurons $neurons"
+    cmd+=" --regions $regions"
+    
+    if [[ "$enable_learning" == "true" ]]; then
+        cmd+=" --enable-learning"
+    fi
+    if [[ "$enable_memory" == "false" ]]; then
+        cmd+=" --disable-memory"
+    fi
+    if [[ "$enable_neuromod" == "false" ]]; then
+        cmd+=" --disable-neuromod"
+    fi
+    if [[ "$enable_development" == "false" ]]; then
+        cmd+=" --disable-development"
+    fi
+    
+    cmd+=" --checkpoint-dir $checkpoint_dir"
+    cmd+=" --log-level $log_level"
+    
+    # Run the command
+    eval "$cmd"
+}
+
+# Function to run specific experiment
+cmd_experiment() {
+    local exp_type="$1"
+    shift
+    
+    case $exp_type in
+        "learning")
+            echo "Running learning experiment..."
+            # Enhanced learning experiment with selectivity
+            run_nlm "$CONFIG_FILE" "3000" "1000" "1" "true" "true" "true" "true"
+            ;;
+        "integration")
+            echo "Running integration experiment..."
+            # Phase 6 integration verification
+            ./nlm_phase6_demo
+            ;;
+        "adaptation")
+            echo "Running adaptation experiment..."
+            # Adaptation to changing environment
+            run_nlm "$CONFIG_FILE" "5000" "1500" "1" "true" "true" "true" "true"
+            ;;
+        "memory")
+            echo "Running memory experiment..."
+            # Memory system tests
+            run_nlm "$CONFIG_FILE" "2000" "800" "1" "false" "true" "false" "false"
+            ;;
+        "neuromodulation")
+            echo "Running neuromodulation experiment..."
+            # Neuromodulation focus
+            run_nlm "$CONFIG_FILE" "2000" "600" "1" "false" "false" "true" "false"
+            ;;
+        *)
+            cmd_help "experiment"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to run benchmarks
+cmd_benchmark() {
+    local sizes="${1:-500,1000,2000}"
+    local steps="${2:-1000}"
+    local output="${3:-benchmark_results.txt}"
+    
+    echo "Running NLM benchmarks..."
+    echo "Sizes: $sizes"
+    echo "Steps: $steps"
+    
+    # Parse sizes
+    IFS=',' read -ra size_array <<< "$sizes"
+    
+    # Run benchmarks
+    echo -e "\nNeuron Size\tSteps/sec\tSpikes/Step\tSynapses/Neuron\tTime (s)" > "$output"
+    
+    for size in "${size_array[@]}"; do
+        local cmd="./nlm_benchmark $size $steps"
+        echo "Running benchmark for $size neurons..."
+        eval "$cmd"
+        # Extract results from benchmark output (simplified)
+        echo "$size\t<N/A>\t<N/A>\t<N/A>\t<N/A>" >> "$output"
+    done
+    
+    echo "Benchmark results written to $output"
+}
+
+# Parse command and execute
+case $1 in
+    "run")
+        cmd_help "run" 2>&1 | head -20
+        run_nlm "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}" "${23}" "${24}" "${25}" "${26}" "${27}" "${28}" "${29}" "${30}" "${31}" "${32}" "${33}" "${34}" "${35}" "${36}" "${37}" "${38}" "${39}" "${40}" "${41}" "${42}" "${43}" "${44}" "${45}" "${46}" "${47}" "${48}" "${49}" "${50}"
+        ;;
+    "experiment")
+        if [[ -z "$2" ]]; then
+            echo "Error: Experiment type not specified"
+            cmd_help "experiment"
+            exit 1
+        fi
+        cmd_experiment "$2" "$@"
+        ;;
+    "benchmark")
+        cmd_benchmark "$2" "$3" "$4"
+        ;;
+    "help")
+        cmd_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Run 'nlm-cli help' for available commands"
+        exit 1
+        ;;
+esac

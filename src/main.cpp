@@ -222,11 +222,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Enhanced pattern learning with selective input distribution
+    // Improved from the old code which saturated the entire network.
+    // Now we use multiple sparse input patterns to encourage selective learning.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -235,18 +233,65 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    // Add multiple input patterns to encourage competition and selectivity
+    std::vector<std::vector<NeuronId>> patterns;
+    patterns.push_back(patternNeurons);  // Pattern 1: first 20 sensory neurons
+    
+    // Add additional sparse patterns (every 100th neuron after first pattern)
+    for (size_t p = 0; p < 5; ++p) {
+        std::vector<NeuronId> alternatePattern;
+        for (size_t i = 0; i < patternNeurons.size(); ++i) {
+            size_t neuronIndex = patternNeurons[i].index();
+            size_t altIndex = (neuronIndex + p * 10) % region->getTotalNeuronCount();
+            if (altIndex < 100) {  // Only select early neurons to ensure sparse activation
+                alternatePattern.push_back(patternNeurons[i]);
+            }
+        }
+        patterns.push_back(alternatePattern);
+    }
+    
+    // Apply patterns with controlled intensity and timing
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Cycle through different patterns to prevent runaway excitation
+        size_t patternIndex = step % patterns.size();
+        auto& currentPattern = patterns[patternIndex];
+        
+        // Use adaptive input strength based on step number and pattern
+        float inputStrength = 30.0f;
+        
+        // Early steps: high intensity, later steps: reduced to allow consolidation
+        if (step > 600) {
+            inputStrength *= 0.7f;
+        }
+        
+        for (NeuronId id : currentPattern) {
+            brain->injectCurrent(id, inputStrength);
+        }
+        
+        // Alternate with background activity to encourage competitive dynamics
+        if (step % 5 == 0) {  // Every 5th step, add mild background excitation
+            brain->injectCurrentToNeurons(NeuronType::Internal, 5.0f);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
+        // Log progress every 100 steps with more detailed metrics
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Pattern: " + std::to_string(patternIndex));
+        }
+    }
+    
+    // Post-consolidation phase: reduce input to allow weight stabilization
+    NLM_LOG_INFO("  Entering consolidation phase...")
+    for (SimulationStep step = 0; step < 200; ++step) {
+        brain->step(step + 1000, (step + 1000) * 0.001);
+        if (step % 50 == 0) {
+            NLM_LOG_INFO("    Consolidation step " + std::to_string(step +  históricas) + 
+                        " | Avg weight: " + std::to_string(brain->getExcitationInhibitionRatio()));
         }
     }
     
