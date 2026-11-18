@@ -3,8 +3,62 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_set>
+#include <cctype>
+#include <regex>
+#include <cmath>
+#include <cstring>
+#include <limits>
 
 namespace nlm {
+
+// Helper functions for config parsing
+inline bool isNumeric(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t pos = 0;
+    bool hasDigit = false;
+    bool hasDecimal = false;
+    bool hasSign = false;
+    
+    if (str[0] == '+' || str[0] == '-') {
+        hasSign = true;
+        pos = 1;
+    }
+    
+    for (size_t i = pos; i < str.size(); ++i) {
+        if (std::isdigit(str[i])) {
+            hasDigit = true;
+        } else if (str[i] == '.') {
+            if (hasDecimal) return false; // Multiple decimal points
+            hasDecimal = true;
+        } else {
+            return false; // Invalid character
+        }
+    }
+    
+    return hasDigit;
+}
+
+inline bool isInteger(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t pos = 0;
+    bool hasSign = false;
+    
+    if (str[0] == '+' || str[0] == '-') {
+        hasSign = true;
+        pos = 1;
+    }
+    
+    for (size_t i = pos; i < str.size(); ++i) {
+        if (!std::isdigit(str[i])) {
+            return false;
+        }
+    }
+    
+    return str.size() > pos; // Must have at least one digit
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,9 +73,7 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Phase 2: Enhanced key=value format parser with validation
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -35,19 +87,26 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better validation
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Validate key (must be non-empty and valid identifier)
+            if (key.empty() || !isValidKey(key)) {
+                NLM_LOG_WARNING("Invalid key in config file: '" + key + "'");
+                continue;
+            }
+            
+            // Remove quotes if present and validate
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Set the value
             set(key, value, ConfigSource::File);
         }
     }
@@ -177,48 +236,244 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Helper methods
+bool Config::validateKey(const std::string& key) const {
+    // Check if key is valid
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Allow alphanumeric characters, underscores, and dots
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '.') {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
-std::string Config::toLower(const std::string& str) {
+bool Config::isValidKey(const std::string& key) const {
+    return validateKey(key);
+}
+
+bool Config::setAdvancedConfig(const std::string& key, const std::string& value) {
+    // Advanced config validation and setting
+    if (!isValidKey(key)) {
+        NLM_LOG_WARNING("Invalid advanced config key: '" + key + "'");
+        return false;
+    }
+    
+    // Try to parse value as different types
+    if (isNumeric(value)) {
+        if (isInteger(value)) {
+            set(key, std::stoll(value), ConfigSource::Runtime);
+        } else {
+            set(key, std::stod(value), ConfigSource::Runtime);
+        }
+    } else if (value == "true" || value == "false") {
+        set(key, value == "true", ConfigSource::Runtime);
+    } else if (value == "null" || value == "none") {
+        set(key, std::string(""), ConfigSource::Runtime);
+    } else {
+        // Treat as string
+        set(key, value, ConfigSource::Runtime);
+    }
+    
+    return true;
+}
+
+std::vector<std::string> Config::getConfigCommands() const {
+    std::vector<std::string> commands;
+    commands.reserve(pImpl->entries.size());
+    
+    for (const auto& entry : pImpl->entries) {
+        commands.push_back("--" + entry.key + "=<value>");
+        
+        // Add type-specific hints
+        if (std::holds_alternative<int>(entry.value)) {
+            commands.back() += " (int)";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            commands.back() += " (float)";
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            commands.back() += " (bool)";;
+        }
+    }
+    
+    return commands;
+}
+
+bool Config::executeConfigCommand(const std::string& command) {
+    if (command.empty() || command[0] != '-') {
+        NLM_LOG_WARNING("Invalid config command: '" + command + "'");
+        return false;
+    }
+    
+    std::string cmd = command.substr(1);
+    size_t pos = cmd.find('=');
+    
+    if (pos == std::string::npos) {
+        NLM_LOG_WARNING("Invalid config command format: '" + command + "'");
+        return false;
+    }
+    
+    std::string key = cmd.substr(0, pos);
+    std::string value = cmd.substr(pos + 1);
+    
+    return setAdvancedConfig(key, value);
+}
+
+// JSON/YAML parsing helpers (Phase 2)
+bool Config::parseJson(const std::string& content) {
+    // Basic JSON parsing implementation
+    // This is a simplified implementation - a real one would use a proper JSON library
+    if (content.empty() || content[0] != '{') {
+        return false;
+    }
+    
+    // Simple JSON parsing - find key-value pairs
+    size_t pos = 1;
+    while (pos < content.size() && content[pos] != '}') {
+        // Find next key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break;
+        }
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = trim(content.substr(keyStart + 1, keyEnd - keyStart - 1));
+        
+        // Find value
+        size_t valueStart = content.find(':', keyEnd);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        size_t valueEnd = content.find('}', valueStart);
+        if (valueEnd == std::string::npos) {
+            valueEnd = content.find(',', valueStart);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+        }
+        
+        std::string valueStr = trim(content.substr(valueStart + 1, valueEnd - valueStart - 1));
+        
+        set(key, parseJsonValue(valueStr), ConfigSource::File);
+        
+        pos = valueEnd + 1;
+    }
+    
+    return true;
+}
+
+bool Config::parseYaml(const std::string& content) {
+    // Basic YAML parsing implementation
+    if (content.empty() || content.find(':') == std::string::npos) {
+        return false;
+    }
+    
+    // Simple YAML parsing - find key: value pairs
+    size_t pos = 0;
+    while (pos < content.size()) {
+        size_t colonPos = content.find(':', pos);
+        if (colonPos == std::string::npos) {
+            break;
+        }
+        
+        std::string key = trim(content.substr(0, colonPos));
+        
+        // Find end of content
+        size_t endPos = content.find_last_not_of('\n', content.size() - 1);
+        if (endPos == std::string::npos) {
+            break;
+        }
+        
+        std::string valueStr = trim(content.substr(colonPos + 1, endPos - colonPos));
+        
+        set(key, parseYamlValue(valueStr), ConfigSource::File);
+        
+        pos = endPos + 1;
+    }
+    
+    return true;
+}
+
+ConfigValue Config::parseJsonValue(const std::string& str) {
+    // Simplified JSON value parsing
+    if (str.empty()) {
+        return "";
+    }
+    
+    // Check for JSON types
+    if (str[0] == '"' && str.back() == '"') {
+        return trimJsonString(str.substr(1, str.size() - 2));
+    } else if (str == "true" || str == "false") {
+        return str == "true";
+    } else if (str == "null") {
+        return std::string("");
+    } else if (isNumeric(str)) {
+        // Try integer first, then double
+        try {
+            if (str.find('.') == std::string::npos) {
+                return std::stoll(str);
+            }
+        } catch (...) {}
+        
+        try {
+            return std::stod(str);
+        } catch (...) {}
+    }
+    
+    return std::string(str);
+}
+
+ConfigValue Config::parseYamlValue(const std::string& str) {
+    // Simplified YAML value parsing
+    if (str.empty()) {
+        return "";
+    }
+    
+    // Check for YAML types
+    if (str[0] == '"' || str[0] == '\'') {
+        if (str.back() == '"' || str.back() == '\'') {
+            return str.substr(1, str.size() - 2);
+        }
+    }
+    
+    if (str == "true" || str == "false") {
+        return str == "true";
+    } else if (str == "null" || str == "none") {
+        return std::string("");
+    } else if (isNumeric(str)) {
+        // Try integer first, then double
+        try {
+            if (str.find('.') == std::string::npos) {
+                return std::stoll(str);
+            }
+        } catch (...) {}
+        
+        try {
+            return std::stod(str);
+        } catch (...) {}
+    }
+    
+    return std::string(str);
+}
+
+std::string Config::trimJsonString(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    if (result.size() >= 2 && result.front() == '"' && result.back() == '"') {
+        result = result.substr(1, result.size() - 2);
+    }
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
-        }
-    }, it->value);
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
+// Template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;

@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -66,12 +67,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +96,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and commands (Phase 2 enhancements)
+    bool validateKey(const std::string& key) const;
+    bool isValidKey(const std::string& key) const;
+    bool setAdvancedConfig(const std::string& key, const std::string& value);
+    std::vector<std::string> getConfigCommands() const;
+    bool executeConfigCommand(const std::string& command);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +110,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers (Phase 2)
+    bool parseJson(const std::string& content);
+    bool parseYaml(const std::string& content);
+    ConfigValue parseJsonValue(const std::string& str);
+    ConfigValue parseYamlValue(const std::string& str);
+    std::string trimJsonString(const std::string& str);
 };
 
 } // namespace nlm

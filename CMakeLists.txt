@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigCommands.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -131,6 +132,12 @@ add_library(nlm_phase6 STATIC
 )
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Config improvements test executable
+add_executable(test_config_improvements
+    test_config_improvements.cpp
+)
+target_link_libraries(test_config_improvements PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
