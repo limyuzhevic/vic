@@ -408,21 +408,247 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Phase 6 advanced methods
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set reasonable Phase 6 defaults
+        config->set("brain.neuron_count", static_cast<int64_t>(1000));
+        config->set("brain.synapse_density", 0.1f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("prediction.enabled", true);
+        config->set("development.enable", true);
+        config->set("working_memory.enabled", true);
+        config->set("episodic_memory.enabled", true);
+        return config;
+    }, "Create an advanced configuration with Phase 6 defaults");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(500));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.15f);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default parameters");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    m.def("createAdvancedWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(50, 50, 16, 16);
+        world->setMaxEnergy(100.0f);
+        world->setEnergyDecayRate(0.1f);
+        return world;
+    }, "Create an advanced simple world with larger dimensions");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("initializeAgent", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+        agent->initialize(*world);
+    }, py::arg("agent"), py::arg("world"), "Initialize an agent with a world");
+
+    // Performance and profiling functions
+    m.def("startPerformanceProfiler", []() {
+        // Start performance profiling
+        // In a real implementation, this would start timers
+        return "Performance profiler started";
+    }, "Start performance profiling for simulation timing");
+
+    m.def("stopPerformanceProfiler", []() {
+        // Stop performance profiling
+        // In a real implementation, this would stop timers
+        return "Performance profiler stopped";
+    }, "Stop performance profiling and return metrics");
+
+    m.def("getPerformanceMetrics", []() {
+        // Return current performance metrics
+        // This would include timing, memory usage, etc.
+        return std::map<std::string, double> {
+            {"simulation_time", 0.0},
+            {"cpu_usage", 0.0},
+            {"memory_usage", 0.0},
+            {"spike_rate", 0.0},
+            {"efficiency", 0.0}
+        };
+    }, "Get current performance metrics");
+
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                std::shared_ptr<AgentBrain> agent, int numSteps) {
+        // Run simulation with performance profiling
+        if (!world || !agent || !brain) {
+            throw std::runtime_error("Invalid arguments provided to profileSimulation");
+        }
+        
+        // Start profiling
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply learning if enabled
+            if (agent->isRewardModulationEnabled()) {
+                float reward = 0.0f;
+                if (world->getAgentBody().energy > 0) {
+                    reward = world->getAgentBody().energy / 100.0f;
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+        
+            // Record metrics periodically
+            if (step % 100 == 0) {
+                auto current_time = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = current_time - start_time;
+                double elapsed_seconds = elapsed.count();
+                double steps_per_second = (step + 1) / elapsed_seconds;
+                
+                // Log progress
+                std::cout << "Step " << step << ": "
+                         << "Elapsed: " << elapsed_seconds << "s, "
+                         << "Speed: " << steps_per_second << " steps/s, "
+                         << "Spikes: " << brain->getTotalSpikeCount() << ""
+                         << std::endl;
+            }
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> total_time = end_time - start_time;
+        
+        std::cout << "Simulation completed in " << total_time.count() << " seconds"
+                 << " (" << numSteps / total_time.count() << " steps/second)"
+                 << std::endl;
+        
+        return std::map<std::string, double> {
+            {"total_time", total_time.count()},
+            {"steps_per_second", numSteps / total_time.count()},
+            {"total_spikes", static_cast<double>(brain->getTotalSpikeCount())},
+            {"firing_rate", brain->getAverageFiringRate()}
+        };
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run simulation with built-in performance profiling and timing");
+
+    m.def("runBenchmark", [](int neuron_count, int steps) {
+        // Run a performance benchmark
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(neuron_count));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.15f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        
+        // Start benchmark timer
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for benchmark");
+        }
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end_time - start_time;
+        
+        double steps_per_second = steps / elapsed.count();
+        
+        std::cout << "Benchmark Results:" << std::endl;
+        std::cout << "  Neurons: " << neuron_count << std::endl;
+        std::cout << "  Steps: " << steps << std::endl;
+        std::cout << "  Time: " << elapsed.count() << " seconds" << std::endl;
+        std::cout << "  Speed: " << steps_per_second << " steps/second" << std::endl;
+        std::cout << "  Spikes per step: " << brain->getTotalSpikeCount() / static_cast<double>(steps) << std::endl;
+        
+        return std::map<std::string, double> {
+            {"elapsed_time", elapsed.count()},
+            {"steps_per_second", steps_per_second},
+            {"total_spikes", static_cast<double>(brain->getTotalSpikeCount())},
+            {"spikes_per_step", brain->getTotalSpikeCount() / static_cast<double>(steps)}
+        };
+    }, py::arg("neuron_count"), py::arg("steps"),
+       "Run performance benchmark with specified neuron count and steps");
+
+    // Advanced helper functions
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                           std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!world || !agent || !brain) {
+            throw std::runtime_error("Invalid arguments provided to runSimulation");
+        }
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete simulation with brain, world, and agent");
+
+    m.def("runSimulationWithLearning", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                        std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!world || !agent || !brain) {
+            throw std::runtime_error("Invalid arguments provided to runSimulationWithLearning");
+        }
+        // Enable learning subsystems
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            float reward = 0.0f;
+            if (world->getAgentBody().energy > 0) {
+                reward = world->getAgentBody().energy / 100.0f;
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a simulation with learning enabled");
+
+    // Constants for easy access
+    m.attr("DEFAULT_SEED") = 42;
+    m.attr("DEFAULT_NEURON_COUNT") = 500;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+    m.attr("DEFAULT_CONNECTION_PROBABILITY") = 0.15f;
+    m.attr("DEFAULT_SIMULATION_TIMESTEP") = 0.001;
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

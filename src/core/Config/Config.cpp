@@ -217,6 +217,247 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Configuration validation and validation helpers
+bool Config::validate(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators) const {
+    std::vector<std::string> errors;
+    
+    for (const auto& [key, validator] : validators) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            errors.push_back("Missing required configuration key: " + key);
+            continue;
+        }
+        
+        if (!validator(it->value)) {
+            errors.push_back("Invalid value for key " + key + ". Value: " + std::visit(
+                [](auto&& v) -> std::string {
+                    using V = std::decay_t<decltype(v)>;
+                    if constexpr (std::is_same_v<V, std::string>) {
+                        return "\"" + v + "\"";
+                    } else {
+                        return std::to_string(v);
+                    }
+                }, it->value));
+        }
+    }
+    
+    if (!errors.empty()) {
+        std::ostringstream oss;
+        oss << "Configuration validation failed with " << errors.size() << " error(s):\n";
+        for (const auto& error : errors) {
+            oss << "  - " << error << "\n";
+        }
+        // Log validation errors
+        Logger::getGlobal()->error(oss.str());
+        return false;
+    }
+    
+    return true;
+}
+
+// Specific validation helpers
+bool Config::validatePositive(const ConfigValue& value) {
+    return std::visit([](auto&& v) -> bool {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_arithmetic_v<V>) {
+            return v > 0;
+        } else {
+            return false;
+        }
+    }, value);
+}
+
+bool Config::validateNonNegative(const ConfigValue& value) {
+    return std::visit([](auto&& v) -> bool {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_arithmetic_v<V>) {
+            return v >= 0;
+        } else {
+            return false;
+        }
+    }, value);
+}
+
+bool Config::validateRange(const ConfigValue& value, double min, double max) {
+    return std::visit([min, max](auto&& v) -> bool {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_arithmetic_v<V>) {
+            return v >= min && v <= max;
+        } else {
+            return false;
+        }
+    }, value);
+}
+
+bool Config::validateStringNotEmpty(const ConfigValue& value) {
+    return std::visit([](auto&& v) -> bool {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<V, std::string>) {
+            return !v.empty();
+        } else {
+            return false;
+        }
+    }, value);
+}
+
+bool Config::validateInEnum(const ConfigValue& value, const std::vector<std::string>& validValues) {
+    return std::visit([&validValues](auto&& v) -> bool {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<V, std::string>) {
+            return std::find(validValues.begin(), validValues.end(), v) != validValues.end();
+        } else {
+            return false;
+        }
+    }, value);
+}
+
+// Get configuration value with validation
+template<typename T>
+std::optional<T> Config::getValidated(const std::string& key, 
+    std::function<bool(const ConfigValue&)> validator) const {
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    // Validate first
+    if (!validator(it->value)) {
+        Logger::getGlobal()->error("Invalid value for key " + key + ". Value: " + std::visit(
+            [](auto&& v) -> std::string {
+                using V = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<V, std::string>) {
+                    return "\"" + v + "\"";
+                } else {
+                    return std::to_string(v);
+                }
+            }, it->value));
+        return std::nullopt;
+    }
+    
+    // Convert to requested type
+    return std::visit([](auto&& v) -> std::optional<T> {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<V, T>) {
+            return v;
+        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
+            return static_cast<T>(v);
+        } else {
+            return std::nullopt;
+        }
+    }, it->value);
+}
+
+// Configuration summary with validation status
+std::string Config::summaryWithValidation() const {
+    std::ostringstream oss;
+    oss << "Configuration Summary (" << pImpl->entries.size() << " entries):\n";
+    oss << "  Valid: " << validate({}) << "\n";
+    
+    if (!pImpl->entries.empty()) {
+        oss << "\n  Configuration entries:\n";
+        for (const auto& entry : pImpl->entries) {
+            oss << "    " << entry.key << " = [";
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                   std::is_same_v<T, std::vector<double>> ||
+                                   std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else {
+                    oss << arg;
+                }
+            }, entry.value);
+            oss << "] (source=" << entry.source << ")\n";
+        }
+    }
+    
+    return oss.str();
+}
+
+// Validate all known configuration keys have valid values
+bool Config::validateAll() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!validateSingleKey(entry.key, entry.value)) {
+            errors.push_back("Invalid value for key " + entry.key);
+        }
+    }
+    
+    if (!errors.empty()) {
+        Logger::getGlobal()->error("Configuration validation failed with " + std::to_string(errors.size()) + " errors");
+        for (const auto& error : errors) {
+            Logger::getGlobal()->error("  - " + error);
+        }
+        return false;
+    }
+    
+    return true;
+}
+
+bool Config::validateSingleKey(const std::string& key, const ConfigValue& value) {
+    // Basic validation based on key patterns
+    if (key.find("neuron_") == 0 || key == "neuron_count") {
+        return validatePositive(value);
+    }
+    
+    if (key.find("connection_") == 0 || key == "connection_probability" || 
+        key == "synaptogenesis_rate" || key == "pruning_rate") {
+        return validateRange(value, 0.0, 1.0);
+    }
+    
+    if (key.find("weight") != std::string::npos) {
+        return validateRange(value, -10.0, 10.0);
+    }
+    
+    if (key.find("rate") != std::string::npos || key == "firing_rate" || 
+        key == "learning_rate" || key == "stdp_learning_rate") {
+        return validateNonNegative(value);
+    }
+    
+    if (key.find("scale") != std::string::npos || key.find("gamma") != std::string::npos) {
+        return validateRange(value, 0.0, 100.0);
+    }
+    
+    if (key == "simulation_timestep" || key == "dt") {
+        return validateRange(value, 0.0001, 1.0);
+    }
+    
+    // Default validation for unknown keys
+    return true;
+}
+
+// Set with validation
+void Config::setValidated(const std::string& key, const ConfigValue& value, 
+                         ConfigSource source, std::function<bool(const ConfigValue&)> validator) {
+    if (validator && !validator(value)) {
+        Logger::getGlobal()->error("Validation failed for key " + key + ". Value: " + std::visit(
+            [](auto&& v) -> std::string {
+                using V = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<V, std::string>) {
+                    return "\"" + v + "\"";
+                } else {
+                    return std::to_string(v);
+                }
+            }, value));
+        return;
+    }
+    
+    set(key, value, source);
+}
+
 // Explicit template instantiations
 // (uint64_t and size_t are the same type on this platform, so only one is listed)
 template std::optional<int> Config::get<int>(const std::string&) const;

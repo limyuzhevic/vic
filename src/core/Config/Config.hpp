@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -66,7 +68,7 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
@@ -77,6 +79,7 @@ template<typename T>
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+ 교
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -95,6 +98,31 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators) const;
+    bool validateAll() const;
+    bool validateSingleKey(const std::string& key, const ConfigValue& value) const;
+    
+    // Validation helpers
+    static bool validatePositive(const ConfigValue& value);
+    static bool validateNonNegative(const ConfigValue& value);
+    static bool validateRange(const ConfigValue& value, double min, double max);
+    static bool validateStringNotEmpty(const ConfigValue& value);
+    static bool validateInEnum(const ConfigValue& value, const std::vector<std::string>& validValues);
+    
+    // Get with validation
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key, 
+        std::function<bool(const ConfigValue&)> validator) const;
+    
+    // Set with validation
+    void setValidated(const std::string& key, const ConfigValue& value, 
+                     ConfigSource source = ConfigSource::Runtime,
+                     std::function<bool(const ConfigValue&)> validator = nullptr);
+    
+    // Configuration summary with validation status
+    std::string summaryWithValidation() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +130,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration validation
+    static bool isValidKey(const std::string& key);
+    static std::vector<std::string> getKnownConfigKeys();
 };
 
 } // namespace nlm
