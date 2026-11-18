@@ -132,11 +132,11 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (new improved version)
 add_executable(nlm
-    src/main.cpp
+    src/nlm_main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli nlm_test_runner)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -201,9 +201,34 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
-# Testing
+# Testing framework
 enable_testing()
+
+# Command line parser library
+add_library(nlm_cli STATIC
+    src/test_runner/CommandLineParser.hpp
+    src/test_runner/CommandLineParser.cpp
+)
+target_include_directories(nlm_cli PUBLIC src)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Test runner library
+add_library(nlm_test_runner STATIC
+    src/test_runner/TestRunner.hpp
+    src/test_runner/TestRunner.cpp
+    src/test_runner/TestImpl.cpp
+)
+target_include_directories(nlm_test_runner PUBLIC src)
+target_link_libraries(nlm_test_runner PUBLIC nlm_core nlm_cli)
+
+# Add unit tests
 add_subdirectory(tests)
+
+# Add test runner demo (optional)
+add_executable(test_runner_demo
+    src/test_runner/TestDemo.cpp
+)
+target_link_libraries(test_runner_demo PUBLIC nlm_core nlm_cli nlm_test_runner)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
