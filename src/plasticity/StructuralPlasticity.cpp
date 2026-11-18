@@ -31,8 +31,8 @@ StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 
 StructuralPlasticity::~StructuralPlasticity() = default;
 
-SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
-                                               NeuronId destination, SynapticWeight weight) {
+void StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
+                                             NeuronId destination, SynapticWeight weight) {
     /*
      * Create a new synapse between source and destination neurons
      * 

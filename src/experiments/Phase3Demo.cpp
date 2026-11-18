@@ -102,7 +102,10 @@ public:
                 agentBrain.processSensoryInput(percept);
 
                 // 3. Simulate brain (multiple steps per action)
-                for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
+                // IMPROVEMENT: Reduced neural steps per action to prevent runaway excitation
+                // Old code: 10 steps per action caused excessive spike activity (~200 spikes/step)
+                // New code: 3 steps per action balances responsiveness with stability
+                for (int neuralStep = 0; neuralStep < 3; ++neuralStep) {
                     (void)neuralStep;
                     brain->step(brainStepCounter++);
                 }

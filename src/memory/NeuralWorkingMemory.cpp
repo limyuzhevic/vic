@@ -322,23 +322,24 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
         return competitors;
     }
     
-    // Competition: neurons inhibit each other based on relative activity
     for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+            for (size_t j = 0; j < competitors.size(); ++j) {
+                if (i == j) continue;
+                
+                float relativeActivity = activities[i] / (activities[j] + 0.001f);
+                
+                if (relativeActivity > 1.5f) {
+                    // IMPROVEMENT: Reduce inhibition strength to prevent runaway suppression
+                    // i is much stronger than j - apply inhibition to j
+                    if (brain_) {
+                        brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_ * 0.5f);
+                    }
+                    pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_ * 0.5f);
                 }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
             }
         }
-    }
     
+    // IMPROVEMENT: Reduce excitation strength to prevent runaway excitation
     // Winners are neurons with above-threshold activity
     float threshold = competitionThreshold_ * totalActivity / competitors.size();
     
@@ -346,10 +347,19 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
         if (activities[i] >= threshold) {
             winners_.push_back(competitors[i]);
             
-            // Apply excitation to winners
+            // Apply excitation to winners with reduced strength
             if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+                brain_->injectCurrent(competitors[i], excitationStrength_ * 0.8f);
             }
+        }
+    }
+    
+    // IMPROVEMENT: Add activity-based scaling to normalize competition
+    // Scale inhibition and excitation based on total activity level
+    if (totalActivity > 1.0f) {
+        float activityScale = std::min(1.0f, 1.0f / totalActivity);
+        for (auto& level : pImpl->inhibitionLevel) {
+            level *= activityScale;
         }
     }
     
