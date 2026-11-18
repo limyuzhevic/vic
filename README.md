@@ -107,6 +107,41 @@ currently separate demos per phase, not a single unified binary:
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
 
+## Advanced Command Line Interface
+
+NLM now includes an advanced command-line interface (`nlm_advanced`) that provides enhanced functionality and configuration options for expert users:
+
+### Advanced CLI Features
+
+- **Comprehensive Configuration Options**: Set simulation parameters, neuron count, connection probability, and custom settings
+- **Multiple Output Formats**: Save results in various formats (txt, json, csv, log)
+- **Checkpoint Management**: Advanced save/load functionality for brain state persistence
+- **Benchmark Mode**: Performance testing and profiling capabilities
+- **Verbose Mode**: Detailed logging and progress tracking
+- **Expert Features**: Custom parameter settings and feature toggles
+
+### Usage Examples
+
+```bash
+# Basic simulation
+nlm_advanced --steps 1000 --neurons 2000
+
+# With benchmark and verbose output
+nlm_advanced --benchmark --verbose --steps 500
+
+# Save checkpoint
+nlm_advanced --save-checkpoint brain_state.chkpt --steps 2000
+
+# Load checkpoint and continue
+nlm_advanced --load-checkpoint brain_state.chkpt
+
+# Custom parameters for advanced users
+nlm_advanced --param stdp_ltp_weight 0.05 --param stdp_ltd_weight 0.025
+
+# Output results in JSON format
+nlm_advanced --json-output results.json --steps 1000
+```
+
 ## Project Structure
 
 ```
@@ -138,6 +173,10 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
+├── bin/                # Installation directory
+│   ├── nlm           # Phase 2 demo
+│   ├── nlm_advanced  # Advanced CLI tool
+│   └── nlm_phase6_demo # Phase 6 integration test
 ├── tests/
 └── configs/
 ```

@@ -6,6 +6,11 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// This demo serves as a comprehensive test of Phase 2 functionality:
+// Test 1: Basic connectivity - verifies neurons can spike and propagate signals
+// Test 2: Plasticity learning - demonstrates activity-dependent synaptic changes
+// Test 3: STDP verification - confirms spike-timing dependent plasticity works
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -163,13 +168,21 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("Error: Brain pointer is null in connectivity test");
+        return;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Error: Region 1 not found in connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("Error: No neurons found in connectivity test");
         return;
     }
     
@@ -228,10 +241,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // and every weight saturated to 1.0 - learning was measurable but not
     // selective at all.
     std::vector<NeuronId> patternNeurons;
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+    if (brain) {
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron && neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                    patternNeurons.push_back(neuron->getId());
+                }
             }
         }
     }
@@ -261,8 +276,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("Error: Brain pointer is null in STDP verification test");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Error: Region 1 not found in STDP verification test");
+        return;
+    }
     
     // Use one real synapse and its own pre/post neurons. The old test
     // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
@@ -279,10 +302,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
