@@ -28,24 +28,80 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM — 熙然
+Neural Learning Machine
+
+USAGE:
+  nlm [OPTIONS] [DEMO_TYPE]
+
+DEMO TYPES:
+  basic                 Phase 2: Basic neural computation (default)
+  plasticity            Phase 2: Plasticity learning experiment
+  stdp                  Phase 2: STDP verification
+  phase3                Phase 3: World interaction and sensorimotor learning
+  phase4                Phase 4: Cognitive and social learning
+  phase5                Phase 5: Performance optimizations
+  phase6                Phase 6: Integration and final brain loop
+
+OPTIONS:
+  --config FILE          Configuration file (JSON, YAML, or .cfg format) (default: configs/default.cfg)
+  --steps N             Number of simulation steps (default: 1000)
+  --neuron-count N      Number of neurons (default: 500)
+  --region-count N      Number of brain regions (default: 1)
+  --save-interval N     Checkpoint save interval (default: 1000)
+  --checkpoint FILE      Specific checkpoint file to load
+  --checkpoint-dir DIR   Directory for checkpoints (default: ./checkpoints)
+  --log-level LEVEL     Logging level: DEBUG, INFO, WARN, ERROR (default: INFO)
+  --log-file FILE       Log output to file
+  --max-steps N         Maximum simulation steps (default: 10000)
+  --enable-plasticity   Enable synaptic plasticity
+  --enable-development  Enable developmental processes
+  --enable-neuromodulation Enable neuromodulation
+  --enable-memory       Enable memory systems
+  --enable-cognition    Enable cognitive systems
+  --simulation-time N   Simulation time in seconds (default: 0.0, unlimited)
+  --help, -h            Show this help message
+  --version             Show version information
+
+ADVANCED OPTIONS:
+  --plasticity-mode MODE Plasticity mode: hebbian, stdp, both (default: both)
+  --learning-rate R     Learning rate multiplier (default: 1.0)
+  --stdp-params LT:LD:TAU STDP parameters: LTP weight, LTD weight, time constant
+  --random-seed N       Random seed for reproducibility (default: 42)
+  --output-dir DIR      Directory for output files (default: ./output)
+  --visualization       Enable visualization (requires additional dependencies)
+  --performance         Print performance metrics and timing information
+  --quiet              Minimal output (only errors and results)
+  --benchmark          Run benchmark mode with detailed timing
+
+ENVIRONMENT:
+  NLM_CONFIG_PATH       Override default config file location
+  NLM_LOG_LEVEL         Override default log level
+  --
+
+EXAMPLES:
+  nlm --steps 5000 --neuron-count 1000 --enable-plasticity
+  nlm --checkpoint my_checkpoint.bin --enable-memory --enable-cognition
+  nlm --log-level DEBUG --log-file nlm.log --enable-neuromodulation
+  nlm --plasticity-mode stdp --stdp-params 0.02:0.015:20
+  nlm --benchmark --performance
+
+EXAMPLES:
+  nlm --help
+  nlm --version
+
+Phase 2 Objective:
+Real neural computation with spiking neurons, plasticity, and learning.
+
+";) << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM — 熙然 Neural Learning Machine v0.1.0 - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "An experimental artificial developmental brain simulation." << std::endl;
+    std::cout << "Built with C++20, event-driven spike propagation, and STDP plasticity." << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -329,28 +385,166 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Command-line argument parsing and configuration
+    std::string demoType = "basic";
     std::string configFile = "configs/default.cfg";
+    int steps = 1000;
+    int neuronCount = 500;
+    int regionCount = 1;
+    int saveInterval = 1000;
+    std::string checkpointFile;
+    std::string checkpointDir = "./checkpoints";
+    std::string logLevel = "INFO";
+    std::string logFile;
+    int maxSteps = 10000;
+    bool enablePlasticity = true;
+    bool enableDevelopment = true;
+    bool enableNeuromodulation = true;
+    bool enableMemory = true;
+    bool enableCognition = true;
+    double simulationTime = 0.0;
+    bool enableVisualization = false;
+    bool performanceMode = false;
+    bool quietMode = false;
+    bool benchmarkMode = false;
+    std::string plasticityMode = "both";
+    double learningRate = 1.0;
+    std::string stdpParams = "0.02:0.015:20";
+    int64_t randomSeed = 42;
+    std::string outputDir = "./output";
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--basic" || arg == "basic") {
+            demoType = "basic";
+        } else if (arg == "--plasticity" || arg == "plasticity") {
+            demoType = "plasticity";
+        } else if (arg == "--stdp" || arg == "stdp") {
+            demoType = "stdp";
+        } else if (arg == "--phase3" || arg == "phase3") {
+            demoType = "phase3";
+        } else if (arg == "--phase4" || arg == "phase4") {
+            demoType = "phase4";
+        } else if (arg == "--phase5" || arg == "phase5") {
+            demoType = "phase5";
+        } else if (arg == "--phase6" || arg == "phase6") {
+            demoType = "phase6";
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.substr(0, 7) == "--config") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                configFile = arg.substr(pos + 1);
+            }
+        } else if (arg.substr(0, 5) == "--steps") {
+            steps = std::atoi(arg.substr(6).c_str());
+        } else if (arg.substr(0, 12) == "--neuron-count") {
+            neuronCount = std::atoi(arg.substr(13).c_str());
+        } else if (arg.substr(0, 12) == "--region-count") {
+            regionCount = std::atoi(arg.substr(13).c_str());
+        } else if (arg.substr(0, 14) == "--save-interval") {
+            saveInterval = std::atoi(arg.substr(15).c_str());
+        } else if (arg.substr(0, 12) == "--checkpoint") {
+            checkpointFile = arg.substr(13);
+        } else if (arg.substr(0, 16) == "--checkpoint-dir") {
+            checkpointDir = arg.substr(17);
+        } else if (arg.substr(0, 11) == "--log-level") {
+            logLevel = arg.substr(12);
+        } else if (arg.substr(0, 10) == "--log-file") {
+            logFile = arg.substr(11);
+        } else if (arg.substr(0, 10) == "--max-steps") {
+            maxSteps = std::atoi(arg.substr(11).c_str());
+        } else if (arg == "--enable-plasticity") {
+            enablePlasticity = true;
+        } else if (arg == "--disable-plasticity") {
+            enablePlasticity = false;
+        } else if (arg == "--enable-development") {
+            enableDevelopment = true;
+        } else if (arg == "--disable-development") {
+            enableDevelopment = false;
+        } else if (arg == "--enable-neuromodulation") {
+            enableNeuromodulation = true;
+        } else if (arg == "--disable-neuromodulation") {
+            enableNeuromodulation = false;
+        } else if (arg == "--enable-memory") {
+            enableMemory = true;
+        } else if (arg == "--disable-memory") {
+            enableMemory = false;
+        } else if (arg == "--enable-cognition") {
+            enableCognition = true;
+        } else if (arg == "--disable-cognition") {
+            enableCognition = false;
+        } else if (arg.substr(0, 17) == "--simulation-time") {
+            simulationTime = std::atof(arg.substr(18).c_str());
+        } else if (arg == "--enable-visualization") {
+            enableVisualization = true;
+        } else if (arg == "--disable-visualization") {
+            enableVisualization = false;
+        } else if (arg == "--performance") {
+            performanceMode = true;
+        } else if (arg == "--quiet") {
+            quietMode = true;
+        } else if (arg == "--benchmark") {
+            benchmarkMode = true;
+        } else if (arg.substr(0, 20) == "--plasticity-mode") {
+            plasticityMode = arg.substr(21);
+        } else if (arg.substr(0, 17) == "--learning-rate") {
+            learningRate = std::atof(arg.substr(18).c_str());
+        } else if (arg.substr(0, 13) == "--stdp-params") {
+            stdpParams = arg.substr(14);
+        } else if (arg.substr(0, 15) == "--random-seed") {
+            randomSeed = std::atoi(arg.substr(16).c_str());
+        } else if (arg.substr(0, 13) == "--output-dir") {
+            outputDir = arg.substr(14);
+        } else {
+            // Check environment variables
+            const char* envConfig = std::getenv("NLM_CONFIG_PATH");
+            if (envConfig && configFile == "configs/default.cfg") {
+                configFile = envConfig;
+            }
+            
+            const char* envLogLevel = std::getenv("NLM_LOG_LEVEL");
+            if (envLogLevel && logLevel == "INFO") {
+                logLevel = envLogLevel;
+            }
+            
+            const char* envCheckpointDir = std::getenv("NLM_CHECKPOINT_DIR");
+            if (envCheckpointDir && checkpointDir == "./checkpoints") {
+                checkpointDir = envCheckpointDir;
+            }
+            
+            // If argument doesn't start with '-', treat as demo type
+            if (arg[0] != '-') {
+                demoType = arg;
+            } else {
+                std::cerr << "Unknown option: " << arg << std::endl;
+                printHelp();
+                return 1;
             }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
+    // Setup logging based on level
+    LogLevel logLevelEnum;
+    if (logLevel == "DEBUG") logLevelEnum = LogLevel::Debug;
+    else if (logLevel == "WARN") logLevelEnum = LogLevel::Warn;
+    else if (logLevel == "ERROR") logLevelEnum = LogLevel::Error;
+    else logLevelEnum = LogLevel::Info;
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!quietMode) {
+        std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+        std::cout << "Configuration file: " << configFile << std::endl;
+        std::cout << "Demo type: " << demoType << std::endl;
+        std::cout << "Steps: " << steps << ", Neurons: " << neuronCount << ", Regions: " << regionCount << std::endl;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

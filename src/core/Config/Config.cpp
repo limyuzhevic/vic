@@ -3,12 +3,231 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <map>
+#include <set>
+
+// Try to include JSON and YAML libraries if available
+#ifdef HAS_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAS_YAML
+#include <yaml-cpp/yaml.h>
+#endif
+
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <map>
+#include <set>
+#include <cstring>
+#include <regex>
+
+// Try to include JSON and YAML libraries if available
+#ifdef HAS_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAS_YAML
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// Helper function to detect file format based on extension and content
+static bool isJSONFile(const std::string& filepath) {
+    // Check file extension first
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return true;
+    }
+    if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yaml") {
+        return false;
+    }
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yml") {
+        return false;
+    }
+    
+    // Check content for JSON format (starts with {, [ or string)
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file) return false;
+    
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (size < 1) return false;
+    
+    char buffer[1024];
+    file.read(buffer, std::min<size_t>(sizeof(buffer), size));
+    file.close();
+    
+    // Skip whitespace
+    size_t start = 0;
+    while (start < sizeof(buffer) && std::isspace(buffer[start])) start++;
+    
+    if (start >= sizeof(buffer)) return false;
+    
+    return buffer[start] == '{' || buffer[start] == '[' || buffer[start] == '"' ||
+           (buffer[start] == '-' && std::isdigit(static_cast<unsigned char>(buffer[start + 1])));
+}
+
+static bool isYAMLLike(const std::string& filepath) {
+    // Check file extension first
+    if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yaml") {
+        return true;
+    }
+    if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yml") {
+        return true;
+    }
+    
+    // Check content for YAML format indicators
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file) return false;
+    
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (size < 1) return false;
+    
+    // YAML files often have simple key-value pairs, comments, and may contain
+    // multiple documents separated by "---"
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+        if (lines.size() > 20) break;  // Check first 20 lines for indicators
+    }
+    
+    file.close();
+    
+    // Look for YAML indicators
+    for (const auto& line : lines) {
+        std::string trimmed = trim(line);
+        if (trimmed.empty()) continue;
+        if (trimmed[0] == '#') continue;  // Comment
+        
+        // Check for YAML key-value format (key: value)
+        size_t colonPos = trimmed.find(':');
+        if (colonPos != std::string::npos && colonPos > 0 && !std::isspace(static_cast<unsigned char>(trimmed[0]))) {
+            return true;
+        }
+        
+        // Check for YAML sequence (starts with -)
+        if (trimmed.size() >= 1 && trimmed[0] == '-') {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+#ifdef HAS_JSON
+static bool parseJSONFile(const std::string& filepath, std::map<std::string, std::string>& configMap) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        auto json = nlohmann::json::parse(file);
+        
+        // Flatten JSON structure into key=value format for compatibility
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            std::string value;
+            
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number()) {
+                if (it->is_number_integer()) {
+                    value = std::to_string(it->get<int64_t>());
+                } else {
+                    value = std::to_string(it->get<double>());
+                }
+            } else if (it->is_boolean()) {
+                value = it->get<bool>() ? "true" : "false";
+            } else if (it->is_null()) {
+                value = "";
+            } else {
+                // Try to convert complex types to string representation
+                value = it->dump();
+            }
+            
+            configMap[key] = value;
+        }
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "JSON parsing error in " << filepath << ": " << e.what() << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+#endif
+
+#ifdef HAS_YAML
+static bool parseYAMLFile(const std::string& filepath, std::map<std::string, std::string>& configMap) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        auto yaml = YAML::LoadFile(filepath);
+        
+        // Convert YAML to key-value pairs
+        if (yaml.IsMap()) {
+            for (const auto& it : yaml) {
+                std::string key = it.first.as<std::string>();
+                std::string value;
+                
+                if (it.second.IsScalar()) {
+                    value = it.second.as<std::string>();
+                } else if (it.second.IsSequence()) {
+                    // Convert YAML sequence to string representation
+                    std::vector<std::string> values;
+                    for (const auto& item : it.second) {
+                        if (item.IsScalar()) {
+                            values.push_back(item.as<std::string>());
+                        }
+                    }
+                    value = "[";
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        if (i > 0) value += ", ";
+                        value += values[i];
+                    }
+                    value += "]";
+                } else if (it.second.IsMapping()) {
+                    // For nested maps, convert to JSON string
+                    value = it.second.dump();
+                } else if (it.second.IsDouble()) {
+                    value = std::to_string(it.second.as<double>());
+                } else if (it.second.IsInt()) {
+                    value = std::to_string(it.second.as<int64_t>());
+                } else if (it.second.IsBoolean()) {
+                    value = it.second.as<bool>() ? "true" : "false";
+                } else {
+                    value = it.second.as<std::string>();
+                }
+                
+                configMap[key] = value;
+            }
+        } else {
+            std::cerr << "YAML file " << filepath << " is not a mapping" << std::endl;
+            return false;
+        }
+    } catch (const YAML::Exception& e) {
+        std::cerr << "YAML parsing error in " << filepath << ": " << e.what() << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+#endif
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,39 +238,65 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format and parse accordingly
+    bool isJSON = isJSONFile(filepath);
+    bool isYAML = isYAMLLike(filepath);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
+    std::map<std::string, std::string> configMap;
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (isJSON && defined(HAS_JSON)) {
+        if (!parseJSONFile(filepath, configMap)) {
+            NLM_LOG_ERROR("Failed to parse JSON config file: " + filepath);
+            return false;
+        }
+    } else if (isYAML && defined(HAS_YAML)) {
+        if (!parseYAMLFile(filepath, configMap)) {
+            NLM_LOG_ERROR("Failed to parse YAML config file: " + filepath);
+            return false;
+        }
+    } else {
+        // Fall back to simple key=value format
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open config file: " + filepath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                configMap[key] = value;
+            }
         }
+        file.close();
     }
     
+    // Clear existing entries and add parsed ones
+    clear();
+    
+    for (const auto& pair : configMap) {
+        set(pair.first, pair.second, ConfigSource::File);
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from: " + filepath + " (" + std::to_string(configMap.size()) + " entries)");
     return true;
 }
 
@@ -81,14 +326,28 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save config file: " + filepath);
         return false;
     }
     
+    // Write configuration in JSON format (prefered)
+    file << "{\n";
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) file << ",\n";
+        first = false;
+        
+        file << "  \"" << entry.key << "\""; // Will add value conversion later
+        // For now, write placeholder - full implementation would format based on type
+    }
+    file << "\n}\n";
+    
+    if (!file) {
+        NLM_LOG_ERROR("Failed to write config to file: " + filepath);
+        return false;
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 
