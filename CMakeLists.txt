@@ -1,3 +1,5 @@
+# Full CMake configuration for NLM project with improvements
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -29,6 +31,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLI/CLIFramework.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -116,21 +119,21 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 5 experiments
 add_library(nlm_phase5 STATIC
     src/experiments/Phase5Experiment.cpp
 )
 target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 6 experiments
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
 )
 target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Main executable
 add_executable(nlm
@@ -146,17 +149,15 @@ target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+    src/experuments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
+# Phase 5 demo executable
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
@@ -173,40 +174,36 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
+# Test executable to verify improved CLI interface
+add_executable(nlm_cli_test
+    src/experiments/CLIInterfaceTest.cpp
+)
+target_link_libraries(nlm_cli_test PUBLIC nlm_core nlm_agent nlm_world)
+
+# Practical demonstration of NLM improvements
+add_executable(nlm_practical_demo
+    src/experiments/PracticalDemoProgram.cpp
+)
+target_link_libraries(nlm_practical_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Demo executable (simple demonstration of new CLI framework)
+add_executable(nlm_demo
+    src/experiments/ImprovedDemoProgram.cpp
+)
+target_link_libraries(nlm_demo PUBLIC nlm_core nlm_agent nlm_world)
+
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
-if(NLM_BUILD_PYTHON_BINDINGS)
-    find_package(Python REQUIRED COMPONENTS Interpreter Development)
-    find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
-    set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
-        POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
-endif()
-
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_demo nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
