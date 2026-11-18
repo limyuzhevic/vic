@@ -146,16 +146,25 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments. Takes a list of argument strings like sys.argv.")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = 0,
+             "Set a configuration value with optional source (ConfigSource enum)")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -412,17 +421,101 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Add utility function to create a simple world with default configuration
+    m.def("createSimpleWorldWithObjects", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 8, 8);
+        world->reset();
+        return world;
+    }, "Create and configure a simple world with default settings");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Add a convenience function for running a complete agent episode
+    m.def("runAgentEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, int numSteps) {
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward calculation based on energy
+            float reward = world->getAgentBody().energy / 100.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return std::make_tuple(brain->getAverageFiringRate(), 
+                               agent->getCuriosityLevel(),
+                               world->getAgentBody().energy);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps") = 100,
+        "Run a complete agent episode. Returns a tuple of (average_firing_rate, curiosity_level, energy)");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add a function to get detailed brain statistics
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["excitatory_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["developmental_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        return stats;
+    }, py::arg("brain"), "Get detailed statistics about the brain as a dictionary");
+
+    // Add utility function to create a simple world with default configuration
+    m.def("createSimpleWorldWithObjects", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 8, 8);
+        world->reset();
+        return world;
+    }, "Create and configure a simple world with default settings");
+
+    // Add a convenience function for running a complete agent episode
+    m.def("runAgentEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, int numSteps) {
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward calculation based on energy
+            float reward = world->getAgentBody().energy / 100.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return std::make_tuple(brain->getAverageFiringRate(), 
+                               agent->getCuriosityLevel(),
+                               world->getAgentBody().energy);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps") = 100,
+        "Run a complete agent episode. Returns a tuple of (average_firing_rate, curiosity_level, energy)");
+
+    // Add a function to get detailed brain statistics
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["excitatory_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["developmental_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        return stats;
+    }, py::arg("brain"), "Get detailed statistics about the brain as a dictionary");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

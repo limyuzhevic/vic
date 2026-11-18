@@ -181,77 +181,282 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
+## Advanced Examples
 
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
+### Advanced Example 1: Learning with Environmental Interaction
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
+# Create a more sophisticated configuration
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+config.set("neuromod.dopamine.scale", 2.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
+
+# Create world with more resources and hazards
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable all advanced features
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
+print("Starting advanced learning simulation...")
+print("Configuration:")
+print(f"  - {brain.getTotalNeuronCount()} neurons")
+print(f"  - {brain.getTotalSynapseCount()} synapses")
+print(f"  - World size: {world.getWidth()}x{world.getHeight()}")
+
+# Advanced simulation with learning curves
+learning_data = []
+for step in range(500):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    # Calculate reward based on agent's performance
+    energy = world.getAgentBody().energy
+    reward = energy / 100.0
+    predicted_reward = 0.0  # Could use prediction system
+    agent.applyRewardModulation(reward, predicted_reward)
+    
+    # Log every 50 steps
+    if step % 50 == 0:
+        stats = pynlm.getBrainStats(brain)
+        learning_data.append({
+            'step': step,
+            'firing_neurons': brain.getFiringNeuronCount(),
+            'avg_firing_rate': brain.getAverageFiringRate(),
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'energy': energy,
+            'development_stage': str(brain.getDevelopmentalStage())
+        })
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons, "
+              f"curiosity={agent.getCuriosityLevel():.3f}, "
+              f"energy={energy:.1f}")
 
-print("Agent simulation complete!")
+print("Advanced simulation complete!")
+print(f"Peak firing neurons: {max(d['firing_neurons'] for d in learning_data)}")
+print(f"Average curiosity: {sum(d['curiosity'] for d in learning_data) / len(learning_data):.3f}")
+```
+
+### Advanced Example 2: Multi-Agent Scenario
+
+```python
+import pynlm
+
+# Setup multiple agents sharing the same brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 3000)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create a shared world
+world = pynlm.createSimpleWorld()
+world.configure(width=100, height=100, visionWidth=20, visionHeight=20)
+world.reset()
+
+# Create multiple agents (they share the brain but have different configurations)
+agents = []
+for i in range(3):
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agents.append(agent)
+
+print("Starting multi-agent simulation...")
+
+# Run multiple agents in parallel (staggered)
+for episode in range(10):
+    print(f"Episode {episode + 1}/10")
+    
+    # Reset world for new episode
+    world.reset()
+    
+    # Each agent gets a turn
+    for agent_idx, agent in enumerate(agents):
+        print(f"  Agent {agent_idx + 1}:")
+        
+        for step in range(100):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Different rewards for different agents (could be based on position, behavior, etc.)
+            reward = world.getAgentBody().energy / 100.0
+            if agent_idx == 0:
+                # Agent 1 prefers resources
+                reward *= 1.5
+            elif agent_idx == 1:
+                # Agent 2 avoids hazards
+                if "hazard" in str(world.getAgentBody().health).lower():
+                    reward *= 0.5
+            # Agent 3 has neutral preferences
+            
+            agent.applyRewardModulation(reward, 0.0)
+            
+            if step % 25 == 0:
+                print(f"    Step {step}: {brain.getFiringNeuronCount()} firing neurons, "
+                      f"curiosity={agent.getCuriosityLevel():.3f}")
+
+print("Multi-agent simulation complete!")
+```
+
+### Advanced Example 3: Text-Based Learning (Phase 6 Feature)
+
+```python
+import pynlm
+
+# Create brain with text capability
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2500)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=40, height=40, visionWidth=24, visionHeight=24)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+print("Starting text-based learning simulation...")
+
+# Text words to be learned (could come from the environment)
+words_to_learn = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape"]
+
+# Simulation with text inputs
+for episode in range(20):
+    print(f"Episode {episode + 1}/20")
+    
+    # Reset and pick a random word
+    world.reset()
+    target_word = words_to_learn[episode % len(words_to_learn)]
+    print(f"  Learning word: '{target_word}'")
+    
+    for step in range(200):
+        world.update(0.1)
+        
+        # Process visual input
+        percept = world.getSensoryPercept()
+        
+        # Simulate text input (in real usage, text would come from world)
+        if step % 50 == 0:
+            # Inject text pattern (Phase 6 feature)
+            text = target_word if step % 100 != 0 else "wrong"
+            print(f"    Processing text: '{text}'")
+        
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Reward based on whether the word matches
+        if step % 100 == 0:
+            # Simple reward: correct word = positive, wrong = negative
+            if "apple" in target_word:
+                reward = 5.0  # Positive for 'apple'
+            else:
+                reward = -2.0  # Negative for other words
+            agent.applyRewardModulation(reward, 0.0)
+            print(f"    Reward: {reward:.1f}")
+
+print("Text-based learning simulation complete!")
+print(f"Text neurons: {agent.getInternalFiringRates()}")
+```
+
+### Advanced Example  bladml
+
+```python
+import pynlm
+
+# Create a specialized configuration for cognitive research
+config = pynlm.createDefaultConfig()
+
+# Research-grade configuration
+config.set("brain.neuron_count", 4000)
+config.set("brain.synapse_density", 0.05)  # Sparse for research
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.002)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.hebbian.learning_rate", 0.001)
+config.set("plasticity.structural.enable", True)
+config.set("plasticity.structural.synaptogenesis_rate", 0.00005)
+config.set("plasticity.structural.pruning_rate", 0.000005)
+
+# Neuromodulation for advanced research
+config.set("neuromod.dopamine.scale", 1.5)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.curiosity.scale", 2.0)
+config.set("neuromod.novelty.enable", True)
+config.set("neuromod.novelty.sensitivity", 1.0)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=60, height=60, visionWidth=16, visionHeight=16)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all research features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print("Starting cognitive research simulation...")
+print(f"Research brain: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+print(f"Configuration: High-density research setup with precise plasticity parameters")
+
+# Research-grade simulation with detailed monitoring
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Research-level monitoring
+    if step % 100 == 0:
+        stats = pynlm.getBrainStats(brain)
+        print(f"Step {step}:")
+        for key, value in stats.items():
+            print(f"  {key}: {value}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Prediction error: {agent.getPredictionError():.3f}")
+
+print("Research simulation complete!")
 ```
 
 ---

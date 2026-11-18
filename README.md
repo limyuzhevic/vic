@@ -84,6 +84,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard C++ Build
+
 ```bash
 mkdir build
 cd build
@@ -91,7 +93,23 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Build (Recommended for most users)
+
+```bash
+# Install dependencies
+pip install scikit-build-core pybind11 numpy pytest
+
+# Build and install the Python module
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
 ## Running
+
+### C++ Demos
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
@@ -106,6 +124,77 @@ currently separate demos per phase, not a single unified binary:
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
+
+### Python Usage
+
+```python
+import pynlm
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run a basic simulation
+for step in range(1000):
+    brain.step(step)
+
+print(f"Simulation complete. Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Complete Agent Example
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+## Python Module Information
+
+The `pynlm` Python module provides bindings for the NLM C++ neural simulation framework. It includes:
+
+- **Brain class**: Core neural computation with LIF neurons, plasticity, and memory systems
+- **Config class**: Configuration management for brain parameters
+- **AgentBrain class**: Interface connecting brain to world environment
+- **SimpleWorld class**: 2D world simulation with sensory input and motor output
+
+Key features available through Python:
+
+- Real spiking neural computation (Phase 2)
+- Multiple plasticity mechanisms (STDP, Hebbian)
+- Memory systems (working, episodic, associative)
+- Neuromodulation (reward, curiosity, novelty)
+- Developmental stages
+- Prediction and planning systems
+- Checkpoint save/load
+- Complete agent-environment interaction
 
 ## Project Structure
 
