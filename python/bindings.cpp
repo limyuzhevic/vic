@@ -25,9 +25,24 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Context managers for automatic resource cleanup
+        - Pythonic APIs with properties and iterators
+        - Enhanced error handling with specific exception types
+        - Convenience functions for common patterns
+        - Configuration validation and help
+        - Serialization with JSON and binary formats
+        - Debugging and profiling tools
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Register custom exception types for better error handling
+    py::register_exception<py::error_already_set>(m, "PyError", PyExc_RuntimeError);
+    py::register_exception<std::bad_alloc>(m, "MemoryError", PyExc_MemoryError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -423,6 +438,76 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Additional advanced Pythonic features
+    m.def("validate_config_file", [](const std::string& configFile) {
+        auto config = std::make_shared<Config>();
+        return config->loadFromFile(configFile);
+    }, py::arg("configFile"), "Validate configuration file");
+
+    m.def("list_default_config_keys", []() {
+        auto config = std::make_shared<Config>();
+        return config->getKeys();
+    }, "Get default configuration keys");
+
+    m.def("create_brain_with_file", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration from file: " + configFile);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("configFile"), "Create a brain with configuration from file");
+
+    m.def("create_brain_with_args", [](const std::vector<std::string>& args) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromArgs(static_cast<int>(args.size()), 
+                                 const_cast<char**>(const_cast<const std::string*>(&args[0])))) {
+            throw std::runtime_error("Failed to load configuration from arguments");
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("args"), "Create a brain with configuration from command line arguments");
+
+    // Debug and profiling utilities
+    m.def("export_brain_state", [](const std::shared_ptr<Brain>& brain, const std::string& filename) {
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"), "Export brain state to file");
+
+    m.def("import_brain_state", [](const std::string& filename) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filename)) {
+            throw std::runtime_error("Failed to load brain state from file: " + filename);
+        }
+        return brain;
+    }, py::arg("filename"), "Import brain state from file");
+
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, size_t steps, size_t warmUpSteps = 0) {
+        // Warm up
+        for (size_t i = 0; i < warmUpSteps; ++i) {
+            brain->step(i);
+        }
+        
+        // Benchmark
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t i = warmUpSteps; i < warmUpSteps + steps; ++i) {
+            brain->step(i);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        double msPerStep = (duration.count() / static_cast<double>(steps));
+        
+        return std::make_tuple(msPerStep, steps, duration.count());
+    }, py::arg("brain"), py::arg("steps"), py::arg("warmUpSteps") = 0,
+       "Benchmark brain performance (returns ms_per_step, steps, total_ms)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

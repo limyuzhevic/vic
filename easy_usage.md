@@ -71,6 +71,89 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Brain Setup with Configuration
+
+```python
+import pynlm
+
+# Create brain with custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+
+# Create and initialize brain (using enhanced factory)
+brain = pynlm.create_brain_with_config_file("configs/default.cfg")
+# Or use the enhanced factory that includes validation:
+# brain = pynlm.create_brain_with_config_file("configs/my_config.cfg")
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=16, visionHeight=16)
+agent = pynlm.createAgentBrain(brain)
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons and {brain.getTotalSynapseCount()} synapses")
+```
+
+### Example 4: Complete Learning Simulation
+
+```python
+import pynlm
+
+# Setup with learning capabilities
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1500)
+config.set("plasticity.stdp.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+agent = pynlm.createAgentBrain(brain)
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+world.reset()
+agent.initialize(world)
+
+# Run learning simulation
+for step in range(1000):
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks and produces action
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    
+    # Execute action and get reward
+    result = world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Learn from reward (reward from world internal signals)
+    reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print progress
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Reward: {reward:.3f}")
+
+print("Learning simulation complete!")
+```
+
 ---
 
 ## Simple Analogy
@@ -104,53 +187,156 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Advanced Usage Examples
 
-### Pattern 1: Run a Simulation
+### Example 5: Brain State Management and Persistence
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+import pynlm
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Create and configure brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 3000)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+
+# Save brain state (checkpointing)
+brain.save("checkpoint1.bin")
+print("Saved brain state to checkpoint1.bin")
+
+# Run some simulation steps
+for step in range(500):
+    brain.step(step)
+
+# Load brain state (continue from checkpoint)
+brain.load("checkpoint1.bin")
+print("Loaded brain state from checkpoint1.bin")
+
+# Verify brain is functional
+print(f"Brain has {brain.getTotalSpikeCount()} spikes")
+print(f"Brain has {brain.getFiringNeuronCount()} firing neurons")
 ```
 
-### Pattern 2: Get Brain Stats
+### Example 6: Benchmarking and Performance Testing
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+import pynlm
+import time
+
+# Create a larger brain for meaningful benchmarks
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2500)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run benchmark (returns ms_per_step, steps, total_ms)
+results = pynlm.benchmark_brain(brain, 1000, 100)
+ms_per_step, steps, total_ms = results
+
+print(f"Benchmark completed:")
+print(f"  Steps: {steps}")
+print(f"  Total time: {total_ms} ms")
+print(f"  Average per step: {ms_per_step:.3f} ms")
+print(f"  Performance: {1000/ms_per_step:.1f} steps/sec")
 ```
 
-### Pattern 3: Enable Brain Features
+### Example 7: Configuration Validation and Help
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+import pynlm
+
+# Validate a configuration file
+if pynlm.validate_config_file("configs/default.cfg"):
+    print("Configuration file is valid")
+else:
+    print("Configuration file has errors")
+
+# Get available configuration keys
+default_keys = pynlm.list_default_config_keys()
+print(f"Available configuration keys: {len(default_keys)} keys")
+print("Sample keys:", default_keys[:5])
+
+# Get configuration schema (for documentation/help)
+schema = pynlm.get_config_schema()
+print("Configuration schema includes:")
+for key in schema:
+    print(f"  - {key}")
+```
+
+### Example 8: Error Handling and Robust Simulation
+
+```python
+import pynlm
+
+# Robust simulation with error handling
+try:
+    # Create brain with error handling
+    brain = pynlm.create_brain_with_file("configs/default.cfg")
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=25, height=25, visionWidth=10, visionHeight=10)
+    agent = pynlm.createAgentBrain(brain)
+    
+    world.reset()
+    agent.initialize(world)
+    
+    # Run simulation with error handling
+    for step in range(1000):
+        try:
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+        except RuntimeError as e:
+            print(f"Error at step {step}: {e}")
+            # Continue with next step instead of crashing
+            continue
+        except Exception as e:
+            print(f"Unexpected error at step {step}: {e}")
+            break
+            
+    print("Simulation completed successfully!")
+    
+except Exception as e:
+    print(f"Failed to run simulation: {e}")
+```
+
+### Example 9: Comparative Analysis
+
+```python
+import pynlm
+
+# Create brains with different configurations for comparison
+print("Creating brains with different configurations...")
+
+# Brain A: Standard configuration
+config_a = pynlm.createDefaultConfig()
+brain_a = pynlm.createBrain(config_a)
+brain_a.initialize()
+
+# Brain B: Larger, with learning enabled
+config_b = pynlm.createDefaultConfig()
+config_b.set("brain.neuron_count", 5000)
+config_b.set("plasticity.stdp.enable", True)
+config_b.set("plasticity.hebbian.enable", True)
+
+# Use enhanced factory for brain B with validation
+brain_b = pynlm.create_brain_with_config(config_b)
+
+# Compare brain properties
+print(f"\nBrain A (Standard):")
+print(f"  Neurons: {brain_a.getTotalNeuronCount()}")
+print(f"  Synapses: {brain_a.getTotalSynapseCount()}")
+print(f"  Firing rate: {brain_a.getAverageFiringRate():.3f}")
+
+print(f"\nBrain B (Enhanced with learning):")
+print(f"  Neurons: {brain_b.getTotalNeuronCount()}")
+print(f"  Synapses: {brain_b.getTotalSynapseCount()}")
+print(f"  Firing rate: {brain_b.getAverageFiringRate():.3f}")
 ```
 
 ---
