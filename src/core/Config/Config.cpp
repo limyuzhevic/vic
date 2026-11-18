@@ -86,7 +86,33 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue back to string
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (val ? "true" : "false") << "\n";
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                file << entry.key << " = " << val << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                               std::is_same_v<T, std::vector<double>> ||
+                               std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << val[i] << "\"";
+                    } else {
+                        file << val[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
