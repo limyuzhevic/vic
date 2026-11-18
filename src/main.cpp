@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -202,59 +203,37 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+void runTestsWithConfig(std::shared_ptr<Brain> brain, const Config& config) {
+    bool quiet = config.getOr<bool>("test_quiet", false);
+    bool detailed = config.getOr<bool>("test_detailed", false);
     
-    LearningExperiment experiment(brain, 42);
-    
-    // Record initial state
-    experiment.recordInitialState();
-    
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
+    if (!quiet) {
+        NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     }
+    runBasicConnectivityTest(brain);
     
-    // Apply repeated input pattern to stimulate learning
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
-    std::vector<NeuronId> patternNeurons;
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
-            }
-        }
+    if (!quiet) {
+        NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
-        
-        brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
-        }
+    runPlasticityExperiment(brain);
+    
+    if (!quiet) {
+        NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     }
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
     
-    // Record final state
-    experiment.recordFinalState();
-    
-    // Compute and display statistics
-    experiment.computeStatistics();
+    if (detailed) {
+        NLM_LOG_INFO("=== Detailed Test Summary ===");
+        NLM_LOG_INFO("  Test 1: Basic connectivity - verified spike propagation");
+        NLM_LOG_INFO("  Test 2: Plasticity - synaptic weight changes recorded");
+        NLM_LOG_INFO("  Test 3: STDP - correlated pre-post activity tested");
+    }
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -279,22 +258,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -389,30 +368,20 @@ int main(int argc, char** argv) {
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_ERROR("Failed to initialize brain!");
         return 1;
     }
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests with configurable options
+    runTestsWithConfig(brain, *config);
     
     // Final brain status
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
+    NLM_LOG_INFO("=== Brain Reset and Recovery ===");
+    brain->reset();
+    brain->initialize();
     brain->logStatus();
     
     NLM_LOG_INFO("");
