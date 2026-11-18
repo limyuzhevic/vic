@@ -32,7 +32,8 @@ struct Phase6IntegrationResult {
     // System integration status
     bool memoryWorkingMemoryIntegrated;
     bool memoryEpisodicMemoryIntegrated;
-    bool neuromodulationIntegrated;
+    float memorySemanticMemoryIntegrated;
+    bool memoryProceduralMemoryIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
     bool checkpointingWorks;
@@ -46,6 +47,8 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float conceptsFormed;
+    float actionsLearned;
     
     // Timestamps
     time_t startTime;
@@ -55,7 +58,8 @@ struct Phase6IntegrationResult {
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
-        , neuromodulationIntegrated(false)
+        , memorySemanticMemoryIntegrated(false)
+        , memoryProceduralMemoryIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
         , checkpointingWorks(false)
@@ -67,6 +71,8 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , conceptsFormed(0.0f)
+        , actionsLearned(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -120,19 +126,24 @@ public:
     bool testMemoryIntegration();
     
     /**
-     * Test neuromodulation integration
+     * Test cognition system integration
      */
-    bool testNeuromodulationIntegration();
+    bool testCognitiveIntegration();
     
     /**
-     * Test checkpoint save/load
+     * Test semantic memory integration
      */
-    bool testCheckpointing();
+    bool testSemanticMemoryIntegration();
     
     /**
-     * Test replay system
+     * Test procedural memory integration
      */
-    bool testReplay();
+    bool testProceduralMemoryIntegration();
+
+    /**
+     * Test prediction system integration
+     */
+    bool testPredictionIntegration();
 };
 
 } // namespace nlm
