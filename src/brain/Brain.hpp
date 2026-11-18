@@ -15,21 +15,33 @@ namespace nlm {
 
 // Forward declarations
 class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class RandomGenerator;
+    class SimulationClock;
+    class Logger;
+    class NeuralWorkingMemory;
+    class NeuralEpisodicMemory;
+    class NeuralAssociativeMemory;
+    class PredictionSystem;
+    class NeuralPlanner;
+    class ConceptFormation;
+    class AttentionalSelection;
+    class DevelopmentSystem;
+    class Dopamine;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
+    class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
+    
+    // Neuromodulation interfaces
+    class Neuromodulator;
+    class Reward;
+    class AgentBrain;
+    class SimpleWorld;
+    class AgentBody;
+    class SensoryPercept;
+    class ActionResult;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -185,6 +197,15 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

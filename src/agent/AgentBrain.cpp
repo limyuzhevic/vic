@@ -20,6 +20,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , acetylcholineEnabled_(true)
+    , norepinephrineEnabled_(true)
+    , serotoninEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -163,6 +166,19 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     predictedVision_.clear();
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize new neuromodulators
+    if (brain_) {
+        if (brain_->getAcetylcholine()) {
+            brain_->getAcetylcholine()->initialize(brain_.get());
+        }
+        if (brain_->getNorepinephrine()) {
+            brain_->getNorepinephrine()->initialize(brain_.get());
+        }
+        if (brain_->getSerotonin()) {
+            brain_->getSerotonin()->initialize(brain_.get());
+        }
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -1041,6 +1057,30 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getAcetylcholineLevel() const {
+    float level = 0.0f;
+    if (brain_ && brain_->getAcetylcholine()) {
+        level = brain_->getAcetylcholine()->getLevel();
+    }
+    return level;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    float level = 0.0f;
+    if (brain_ && brain_->getNorepinephrine()) {
+        level = brain_->getNorepinephrine()->getLevel();
+    }
+    return level;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    float level = 0.0f;
+    if (brain_ && brain_->getSerotonin()) {
+        level = brain_->getSerotonin()->getLevel();
+    }
+    return level;
+}
+
 namespace {
 const char* phase5CmdName(MotorCommand cmd) {
     switch (cmd) {
@@ -1078,6 +1118,11 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Reset new neuromodulation flags
+    acetylcholineEnabled_ = true;
+    norepinephrineEnabled_ = true;
+    serotoninEnabled_ = true;
     
     // Clear the visual prediction (a new episode's first scene is
     // novel again) and the touch state.

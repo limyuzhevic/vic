@@ -388,13 +388,19 @@ PYBIND11_MODULE(pynlm, m) {
              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+.def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
+        .def("getAcetylcholineLevel", &AgentBrain::getAcetylcholineLevel,
+              "Get acetylcholine level")
+        .def("getNorepinephrineLevel", &AgentBrain::getNorepinephrineLevel,
+              "Get norepinephrine level")
+        .def("getSerotoninLevel", &AgentBrain::getSerotoninLevel,
+              "Get serotonin level")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -407,6 +413,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    
+    // Neuromodulation configuration
+    .def("enableAcetylcholine", &AgentBrain::enableAcetylcholine, py::arg("enable"))
+    .def("enableNorepinephrine", &AgentBrain::enableNorepinephrine, py::arg("enable"))
+    .def("enableSerotonin", &AgentBrain::enableSerotonin, py::arg("enable"))
+    .def("isAcetylcholineEnabled", &AgentBrain::isAcetylcholineEnabled)
+    .def("isNorepinephrineEnabled", &AgentBrain::isNorepinephrineEnabled)
+    .def("isSerotoninEnabled", &AgentBrain::isSerotoninEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

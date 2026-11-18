@@ -70,6 +70,15 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get acetylcholine level
+    float getAcetylcholineLevel() const;
+    
+    // Get norepinephrine level
+    float getNorepinephrineLevel() const;
+    
+    // Get serotonin level
+    float getSerotoninLevel() const;
 
     // Thought trace (Phase 5): a one-line, human-readable record of the
     // most recent loop — what was perceived, what the planner suggested
@@ -131,10 +140,20 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // New neuromodulation configuration
+    void enableAcetylcholine(bool enable) { acetylcholineEnabled_ = enable; }
+    void enableNorepinephrine(bool enable) { norepinephrineEnabled_ = enable; }
+    void enableSerotonin(bool enable) { serotoninEnabled_ = enable; }
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // New neuromodulation status
+    bool isAcetylcholineEnabled() const { return acetylcholineEnabled_; }
+    bool isNorepinephrineEnabled() const { return norepinephrineEnabled_; }
+    bool isSerotoninEnabled() const { return serotoninEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -179,6 +198,11 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // New neuromodulation configuration flags
+    bool acetylcholineEnabled_;
+    bool norepinephrineEnabled_;
+    bool serotoninEnabled_;
     
     // Slowly adapting prediction of the visual scene, for novelty
     // detection (see processSensoryInput). Not the previous frame:
