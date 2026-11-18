@@ -56,22 +56,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
+    // Enhanced argument parsing with better error handling
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with improved formatting
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +92,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validateKeyValue(const std::string& key, const std::string& value);
+    bool validateEntry(const ConfigEntry& entry);
+    
+    // Helper function for string conversion
+    static std::string toString(const ConfigValue& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +106,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection and parsing
+    bool loadFromKeyValueFile(std::ifstream& file, const std::string& filepath);
+    bool loadFromJSON(std::ifstream& file, const std::string& filepath);
+    bool loadFromYAML(std::ifstream& file, const std::string& filepath);
 };
 
 } // namespace nlm
