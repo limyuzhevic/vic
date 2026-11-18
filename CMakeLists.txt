@@ -165,19 +165,36 @@ add_executable(nlm_phase6_demo
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
+# # association probe, concept/social probes, and a sandbox run with
+# # a teacher, planner overrides, and a checkpoint round-trip. The old
+# # nlm_phase6_demo integration demo is left unchanged.
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+# Phase 5 demo executable (Phase 5, added here: pattern probe,
+# # sandbox run, and checkpoint round-trip for the brain-personality
+# # step — previously Phase 5 was library-only with no demo).
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+# NLM Command Line Interface
+add_executable(nlm-cli
+    nlm_cli.cpp
+)
+target_link_libraries(nlm-cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+# Target alias for backwards compatibility
+add_custom_target(cli ALIAS nlm-cli)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
