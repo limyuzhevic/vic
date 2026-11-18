@@ -2,9 +2,16 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/eigen.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <unordered_map>
+#include <sstream>
+#include <iomanip>
+#include <numeric>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -408,6 +415,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Default factories
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -423,6 +431,478 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Utility functions
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, 
+                           int numSteps, double timestep = 0.1) -> py::dict {
+        py::dict results;
+        
+        // Reset everything
+        if (brain) brain->reset();
+        if (world) world->reset();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            if (world) {
+                world->update(timestep);
+            }
+            
+            if (agent && world) {
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+            }
+            
+            if (brain) {
+                brain->step(step);
+            }
+            
+            if (agent && world) {
+                auto motor_cmd = agent->decodeMotorCommand();
+                world->applyMotorCommand(motor_cmd, world->getSimulationTime());
+                
+                // Apply reward modulation
+                double reward = 0.0;
+                if (auto percept = world->getSensoryPercept()) {
+                    auto internal = percept->getInternal();
+                    if (!internal.empty()) reward = internal[0];
+                }
+                agent->applyRewardModulation(reward, 0.0);
+                agent->updateDevelopment(timestep);
+            }
+        }
+        
+        // Collect statistics
+        results["steps_completed"] = numSteps;
+        results["total_spikes"] = brain ? brain->getTotalSpikeCount() : 0;
+        results["firing_neurons"] = brain ? brain->getFiringNeuronCount() : 0;
+        results["average_firing_rate"] = brain ? brain->getAverageFiringRate() : 0.0;
+        results["development_stage"] = brain ? static_cast<int>(brain->getDevelopmentalStage()) : 0;
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("timestep") = 0.1,
+          "Run a complete simulation with brain, world, and agent");
+
+    m.def("createExperiment", [](std::string name, std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                std::shared_ptr<AgentBrain> agent) -> py::dict {
+        py::dict experiment;
+        experiment["name"] = name;
+        experiment["brain"] = brain;
+        experiment["world"] = world;
+        experiment["agent"] = agent;
+        experiment["start_time"] = std::chrono::system_clock::now();
+        experiment["parameters"] = py::dict();
+        experiment["results"] = py::dict();
+        return experiment;
+    }, py::arg("name"), py::arg("brain"), py::arg("world"), py::arg("agent"),
+          "Create an experiment for running and analyzing simulations");
+
+    m.def("collectStatistics", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) -> py::dict {
+        py::dict stats;
+        
+        if (brain) {
+            stats["total_neurons"] = brain->getTotalNeuronCount();
+            stats["total_synapses"] = brain->getTotalSynapseCount();
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            stats["average_firing_rate"] = brain->getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+            stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+            stats["region_count"] = brain->getRegionCount();
+            
+            // Network metrics
+            double excitation = 0.0, inhibition = 0.0;
+            auto regions = brain->getRegions();
+            for (const auto& region : regions) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getType() == SynapseType::Excitatory) excitation += syn->getWeight();
+                    else if (syn->getType() == SynapseType::Inhibitory) inhibition += syn->getWeight();
+                }
+            }
+            stats["network_excitation"] = excitation;
+            stats["network_inhibition"] = inhibition;
+            stats["network_balance"] = (excitation + inhibition) > 0 ? excitation / (excitation + inhibition) : 0.5;
+        }
+        
+        if (agent) {
+            stats["curiosity_level"] = agent->getCuriosityLevel();
+            stats["novelty_level"] = agent->getNoveltyLevel();
+            stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+            stats["prediction_error"] = agent->getPredictionError();
+        }
+        
+        return stats;
+    }, py::arg("brain"), py::arg("agent"), 
+          "Collect comprehensive statistics from brain and agent");
+
+    // Enhanced configuration utilities
+    m.def("configureBrain", [](std::shared_ptr<Config> config, std::map<std::string, py::object> settings) -> std::shared_ptr<Config> {
+        for (const auto& pair : settings) {
+            std::string key = pair.first;
+            py::object value = pair.second;
+            
+            if (value.is(py::int_())) {
+                config->set(key, value.cast<int64_t>(), ConfigSource::User);
+            } else if (value.is(py::float_())) {
+                config->set(key, value.cast<double>(), ConfigSource::User);
+            } else if (value.is(py::bool_())) {
+                config->set(key, value.cast<bool>(), ConfigSource::User);
+            } else if (value.is(py::str())) {
+                config->set(key, value.cast<std::string>(), ConfigSource::User);
+            }
+        }
+        return config;
+    }, py::arg("config"), py::arg("settings"), 
+          "Configure brain with a dictionary of settings");
+
+    // Advanced world management
+    m.def("createAndConfigureWorld", [](double width, double height, int visionWidth, int visionHeight, 
+                                      double maxEnergy = 100.0, double energyDecayRate = 0.95) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecayRate);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"), 
+          py::arg("maxEnergy") = 100.0, py::arg("energyDecayRate") = 0.95,
+          "Create and configure a simple world");
+
+    m.def("addResource", [](std::shared_ptr<SimpleWorld> world, double x, double y, double value = 1.0) {
+        if (world) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value);
+            world->addObject(obj);
+        }
+    }, py::arg("world"), py::arg("x"), py::arg("y"), py::arg("value") = 1.0,
+          "Add a resource object to the world");
+
+    // Batch operations
+    m.def("batchInjectCurrent", [](std::shared_ptr<Brain> brain, std::vector<std::pair<NeuronId, double>> injections, 
+                                  SimulationStep currentStep) {
+        for (const auto& pair : injections) {
+            brain->injectCurrent(pair.first, pair.second);
+        }
+        brain->step(currentStep);
+    }, py::arg("brain"), py::arg("injections"), py::arg("currentStep"),
+          "Inject current to multiple neurons in batch");
+
+    m.def("stepBatch", [](std::shared_ptr<Brain> brain, int numSteps, double timestep = 0.1) -> std::vector<py::dict> {
+        std::vector<py::dict> results;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            py::dict step_result;
+            step_result["step"] = step;
+            step_result["spikes"] = brain->getTotalSpikeCount();
+            step_result["firing_neurons"] = brain->getFiringNeuronCount();
+            step_result["average_firing_rate"] = brain->getAverageFiringRate();
+            
+            brain->step(step);
+            results.push_back(step_result);
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("timestep") = 0.1,
+          "Run multiple simulation steps and collect statistics for each");
+
+    // Debugging and visualization utilities
+    m.def("getDebugInfo", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                           std::shared_ptr<AgentBrain> agent) -> std::string {
+        std::stringstream ss;
+        ss << "=== NLM Debug Information ===\n";
+        
+        if (brain) {
+            ss << "Brain Status:\n";
+            ss << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+            ss << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+            ss << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+            ss << "  Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+            ss << "  Average Firing Rate: " << brain->getAverageFiringRate() << "\n";
+            ss << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+            ss << "  Regions: " << brain->getRegionCount() << "\n";
+        }
+        
+        if (world) {
+            ss << "World Status:\n";
+            ss << "  Width: " << world->getWidth() << "\n";
+            ss << "  Height: " << world->getHeight() << "\n";
+            ss << "  Simulation Time: " << world->getSimulationTime() << "\n";
+            ss << "  Max Energy: " << world->getMaxEnergy() << "\n";
+            ss << "  Energy Decay Rate: " << world->getEnergyDecayRate() << "\n";
+        }
+        
+        if (agent) {
+            ss << "Agent Status:\n";
+            ss << "  Curiosity: " << agent->getCuriosityLevel() << "\n";
+            ss << "  Novelty: " << agent->getNoveltyLevel() << "\n";
+            ss << "  Neuromodulation: " << agent->getNeuromodulationLevel() << "\n";
+            ss << "  Prediction Error: " << agent->getPredictionError() << "\n";
+        }
+        
+        ss << "=================================\n";
+        return ss.str();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+          "Get detailed debug information as a string");
+
+    m.def("profilePerformance", [](std::shared_ptr<Brain> brain, int steps = 100, double timestep = 0.1) -> py::dict {
+        py::dict profile;
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < steps; ++step) {
+            if (brain) brain->step(step);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        profile["total_steps"] = steps;
+        profile["total_time_ms"] = duration.count();
+        profile["time_per_step_ms"] = duration.count() / static_cast<double>(steps);
+        profile["steps_per_second"] = steps / (duration.count() / 1000.0);
+        profile["spikes_generated"] = brain ? brain->getTotalSpikeCount() : 0;
+        profile["final_firing_rate"] = brain ? brain->getAverageFiringRate() : 0.0;
+        
+        return profile;
+    }, py::arg("brain"), py::arg("steps") = 100, py::arg("timestep") = 0.1,
+          "Profile brain performance over multiple steps");
+
+    // Enhanced sensory and motor utilities
+    m.def("getPerceptFeatures", [](std::shared_ptr<SimpleWorld> world) -> py::dict {
+        py::dict features;
+        if (!world) return features;
+        
+        auto percept = world->getSensoryPercept();
+        if (!percept) return features;
+        
+        // Vision features
+        auto vision = percept->getVision();
+        if (vision) {
+            features["vision_width"] = vision->getWidth();
+            features["vision_height"] = vision->getHeight();
+            features["vision_channels"] = vision->getChannels();
+            auto data = vision->getData();
+            features["vision_data"] = std::vector<float>(data.begin(), data.end());
+        }
+        
+        // Internal signals
+        auto internal = percept->getInternal();
+        if (!internal.empty()) features["internal_signals"] = internal;
+        
+        // Proprioception
+        auto proprioception = percept->getProprioception();
+        if (!proprioception.empty()) features["proprioception"] = proprioception;
+        
+        // Touch
+        auto touch = percept->getTouch();
+        if (!touch.empty()) features["touch"] = touch;
+        
+        return features;
+    }, py::arg("world"), "Extract feature vector from world percept");
+
+    m.def("createActionFromDict", [](std::map<std::string, py::object> actionDict) -> std::shared_ptr<Action> {
+        ActionType type = ActionType::Wait;
+        std::vector<float> parameters;
+        
+        if (actionDict.find("type") != actionDict.end()) {
+            std::string typeStr = actionDict["type"].cast<std::string>();
+            if (typeStr == "MoveForward") type = ActionType::MoveForward;
+            else if (typeStr == "MoveBackward") type = ActionType::MoveBackward;
+            else if (typeStr == "TurnLeft") type = ActionType::TurnLeft;
+            else if (typeStr == "TurnRight") type = ActionType::TurnRight;
+            else if (typeStr == "Look") type = ActionType::Look;
+            else if (typeStr == "Interact") type = ActionType::Interact;
+            else if (typeStr == "Eat") type = ActionType::Eat;
+            else if (typeStr == "Drink") type = ActionType::Drink;
+            else if (typeStr == "Rest") type = ActionType::Rest;
+        }
+        
+        if (actionDict.find("parameters") != actionDict.end()) {
+            parameters = actionDict["parameters"].cast<std::vector<float>>();
+        }
+        
+        return std::make_shared<Action>(type, parameters);
+    }, py::arg("actionDict"), "Create an Action from a dictionary");
+
+    m.def("enableAllFeatures", [](std::shared_ptr<AgentBrain> agent, bool enable = true) {
+        if (agent) {
+            agent->enableRewardModulation(enable);
+            agent->enableStructuralPlasticity(enable);
+            agent->enableDevelopment(enable);
+            agent->enableCuriosity(enable);
+        }
+    }, py::arg("agent"), py::arg("enable") = true,
+          "Enable or disable all learning features");
+
+    // Enhanced initialization validation
+    m.def("isInitialized", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                             std::shared_ptr<AgentBrain> agent) -> bool {
+        bool valid = true;
+        
+        if (brain && !brain->getTotalNeuronCount()) valid = false;
+        if (world && (world->getWidth() <= 0 || world->getHeight() <= 0)) valid = false;
+        
+        return valid;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+          "Check if all components are properly initialized");
+
+    m.def("initializeAll", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                            std::shared_ptr<AgentBrain> agent) -> bool {
+        bool success = true;
+        
+        if (brain && !brain->initialize()) success = false;
+        if (world) world->reset();
+        if (agent && world) agent->initialize(world);
+        
+        return success;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+          "Initialize all components and return success status");
+
+    // Additional convenience and utility functions
+    
+    // Simple simulation runner for common use cases
+    m.def("runSimpleSimulation", [](std::shared_ptr<Brain> brain, int steps, double timestep = 0.1) -> py::dict {
+        py::dict results;
+        
+        if (!brain) {
+            return results;
+        }
+        
+        // Get initial stats
+        results["initial_neurons"] = brain->getTotalNeuronCount();
+        results["initial_spikes"] = brain->getTotalSpikeCount();
+        results["initial_firing_rate"] = brain->getAverageFiringRate();
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+            
+            // Collect stats every 100 steps
+            if (step % 100 == 0) {
+                py::dict step_result;
+                step_result["step"] = step;
+                step_result["total_spikes"] = brain->getTotalSpikeCount();
+                step_result["firing_neurons"] = brain->getFiringNeuronCount();
+                step_result["average_firing_rate"] = brain->getAverageFiringRate();
+                results["step_" + std::to_string(step)] = step_result;
+            }
+        }
+        
+        // Final stats
+        results["final_neurons"] = brain->getTotalNeuronCount();
+        results["final_spikes"] = brain->getTotalSpikeCount();
+        results["final_firing_rate"] = brain->getAverageFiringRate();
+        results["total_steps"] = steps;
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.1,
+          "Run a simple simulation and return step-by-step results");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) -> bool {
+        if (!brain) return false;
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"),
+          "Export brain state to file");
+
+    m.def("importBrainState", [](const std::string& filename, std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) return brain;
+        if (!brain->load(filename)) return brain;
+        return brain;
+    }, py::arg("filename"), py::arg("config"),
+          "Import brain state from file and create new brain");
+
+    m.def("calculateLearningMetrics", [](std::shared_ptr<Brain> brain, int windowSteps = 100) -> py::dict {
+        py::dict metrics;
+        
+        if (!brain) {
+            metrics["error"] = "Invalid brain pointer";
+            return metrics;
+        }
+        
+        // Simple learning metrics calculation
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"]_CALL brain->getTotalSynapseCount();
+        metrics["current_firing_rate"] = brain->getAverageFiringRate();
+        metrics["learning_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("windowSteps") = 100,
+          "Calculate learning metrics for the brain");
+
+    m.def("createTutorialExample", [](std::string exampleType) -> py::dict {
+        py::dict example;
+        
+        if (exampleType == "minimal") {
+            example["code"] = R"(
+import pynlm
+
+# Create a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+
+print(f"Your brain has {brain.getTotalNeuronCount()} neurons!")
+";
+        }
+        else if (exampleType == "complete") {
+            example["code"] = R"(
+import pynlm
+
+# Complete agent example
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initialize(world)
+agent.enableAllFeatures(True)
+
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+";
+        }
+        
+        return example;
+    }, py::arg("exampleType"),
+          "Create tutorial example code as Python code string");
+
+    // Type conversion utilities
+    m.def("neuronIdToInt", [](NeuronId id) { return id.value; }, py::arg("id"),
+          "Convert NeuronId to integer for indexing");
+
+    m.def("intToNeuronId", [](uint64_t value) { return NeuronId(value); }, py::arg("value"),
+          "Convert integer to NeuronId");
+
+    // Performance monitoring
+    m.def("monitorPerformance", [](std::shared_ptr<Brain> brain, int samples = 10) -> py::dict {
+        py::dict perf;
+        
+        if (!brain) return perf;
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (int i = 0; i < samples; ++i) {
+            brain->step(i);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        
+        perf["samples"] = samples;
+        perf["total_time_us"] = duration.count();
+        perf["time_per_step_us"] = duration.count() / static_cast<double>(samples);
+        perf["steps_per_second"] = samples / (duration.count() / 1000000.0);
+        
+        return perf;
+    }, py::arg("brain"), py::arg("samples") = 10,
+          "Monitor and report brain performance metrics");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
