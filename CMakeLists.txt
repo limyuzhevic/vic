@@ -29,7 +29,14 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain - modular components
+    src/brain/BrainInitialization.cpp
+    src/brain/BrainStep.cpp
+    src/brain/BrainIO.cpp
+    src/brain/BrainMemory.cpp
+    src/brain/BrainStatistics.cpp
+    src/brain/BrainIntegration.cpp
+    # Original Brain components (kept for compatibility)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp

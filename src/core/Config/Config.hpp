@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -30,6 +32,52 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Validation result
+enum class ValidationResult {
+    Success,
+    InvalidType,
+    ValueOutOfRange,
+    MissingRequired,
+    InvalidFormat
+};
+
+// Configuration validation rule
+struct ConfigValidationRule {
+    std::string key;
+    std::function<ValidationResult(const ConfigValue&)> validator;
+    std::string errorMessage;
+    bool required;
+    
+    ConfigValidationRule(const std::string& k, const std::function<ValidationResult(const ConfigValue&)>& v, 
+                         const std::string& err, bool req = false)
+        : key(k), validator(v), errorMessage(err), required(req) {}
+};
+
+// Configuration schema
+class ConfigSchema {
+public:
+    // Add validation rule
+    void addRule(const ConfigValidationRule& rule);
+    
+    // Validate configuration
+    ValidationResult validate(const Config& config, std::string& errorMessage) const;
+    
+    // Get all validation errors
+    std::vector<std::string> getValidationErrors(const Config& config) const;
+    
+    // Check if all rules are satisfied
+    bool isValid(const Config& config) const;
+    
+    // Get required keys
+    std::vector<std::string> getRequiredKeys() const;
+    
+    // Get validation error count
+    size_t getErrorCount(const Config& config) const;
+    
+private:
+    std::vector<ConfigValidationRule> rules;
 };
 
 // Configuration entry
@@ -66,12 +114,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +143,11 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation methods
+    bool validate() const;
+    std::string getValidationErrors() const;
+    void setSchema(const ConfigSchema& schema);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +155,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration schema for validation
+    ConfigSchema schema;
 };
 
 } // namespace nlm
