@@ -25,6 +25,100 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        ## Quick Start Examples
+        
+        **Basic Brain Setup:**
+        ```python
+        import pynlm
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        for step in range(100):
+            brain.step(step)
+        ```
+        
+        **Complete Agent Simulation:**
+        ```python
+        import pynlm
+        
+        # Create brain and world
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableDevelopment(True)
+        
+        # Run simulation
+        for step in range(1000):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            if step % 100 == 0:
+                print(f"Step {step}: Firing rate = {brain.getAverageFiringRate():.3f}")
+        ```
+        
+        **Advanced Learning with Memory:**
+        ```python
+        # Configure for advanced learning
+        config = pynlm.createDefaultConfig()
+        config.set("working_memory.enabled", True)
+        config.set("episodic_memory.enabled", True)
+        config.set("prediction.enabled", True)
+        config.set("structural_plasticity.enabled", True)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent with custom settings
+        agent = pynlm.createAgentBrain(brain)
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableDevelopment(True)
+        agent.enableStructuralPlasticity(True)
+        
+        # Training loop with progress tracking
+        for step in range(5000):
+            # Process world interaction
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            
+            # Get action and execute
+            action = agent.decodeMotorCommand()
+            result = world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Learn from outcome
+            reward = result.reward
+            predicted = agent.getPredictionError()
+            agent.applyRewardModulation(reward, predicted)
+            
+            if step % 500 == 0:
+                stats = {
+                    'step': step,
+                    'neurons': brain.getTotalNeuronCount(),
+                    'spikes': brain.getTotalSpikeCount(),
+                    'firing_rate': brain.getAverageFiringRate(),
+                    'curiosity': agent.getCuriosityLevel(),
+                    'development': brain.getDevelopmentalStage().name,
+                    'reward': reward,
+                    'prediction_error': predicted
+                }
+                print(f"Progress: {stats}")
+        ```
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -73,31 +167,6 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
@@ -135,11 +204,20 @@ PYBIND11_MODULE(pynlm, m) {
         .export_values();
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
+        .value("Empty", WorldObjectType::Empty, "Empty/invalid cell")
+        .value("Resource", WorldObjectType::Resource, "Positive resource object")
+        .value("Hazard", WorldObjectType::Hazard, "Negative hazard/danger")
+        .value("Wall", WorldObjectType::Wall, "Impassable barrier")
+        .value("Marker", WorldObjectType::Marker, "Navigation marker/landmark")
+        .export_values();
+
+    py::enum_<RegionType>(m, "RegionType", R"pbdoc(Brain region type enumeration)pbdoc")
+        .value("Sensory", RegionType::Sensory, "Sensory processing region")
+        .value("Motor", RegionType::Motor, "Motor control region")
+        .value("Cognitive", RegionType::Cognitive, "Cognitive processing region")
+        .value("Memory", RegionType::Memory, "Memory storage region")
+        .value("Association", RegionType::Association, "Association/coupling region")
+        .value("Modulatory", RegionType::Modulatory, "Modulation/regulatory region")
         .export_values();
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
@@ -272,28 +350,123 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+              py::arg("visionWidth"), py::arg("visionHeight"),
+              "Configure the world dimensions and agent vision")
+        .def("reset", &SimpleWorld::reset,
+              "Reset the world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+              "Set the agent's starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+              "Update world state by given timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+              py::arg("cmd"), py::arg("currentTime"),
+              "Apply motor command and return action result")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+              py::return_value_policy::reference_internal,
+              "Get sensory percept containing vision, touch, internal, proprioception")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+              py::return_value_policy::reference_internal,
+              "Get agent body state (position, velocity, energy, etc.)")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+              "Add a world object (Resource, Hazard, Wall, etc.)")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+              "Remove object at given position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+              "Check if position is valid (not wall, within bounds)")
+        .def("getWidth", &SimpleWorld::getWidth,
+              "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight,
+              "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+              "Get maximum agent energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+              "Set maximum agent energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+              "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+              "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+              "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+              "Set random seed for reproducible simulations")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+              "Get current random seed");
+
+    // Enhanced convenience functions for common patterns
+    m.def("createTrainingEnvironment", []() -> std::pair<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>> {
+        auto config = std::make_shared<Config>();
+        config->set("working_memory.enabled", true);
+        config->set("episodic_memory.enabled", true);
+        config->set("prediction.enabled", true);
+        config->set("structural_plasticity.enabled", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10, 10);
+        
+        return {brain, world};
+    }, "Create a pre-configured training environment with learning enabled");
+
+    m.def("createExplorationEnvironment", []() -> std::pair<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>> {
+        auto config = std::make_shared<Config>();
+        config->set("curiosity.enabled", true);
+        config->set("novelty.enabled", true);
+        config->set("development.enabled", true);
+        config->set("working_memory.enabled", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(30, 30, 12, 12);
+        world->reset();
+        world->setAgentStart(15, 15);
+        world->setMaxEnergy(200.0f);
+        
+        return {brain, world};
+    }, "Create a pre-configured exploration environment with curiosity and novelty detection");
+
+    m.def("createVisualizationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("visualization.enabled", true);
+        config->set("logging.level", "info");
+        config->set("checkpoint.enabled", true);
+        config->set("checkpoint.interval", 1000);
+        
+        return config;
+    }, "Create configuration optimized for visualization and monitoring");
+
+    m.def("runStandardBenchmark", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(15, 15, 6, 6);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Run standard benchmark
+        for (int step = 0; step < 1000; ++step) {
+            world->update(0.1f);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getExcitationInhibitionRatio()
+        );
+    }, "Run standard benchmark simulation and return performance metrics");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -408,21 +581,138 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Enhanced config validation and type checking
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        // Check for required fields
+        std::vector<std::string> essential_keys = {
+            "working_memory.enabled",
+            "prediction.enabled",
+            "neuromodulation.enabled",
+            "development.enabled"
+        };
+        
+        for (const auto& key : essential_keys) {
+            if (!config.has(key)) {
+                warnings.push_back("Key " + key + " not set (using default)");
+            }
+        }
+        
+        // Validate learning system consistency
+        bool working_memory = config.get<bool>("working_memory.enabled", false);
+        bool episodic_memory = config.get<bool>("episodic_memory.enabled", false);
+        bool prediction = config.get<bool>("prediction.enabled", false);
+        
+        if (working_memory && !prediction) {
+            warnings.push_back("Working memory enabled but prediction disabled - unusual configuration");
+        }
+        
+        return std::make_pair(errors, warnings);
+    }, py::arg("config"), "Validate configuration and return errors/warnings");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced simulation utilities
+    m.def("runComparisonSimulation", [](std::function<void(std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>)> setup,
+                                       std::function<void(int, std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>)> step,
+                                       int num_steps) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        
+        // Setup the simulation
+        setup(brain, world);
+        
+        // Run the simulation
+        for (int step_num = 0; step_num < num_steps; ++step_num) {
+            world->update(0.1f);
+            step(step_num, brain, world);
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getExcitationInhibitionRatio()
+        );
+    }, py::arg("setup"), py::arg("step"), py::arg("num_steps"),
+       "Run a custom comparison simulation with user-defined setup and step functions");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Neurogenesis and development utilities
+    m.def("createDevelopingBrain", [](bool enable_neurogenesis = true, bool enable_pruning = true,
+                                     float neurogenesis_rate = 0.01f, float pruning_threshold = 0.5f) {
+        auto config = std::make_shared<Config>();
+        config->set("development.neurogenesis.enabled", enable_neurogenesis);
+        config->set("development.pruning.enabled", enable_pruning);
+        config->set("development.neurogenesis.rate", neurogenesis_rate);
+        config->set("development.pruning.threshold", pruning_threshold);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Enable development features
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableDevelopment(true);
+        
+        return std::make_pair(brain, agent);
+    }, py::arg("enable_neurogenesis") = true,
+       py::arg("enable_pruning") = true,
+       py::arg("neurogenesis_rate") = 0.01f,
+       py::arg("pruning_threshold") = 0.5f,
+       "Create a brain with enhanced development capabilities (neurogenesis and pruning)");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Visualization and monitoring utilities
+    m.def("createDebugVisualizationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("visualization.enabled", true);
+        config->set("visualization.output_file", "debug_visualization.json");
+        config->set("visualization.update_rate", 0.1);
+        config->set("logging.level", "debug");
+        config->set("logging.format", "json");
+        config->set("checkpoint.enabled", true);
+        config->set("checkpoint.interval", 100);
+        config->set("metrics.enabled", true);
+        config->set("metrics.collect_frequency", 10);
+        
+        return config;
+    }, "Create a configuration optimized for debugging and visualization");
+
+    // Advanced learning configuration presets
+    m.def("createLearningConfig", [](const std::string& learning_mode) {
+        auto config = std::make_shared<Config>();
+        
+        if (learning_mode == "curiosity") {
+            config->set("curiosity.enabled", true);
+            config->set("curiosity.strength", 1.0);
+            config->set("novelty.enabled", true);
+            config->set("novelty.sensitivity", 0.5);
+            config->set("working_memory.enabled", true);
+            config->set("episodic_memory.enabled", true);
+            config->set("prediction.enabled", true);
+            config->set("structural_plasticity.enabled", true);
+        }
+        else if (learning_mode == "efficient") {
+            config->set("working_memory.enabled", true);
+            config->set("prediction.enabled", true);
+            config->set("curiosity.enabled", false);
+            config->set("novelty.enabled", false);
+            config->set("structural_plasticity.enabled", false);
+            config->set("development.enabled", false);
+        }
+        else if (learning_mode == "exploration") {
+            config->set("curiosity.enabled", true);
+            config->set("curiosity.strength", 2.0);
+            config->set("novelty.enabled", true);
+            config->set("novelty.sensitivity", 1.0);
+            config->set("working_memory.enabled", true);
+            config->set("episodic_memory.enabled", true);
+            config->set("prediction.enabled", true);
+            config->set("structural_plasticity.enabled", true);
+            config->set("development.enabled", true);
+        }
+        
+        return config;
+    }, py::arg("learning_mode"), "Create a configuration optimized for specific learning modes (curiosity, efficient, exploration)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
