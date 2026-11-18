@@ -1,10 +1,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -142,31 +144,55 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
+    .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+              "Load configuration from a JSON or key=value file")
+         // loadFromArgs takes (int, char**) in C++, which has no Python
+         // equivalent; bind it as a list of strings instead (Phase 5
+         // fix — the old binding did not compile).
+         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+             std::vector<char*> argv;
+             argv.reserve(args.size());
+             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+         }, py::arg("args"),
+              "Load configuration from command line arguments")
+         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+              "Save configuration to a JSON file")
+         .def("hasKey", &Config::has, py::arg("key"),
+              "Check if configuration key exists")
+         .def("listKeys", &Config::getKeys,
+              "List all configuration keys")
+         .def("clearAll", &Config::clear,
+              "Clear all configuration entries")
+         .def("getSummary", &Config::summary,
+              "Get configuration summary string")
+         // Additional convenience methods for Config
+         .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get integer configuration value")
+         .def("getDouble", [](const Config& self, const std::string& key, double defaultValue) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get double configuration value")
+         .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get boolean configuration value")
+         .def("setInt", &Config::set<int>, py::arg("key"), py::arg("value"),
+              "Set integer configuration value")
+         .def("setDouble", &Config::set<double>, py::arg("key"), py::arg("value"),
+              "Set double configuration value")
+         .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+              "Set boolean configuration value")
+         .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+              "Set string configuration value")
+         .def("removeKey", &Config::remove, py::arg("key"),
+              "Remove configuration key")
+         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
 

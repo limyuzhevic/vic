@@ -80,18 +80,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
         float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
-        
+
         // Update development
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
-        
+
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;

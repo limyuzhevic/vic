@@ -157,9 +157,6 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             float dx = std::cos(agent_.orientation) * moveSpeed;
             float dy = std::sin(agent_.orientation) * moveSpeed;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
@@ -173,23 +170,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
         }
         
-        case MotorCommand::MoveBackward: {
-            agent_.angularVelocity = 0.0f;
-            agent_.isTurning = false;
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = -0.01f;  // Small cost for movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -0.05f;  // Cost for hitting wall
                 result.success = false;
             }
             break;

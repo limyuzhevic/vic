@@ -18,13 +18,13 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters - optimized for realistic activity levels
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), firingRate(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -290,14 +290,22 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
-    
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Biological thresholds optimized for realistic activity
+    // Firing threshold typically -50 to -55mV (more negative for stability)
+    pImpl->state.threshold = -50.0f + rng.uniformReal(-5.0f, 5.0f);
     
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    
+    // Reset potential typically -75mV to -85mV (more negative than resting)
+    pImpl->state.resetPotential = -75.0f + rng.uniformReal(0.0f, 10.0f);
+    
+    // Refractory period: 5-15ms (longer to reduce firing rate)
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(5), uint32_t(15)));
+    
+    // Phase 6: tighter firing rate EMA decay for smoother learning signals
+    // Increased weight on previous rate to reduce noise
+    pImpl->state.firingRate = 0.0f;
     
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);

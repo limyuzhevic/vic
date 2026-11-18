@@ -80,6 +80,9 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set value with description
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description);
+    
     // Check existence
     bool has(const std::string& key) const;
     

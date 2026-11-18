@@ -10,8 +10,14 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
+    // Network activity monitoring
+    float networkActivityRatio;
+    uint64_t spikeCount;
+    uint64_t maxExpectedSpikes;
+    
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             covarianceThreshold(0.0f), networkActivityRatio(0.0f),
+             spikeCount(0), maxExpectedSpikes(1000) {}
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -53,6 +59,17 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
+    // Update network activity monitoring
+    pImpl->spikeCount += preSpikes.size() + postSpikes.size();
+    if (pImpl->maxExpectedSpikes > 0) {
+        pImpl->networkActivityRatio = static_cast<float>(pImpl->spikeCount) / 
+                                      static_cast<float>(pImpl->maxExpectedSpikes);
+        // Cap at 1.0 to prevent overflow
+        if (pImpl->networkActivityRatio > 1.0f) {
+            pImpl->networkActivityRatio = 1.0f;
+        }
+    }
+    
     // Nearest-neighbour version: the old all-pairs count made delta grow
     // with history length (up to 100x100 pairs) and saturated every weight
     // to its bound in one step. One correlated recent pair = one step.
@@ -63,18 +80,40 @@ void Hebbian::update(Synapse* synapse,
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Optimized weight change with pattern selectivity:
+    // 1. Apply baseline Hebbian coactivity (strengthening correlated spikes)
+    // 2. Add activity-dependent modulation based on overall network activity
+    // 3. Use asymmetric scaling to preserve relative differences between synapses
+    
+    // Baseline Hebbian component: strengthens correlated connections
     if (std::abs(delta) > 1e-6f) {
+        // Enhanced scaling: synapse-specific modulation based on its current state
+        // This preserves differences between synapses rather than saturating them together
         delta *= (1.0f - std::abs(synapse->getWeight()));
+        
+        // Activity-dependent modulation: reduce learning when network is too active
+        // to prevent runaway potentiation
+        float activityModulation = 0.5f * (1.0f - std::min(1.0f, pImpl->networkActivityRatio));
+        delta *= activityModulation;
+        
         applyWeightChange(synapse, delta);
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
+        
+        // More refined sign enforcement: maintain clear excitation/inhibition boundaries
+        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.005f) {
+            synapse->setWeight(-0.005f);
+        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.005f) {
+            synapse->setWeight(0.005f);
         }
+    }
+}
+
+float Hebbian::getNetworkActivityRatio() const {
+    return pImpl ? pImpl->networkActivityRatio : 0.0f;
+}
+
+void Hebbian::setNetworkActivityRatio(float ratio) {
+    if (pImpl) {
+        pImpl->networkActivityRatio = std::clamp(ratio, 0.0f, 1.0f);
     }
 }
 

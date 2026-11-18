@@ -132,9 +132,6 @@ public:
                     std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
                 }
                 
-                // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
@@ -151,7 +148,7 @@ public:
 
                 // 8. Update development
                 agentBrain.updateDevelopment(0.1);
-                
+
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
