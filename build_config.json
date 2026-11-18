@@ -1,0 +1,57 @@
+{
+    "cmake_minimum_required": "3.16",
+    "project_name": "NLM",
+    "project_version": "0.1.0",
+    "languages": ["CXX"],
+    
+    "build_types": {
+        "Debug": {
+            "compiler_flags": ["-Wall", "-Wextra", "-Wpedantic", "-g", "-O0"],
+            "defines": ["DEBUG"]
+        },
+        "Release": {
+            "compiler_flags": ["-Wall", "-Wextra", "-Wpedantic", "-O3", "-DNDEBUG"],
+            "defines": []
+        },
+        "RelWithDebInfo": {
+            "compiler_flags": ["-Wall", "-Wextra", "-Wpedantic", "-O2", "-g"],
+            "defines": []
+        }
+    },
+    
+    "build_targets": {
+        "nlm": {
+            "type": "executable",
+            "sources": ["src/main.cpp"],
+            "dependencies": ["nlm_core"],
+            "description": "Main NLM simulation executable"
+        },
+        "nlm_test_fixes": {
+            "type": "executable",
+            "sources": ["tests/test_fixes.cpp"],
+            "dependencies": ["nlm_core"],
+            "description": "Unit tests for bug fixes"
+        },
+        "nlm_benchmark": {
+            "type": "executable",
+            "sources": ["src/benchmark.cpp"],
+            "dependencies": ["nlm_core"],
+            "description": "Performance benchmark suite"
+        }
+    },
+    
+    "install": {
+        "targets": ["nlm", "nlm_core", "nlm_agent", "nlm_world"],
+        "directories": {
+            "bin": ["nlm"],
+            "lib": ["nlm_core", "nlm_agent", "nlm_world"]
+        }
+    },
+    
+    "python_bindings": {
+        "enabled": true,
+        "module_name": "pynlm",
+        "sources": ["python/bindings.cpp"],
+        "dependencies": ["nlm_core", "nlm_agent", "nlm_world"]
+    }
+}

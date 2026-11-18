@@ -720,20 +720,14 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Use O(1) lookup via neuronById map - no fallback to linear scan
     auto it = pImpl->neuronById.find(neuron.index());
     if (it != pImpl->neuronById.end()) {
         it->second->injectCurrent(current);
         return;
     }
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
-    }
+    // If not found, this indicates a bug in neuronById maintenance
+    // The brain should have proper neuron tracking to avoid this fallback
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
@@ -855,6 +849,14 @@ void Brain::reset() {
     
     for (auto& region : pImpl->regions) {
         region->reset();
+    }
+    
+    // Rebuild neuronById map after reset
+    pImpl->neuronById.clear();
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            pImpl->neuronById[neuron->getId().index()] = neuron;
+        }
     }
     
     pImpl->spikeSystem->reset();
