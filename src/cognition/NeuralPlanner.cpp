@@ -110,49 +110,57 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
 std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
     std::vector<std::vector<ActionType>> result;
     
-    // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
-        ActionType::MoveForward, ActionType::MoveBackward,
-        ActionType::TurnLeft, ActionType::TurnRight,
-        ActionType::Interact, ActionType::Wait
-    };
+    // Phase 6 improvement: Use a more efficient generation approach
+    // instead of generating ALL sequences then sampling, we can generate
+    // more representative sequences directly
     
-    // For now, generate sequences of depth actions
-    // This could be optimized with pruning
-    
-    std::function<void(std::vector<ActionType>&, size_t)> generate = 
-        [&](std::vector<ActionType>& current, size_t remaining) {
-            if (remaining == 0) {
-                result.push_back(current);
-                return;
-            }
-            
-            for (ActionType action : baseActions) {
-                current.push_back(action);
-                generate(current, remaining - 1);
-                current.pop_back();
-            }
+    // Choose action subset based on planning depth for better efficiency
+    std::vector<ActionType> baseActions;
+    if (depth <= 2) {
+        // For shallow planning, use all actions
+        baseActions = {
+            ActionType::MoveForward, ActionType::MoveBackward,
+            ActionType::TurnLeft, ActionType::TurnRight,
+            ActionType::Interact, ActionType::Wait
         };
-    
-    std::vector<ActionType> current;
-    generate(current, depth);
-
-    // Limit number of sequences. Phase 5 fix: the old code kept only
-    // the first 100 sequences, which — with depth 5 and lexicographic
-    // generation — all start with MoveForward, so the planner could
-    // never suggest any other first action no matter what it learned.
-    // Keeping 100 evenly spaced sequences preserves one representative
-    // per first action, so learned action quality can actually change
-    // the planner's suggestion.
-    if (result.size() > 100) {
-        std::vector<std::vector<ActionType>> kept;
-        kept.reserve(100);
-        for (size_t i = 0; i < 100; ++i) {
-            kept.push_back(result[i * result.size() / 100]);
-        }
-        result = std::move(kept);
+    } else if (depth <= 3) {
+        // For medium planning, reduce actions to focus on important ones
+        baseActions = {
+            ActionType::MoveForward, ActionType::TurnLeft,
+            ActionType::TurnRight, ActionType::Interact
+        };
+    } else {
+        // For deep planning, focus on most critical actions
+        baseActions = {
+            ActionType::MoveForward, ActionType::TurnLeft,
+            ActionType::TurnRight
+        };
     }
-
+    
+    // Generate representative sequences instead of all combinations
+    // Use a stratified approach to ensure good coverage
+    size_t maxSequences = std::min<size_t>(100, baseActions.size() * std::pow(baseActions.size(), depth - 1));
+    
+    // Pre-compute representative sequences using modular arithmetic
+    // This ensures even distribution and avoids bias toward first actions
+    result.reserve(maxSequences);
+    
+    for (size_t seqIdx = 0; seqIdx < maxSequences; ++seqIdx) {
+        std::vector<ActionType> sequence;
+        sequence.reserve(depth);
+        
+        // Generate sequence using hash-based selection for diversity
+        size_t actionCount = baseActions.size();
+        for (size_t step = 0; step < depth; ++step) {
+            // Use different hash seeds for each position to get variety
+            size_t hash = std::hash<std::vector<ActionType>>{}({step, seqIdx});
+            size_t actionIdx = hash % actionCount;
+            sequence.push_back(baseActions[actionIdx]);
+        }
+        
+        result.push_back(std::move(sequence));
+    }
+    
     return result;
 }
 

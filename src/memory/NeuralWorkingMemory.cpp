@@ -22,6 +22,10 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
 {
 }
 
