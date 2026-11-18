@@ -1,0 +1,78 @@
+cmake_minimum_required(VERSION 3.16)
+project(NLM-Utils VERSION 0.1.0 LANGUAGES CXX)
+
+# C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Enable warnings
+if(MSVC)
+    add_compile_options(/W4)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Performance monitoring utilities
+add_library(perf_utils STATIC
+    src/core/Performance/PerformanceMonitor.cpp
+    src/core/Performance/ProgressReporter.cpp
+)
+
+target_include_directories(perf_utils PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Test framework
+add_library(test_framework STATIC
+    src/core/Tests/TestFramework.cpp
+)
+
+target_include_directories(test_framework PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(test_framework PUBLIC perf_utils)
+
+# Configuration validation
+add_library(config_validation STATIC
+    src/core/Config/ConfigurationSchema.cpp
+)
+
+target_include_directories(config_validation PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Installation targets
+install(TARGETS perf_utils test_framework config_validation
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Package configuration
+include(GNUInstallDirs)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLM-UtilsConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NLM-UtilsConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM-Utils
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NLM-UtilsConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/NLM-UtilsConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/NLM-UtilsConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM-Utils
+)
