@@ -48,7 +48,6 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -64,7 +63,7 @@ struct LearningExperiment {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region for plasticity analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
@@ -83,7 +82,7 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region for plasticity analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
@@ -295,12 +294,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
 
-    float totalDelta = delta;
-    
-    NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    // Use delta directly instead of redundant totalDelta variable
+    if (delta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+    } else if (delta < -0.001f) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
@@ -333,11 +330,29 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printBanner();
+            std::cout << "\n=== Usage ===\n";
+            std::cout << "  nlm [options]\n\n";
+            std::cout << "=== Options ===\n";
+            std::cout << "  --help, -h          Show this help message\n";
+            std::cout << "  --config=file, -c   Load configuration from file\n";
+            std::cout << "  --neuron-count=num  Set number of neurons (default: 500)\n";
+            std::cout << "  --region-count=num  Set number of regions (default: 1)\n";
+            std::cout << "  --timestep=num      Set simulation timestep in seconds (default: 0.001)\n";
+            std::cout << "  --seed=num          Set random seed (default: 42)\n";
+            std::cout << "\n=== Examples ===\n";
+            std::cout << "  nlm --config=myconfig.cfg --neuron-count=1000\n";
+            std::cout << "  nlm --timestep=0.01 --seed=123\n";
+            return 0;
+        }
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
+                NLM_LOG_INFO("Config file specified via command line: " + configFile);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+                NLM_LOG_INFO("Config file specified via command line: " + configFile);
             }
         }
     }
@@ -346,25 +361,32 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults.");
     }
     
-    // Override with command line args
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults.");
+    }
+    
+    // Override with command line args using modern parsing
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (these are overridden by command line args)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // STDP parameters (Phase 2 defaults)
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
+    // Structural plasticity parameters (Phase 2 defaults)
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
