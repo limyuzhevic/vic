@@ -132,11 +132,17 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (Phase 2: Real Neural Computation)
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 6 enhanced main executable (Final Integration Demo)
+add_executable(nlm_phase6
+    src/main_phase6.cpp
+)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
