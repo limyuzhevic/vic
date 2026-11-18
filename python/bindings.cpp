@@ -123,6 +123,142 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
+    // Enhanced Python interfaces for advanced users
+    py::class_<Config, std::shared_ptr<Config>>(m, "ConfigAdvanced", R"pbdoc(Advanced configuration class with validation and schema support)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file (Phase 6)")
+        .def("validate", &Config::has, py::arg("key"),
+             "Validate that a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a detailed summary string of the configuration")
+        .def("setDefaults", [](Config& self) {
+            // Set comprehensive default configuration
+            self.set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            self.set("simulation_timestep", 0.001, ConfigSource::Default);
+            self.set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            self.set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            self.set("connection_probability", 0.15f, ConfigSource::Default);
+            self.set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            self.set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            self.set("stdp_tau", 20.0f, ConfigSource::Default);
+            self.set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            self.set("pruning_rate", 0.00001f, ConfigSource::Default);
+        }, "Set comprehensive default configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<ConfigAdvanced: " + cfg.summary() + ">";
+        });
+
+    // Enhanced Brain interface for advanced users
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "BrainAdvanced", R"pbdoc(Advanced brain interface with enhanced simulation control)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"), "Initialize brain with configuration")
+        .def("initialize", &Brain::initialize, "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"), "Perform a simulation step")
+        .def("stepWithTime", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"), "Perform a simulation step with timestamp")
+        .def("resetToState", &Brain::reset, "Reset brain state")
+        .def("saveState", &Brain::save, py::arg("filepath"), "Save brain state to file")
+        .def("loadState", &Brain::load, py::arg("filepath"), "Load brain state from file")
+        .def("getRegionCount", &Brain::getRegionCount, "Get the number of regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount, "Get total neuron count")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount, "Get total synapse count")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate, "Get average firing rate")
+        .def("getExcitatoryInhibitionRatio", &Brain::getExcitationInhibitionRatio, "Get excitation/inhibition ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount, "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage, "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage, py::arg("stage"), "Set developmental stage")
+        .def("getConfig", &Brain::getConfig, py::return_value_policy::reference_internal, "Get the configuration")
+        .def("logStatus", &Brain::logStatus, "Log brain status and statistics")
+        .def("enableAllPlasticity", [](Brain& brain) {
+            // Enable all plasticity mechanisms
+            auto* stdp = brain.getSTDP();
+            auto* hebbian = brain.getHebbian();
+            auto* structural = brain.getStructuralPlasticity();
+            if (stdp) stdp->enableAllPlasticity(true, true, true);
+            if (hebbian) hebbian->enableAllPlasticity(true);
+            if (structural) structural->enable(true);
+        }, "Enable all plasticity mechanisms")
+        .def("disableAllPlasticity", [](Brain& brain) {
+            // Disable all plasticity mechanisms
+            auto* stdp = brain.getSTDP();
+            auto* hebbian = brain.getHebbian();
+            auto* structural = brain.getStructuralPlasticity();
+            if (stdp) stdp->enableAllPlasticity(false, false, false);
+            if (hebbian) hebbian->enableAllPlasticity(false);
+            if (structural) structural->enable(false);
+        }, "Disable all plasticity mechanisms")
+        .def("getStatistics", [](const Brain& brain) {
+            py::dict stats;
+            stats["total_neurons"] = brain.getTotalNeuronCount();
+            stats["total_synapses"] = brain.getTotalSynapseCount();
+            stats["total_spikes"] = brain.getTotalSpikeCount();
+            stats["active_neurons"] = brain.getActiveNeuronCount();
+            stats["firing_neurons"] = brain.getFiringNeuronCount();
+            stats["avg_firing_rate"] = brain.getAverageFiringRate();
+            stats["ei_ratio"] = brain.getExcitationInhibitionRatio();
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("__repr__", [](const Brain& b) {
+            return "<BrainAdvanced: " + std::to_string(b.getTotalNeuronCount()) + 
+                   " neurons, " + std::to_string(b.getTotalSynapseCount()) + 
+                   " synapses, " + std::to_string(b.getTotalSpikeCount()) + " spikes>";
+        });
+
+    // Advanced SimpleWorld interface
+    py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "WorldAdvanced", R"pbdoc(Advanced world interface with enhanced control)pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth") = 32, py::arg("visionHeight") = 32,
+             "Configure the world with dimensions and sensor parameters")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"), "Update world state")
+        .def("applyCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"), "Apply motor command")
+        .def("getPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal, "Get sensory percept")
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal, "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"), "Add world object")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"), "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"), "Check if position is valid")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"), "Set maximum energy")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get maximum energy")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"), "Set energy decay rate")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate, "Get energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime, "Get simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"), "Set random seed")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed, "Get random seed")
+        .def("runEpisode", [](SimpleWorld& world, size_t maxSteps, bool verbose = false) {
+            // Run a complete episode
+            world.reset();
+            for (size_t step = 0; step < maxSteps; ++step) {
+                world.update(0.001);
+                if (verbose && step % 100 == 0) {
+                    auto percept = world.getPercept();
+                    auto body = world.getAgentBody();
+                    std::cout << "Step " << step << ": Agent at (" 
+                             << body.x << ", " << body.y << ")";
+                }
+            }
+            if (verbose) {
+                std::cout << "Episode completed" << std::endl;
+            }
+            return world.getAgentBody().energy;
+        }, py::arg("maxSteps"), py::arg("verbose") = false, "Run a complete episode")
+        .def("__repr__", [](const SimpleWorld& w) {
+            return "<WorldAdvanced: " + std::to_string(w.getWidth()) + "x" + 
+                   std::to_string(w.getHeight()) + " dimensions>";
+        });
+
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
         .value("MoveBackward", MotorCommand::MoveBackward)
