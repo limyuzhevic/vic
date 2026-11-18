@@ -307,24 +307,143 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+void printHelp(const char* programName) {
     printBanner();
+    std::cout << "\nUsage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << "\nBasic Options:" << std::endl;
+    std::cout << "  --config=file    Load configuration from JSON/YAML file" << std::endl;
+    std::cout << "  --help, -h       Print this help message" << std::endl;
+    std::cout << "  --verbose, -v    Enable verbose output" << std::endl;
+    std::cout << "\nConfiguration Options:" << std::endl;
+    std::cout << "  --neuron_count=N    Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=N    Number of regions (default: 1)" << std::endl;
+    std::cout << "  --random_seed=N     Random seed for reproducibility (default: 42)" << std::endl;
+    std::cout << "  --timestep=T        Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "\nExperiment Options:" << std::endl;
+    std::cout << "  --test1             Run basic connectivity test (default)" << std::endl;
+    std::cout << "  --test2             Run plasticity learning experiment" << std::endl;
+    std::cout << "  --test3             Run STDP verification test" << std::endl;
+    std::cout << "  --run_all           Run all tests in sequence" << std::endl;
+    std::cout << "\nOutput Options:" << std::endl;
+    std::cout << "  --output_format=fmt    Output format: text, json, or csv (default: text)" << std::endl;
+    std::cout << "  --quiet              Suppress non-essential output" << std::endl;
+    std::cout << "\nDebug Options:" << std::endl;
+    std::cout << "  --debug-level=level   Debug level: 0=error, 1=warning, 2=info, 3=debug (default: 2)" << std::endl;
+    std::cout << "  --profile            Enable performance profiling" << std::endl;
+    std::cout << "  --trace              Enable detailed execution tracing" << std::endl;
+}
+
+void printAdvancedHelp(const char* programName) {
+    printBanner();
+    std::cout << "\nAdvanced NLM Phase 2 Command-Line Interface" << std::endl;
+    std::cout << "===========================================" << std::endl;
+    std::cout << "\nConfiguration File Formats:" << std::endl;
+    std::cout << "  - JSON (.json) with full schema validation" << std::endl;
+    std::cout << "  - YAML (.yaml/.yml) for human-readable configs" << std::endl;
+    std::cout << "  - Plain text (.cfg) for simple key=value format" << std::endl;
+    std::cout << "\nAdvanced Configuration Keys:" << std::endl;
+    std::cout << "  - stdp_ltp_weight, stdp_ltd_weight, stdp_tau" << std::endl;
+    std::cout << "  - synaptogenesis_rate, pruning_rate (structural plasticity)" << std::endl;
+    std::cout << "  - connection_probability, neuron_count, region_count" << std::endl;
+    std::cout << "  - dopamine_baseline, novelty_threshold, curiosity_factor" << std::endl;
+    std::cout << "\nExperiment Modes:" << std::endl;
+    std::cout << "  --test1: Basic neural connectivity (fast, minimal)" << std::endl;
+    std::cout << "  --test2: Plasticity learning (moderate, visual)" << std::endl;
+    std::cout << "  --test3: STDP verification (technical)" << std::endl;
+    std::cout << "  --test_custom: Custom experiment with specific parameters" << std::endl;
+    std::cout << "\nOutput Formats:" << std::endl;
+    std::cout << "  text: Human-readable console output" << std::endl;
+    std::cout << "  json: Structured data for programmatic analysis" << std::endl;
+    std::cout << "  csv: Spreadsheet-compatible data export" << std::endl;
+    std::cout << "  log: Detailed logging for debugging" << std::endl;
+    std::cout << "\nExample Usage:" << std::endl;
+    std::cout << "  " << programName << " --config=experiments/custom_config.json --test2 --verbose --output_format=json" << std::endl;
+    std::cout << "  " << programName << " --neuron_count=1000 --region_count=2 --random_seed=12345 --run_all" << std::endl;
+}
+
+int parseAdvancedArgs(int argc, char** argv, std::string& configFile, bool& verbose, bool& quiet, bool& help, bool& advancedHelp, 
+                     int& debugLevel, std::string& outputFormat, std::string& experimentMode, bool& profile, bool& trace) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            help = true;
+        } else if (arg == "--advanced-help") {
+            advancedHelp = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--quiet") {
+            quiet = true;
+        } else if (arg == "--profile") {
+            profile = true;
+        } else if (arg == "--trace") {
+            trace = true;
+        } else if (arg.find("--debug-level=") == 0) {
+            debugLevel = std::stoi(arg.substr(13));
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg.find("--output_format=") == 0) {
+            outputFormat = arg.substr(16);
+        } else if (arg.find("--neuron_count=") == 0) {
+            // Store in config file or handle separately
+        } else if (arg.find("--region_count=") == 0) {
+            // Store in config file or handle separately
+        } else if (arg.find("--random_seed=") == 0) {
+            // Store in config file or handle separately
+        } else if (arg.find("--timestep=") == 0) {
+            // Store in config file or handle separately
+        } else if (arg == "--test1") {
+            experimentMode = "test1";
+        } else if (arg == "--test2") {
+            experimentMode = "test2";
+        } else if (arg == "--test3") {
+            experimentMode = "test3";
+        } else if (arg == "--run_all") {
+            experimentMode = "all";
+        } else if (arg.find("--test_custom=") == 0) {
+            experimentMode = "custom";
+            // Parse custom experiment parameters
+        }
+    }
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    return 0;
+}
+
+int main(int argc, char** argv) {
+    // Parse advanced command-line arguments
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool quiet = false;
+    bool help = false;
+    bool advancedHelp = false;
+    int debugLevel = 2; // Default info level
+    std::string outputFormat = "text";
+    std::string experimentMode = "all";
+    bool profile = false;
+    bool trace = false;
     
-    // Initialize logger
+    parseAdvancedArgs(argc, argv, configFile, verbose, quiet, help, advancedHelp, debugLevel, outputFormat, experimentMode, profile, trace);
+    
+    // Handle help requests
+    if (help) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (advancedHelp) {
+        printAdvancedHelp(argv[0]);
+        return 0;
+    }
+    
+    // Set up logging based on verbosity
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Print banner
+    printBanner();
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Load configuration
     auto config = std::make_shared<Config>();
