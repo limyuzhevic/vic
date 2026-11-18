@@ -614,25 +614,139 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+        // Extract current neural state for prediction
+        std::vector<float> neuralState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    neuralState.push_back(state.membranePotential);
+                    neuralState.push_back(state.firingRate);
+                }
+            }
+        }
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Create a simple prediction from neural activity patterns
+        // In a real system, this would use learned predictive models
+        if (!neuralState.empty()) {
+            // Use episodic memory to form predictions based on similar past states
+            if (pImpl->episodicMemory) {
+                auto episodes = pImpl->episodicMemory->getEpisodes();
+                if (!episodes.empty()) {
+                    // Find most similar episode
+                    float bestSimilarity = 0.0f;
+                    const EpisodicMemoryItem* bestEpisode = nullptr;
+                    
+                    for (const auto* episode : episodes) {
+                        float similarity = 0.0f;
+                        if (!neuralState.empty() && !episode->sensoryState.empty()) {
+                            // Simple similarity based on length (in real system, this would be more sophisticated)
+                            if (neuralState.size() == episode->sensoryState.size() && 
+                                neuralState.size() > 0) {
+                                float sumDiff = 0.0f;
+                                for (size_t i = 0; i < neuralState.size(); ++i) {
+                                    float diff = neuralState[i] - episode->sensoryState[i];
+                                    sumDiff += diff * diff;
+                                }
+                                similarity = 1.0f / (1.0f + std::sqrt(sumDiff));
+                            }
+                        }
+                        
+                        if (similarity > bestSimilarity && similarity > 0.3f) {
+                            bestSimilarity = similarity;
+                            bestEpisode = episode;
+                        }
+                    }
+                    
+                    if (bestEpisode && bestSimilarity > 0.5f) {
+                        // Train prediction system on the pattern
+                        // In a real implementation, this would update a predictive model
+                        pImpl->predictionSystem->train(bestEpisode->sensoryState);
+                        
+                        // Use prediction to guide attention
+                        if (pImpl->attention) {
+                            // Increase attention to neurons similar to predicted pattern
+                            std::vector<NeuronId> predictedNeurons = bestEpisode->activeNeurons;
+                            pImpl->attention->processPrediction(predictedNeurons);
+                        }
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity pattern
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentPattern.push_back(state.membranePotential);
+                    currentPattern.push_back(state.firingRate);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Present current neural activity to concept formation system
+            // This allows concepts to emerge from recurrent neural activity
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern,
+                std::vector<float>(), // Features would come from sensory encoding
+                0.0f,                 // Reward signal
+                pImpl->currentStep
+            );
+            
+            if (conceptId > 0) {
+                // Get the neural representation of this concept
+                std::vector<float> conceptPrototype = 
+                    pImpl->conceptFormation->getConceptPrototype(conceptId);
+                
+                if (!conceptPrototype.empty() && pImpl->attention) {
+                    // Use concept to guide attention to relevant neural populations
+                    pImpl->attention->processConcept(conceptPrototype);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 10b: Update neural planner ==========
+    if (pImpl->planner) {
+        // The neural planner evaluates action sequences based on current state
+        // It uses working memory, predictions, and concepts to select actions
+        
+        // Gather current brain state for planning
+        std::vector<float> planningContext;
+        
+        // Add working memory content
+        if (pImpl->workingMemory) {
+            auto wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+            planningContext.insert(planningContext.end(), 
+                                  wmNeurons.begin(), wmNeurons.end());
+        }
+        
+        // Add prediction error to context
+        float predictionError = pImpl->predictionSystem ? 
+            pImpl->predictionSystem->getPredictionError() : 0.0f;
+        planningContext.push_back(predictionError);
+        
+        // Add concept stability
+        float conceptStability = 0.0f;
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            conceptStability = pImpl->conceptFormation->getConceptStability(1);
+        }
+        planningContext.push_back(conceptStability);
+        
+        if (!planningContext.empty()) {
+            // Run the planner to get action recommendations
+            planningContext.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+            
+            // The planner would normally generate action sequences here
+            // For now, we just mark that planning was attempted
+            pImpl->planner->updatePlanning(planningContext, pImpl->timestep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
