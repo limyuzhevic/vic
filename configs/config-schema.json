@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nlm/nlm-config-schema",
+  "title": "NLM Configuration Schema",
+  "description": "JSON schema for NLM configuration file format",
+  "type": "object",
+  "properties": {
+    "random_seed": {
+      "type": "integer",
+      "description": "Random seed for reproducible experiments",
+      "default": 42
+    },
+    "simulation_timestep": {
+      "type": "number",
+      "description": "Simulation timestep in seconds",
+      "default": 0.001
+    },
+    "neuron_count": {
+      "type": "integer",
+      "description": "Number of neurons in the brain",
+      "default": 1000
+    },
+    "region_count": {
+      "type": "integer",
+      "description": "Number of brain regions",
+      "default":  queste
+    },
+    "connection_probability": {
+      "type": "number",
+      "description": "Connection probability for random connectivity",
+      "default": 0.1
+    },
+    "plasticity_learning_rate": {
+      "type": "number",
+      "description": "Global plasticity learning rate",
+      "default": 0.01
+    },
+    "stdp_ltp_weight": {
+      "type": "number",
+      "description": "STDP long-term potentiation weight",
+      "default": 0.01
+    },
+    "stdp_ltd_weight": {
+      "type": "number",
+      "description": "STDP long-term depression weight",
+      "default": 0.012
+    },
+    "stdp_time_constant": {
+      "type": "number",
+      "description": "STDP time constant",
+      "default": 20.0
+    },
+    "development_synaptogenesis_rate": {
+      "type": "number",
+      "description": "Synaptogenesis rate during development",
+      "default": 0.001
+    },
+    "development_pruning_rate": {
+      "type": "number",
+      "description": "Pruning rate during development",
+      "default": 0.0001
+    },
+    "dopamine_baseline": {
+      "type": "number",
+      "description": "Baseline dopamine level",
+      "default": 0.1
+    },
+    "reward_discount_factor": {
+      "type": "number",
+      "description": "Reward discount factor for reinforcement learning",
+      "default": 0.99
+    },
+    "environment_name": {
+      "type": "string",
+      "description": "Environment name",
+      "default": "GridWorld"
+    },
+    "environment_width": {
+      "type": "integer",
+      "description": "Environment width",
+      "default": 10
+    },
+    "environment_height": {
+      "type": "integer",
+      "description": "Environment height",
+      "default": 10
+    },
+    "log_level": {
+      "type": "string",
+      "description": "Log level",
+      "enum": ["OFF", "ERROR", "WARNING", "INFO", "DEBUG"],
+      "default": "INFO"
+    },
+    "log_to_file": {
+      "type": "boolean",
+      "description": "Whether to log to file",
+      "default": false
+    },
+    "log_filename": {
+      "type": "string",
+      "description": "Log filename",
+      "default": "nlm.log"
+    },
+    "max_simulation_steps": {
+      "type": "integer",
+      "description": "Maximum simulation steps",
+      "default": 10000
+    },
+    "simulation_time_limit": {
+      "type": "number",
+      "description": "Simulation time limit in seconds",
+      "default": 0.0
+    },
+    "visualization_enabled": {
+      "type": "boolean",
+      "description": "Whether visualization is enabled",
+      "default": false
+    },
+    "visualization_update_rate": {
+      "type": "number",
+      "description": "Visualization update rate in Hz",
+      "default": 30.0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "random_seed",
+    "simulation_timestep",
+    "neuron_count",
+    "region_count",
+    "connection_probability",
+    "dopamine_baseline"
+  ],
+  "examples": [
+    {
+      "random_seed": 42,
+      "simulation_timestep": 0.001,
+      "neuron_count": 1000,
+      "region_count": 2,
+      "connection_probability": 0.1,
+      "dopamine_baseline": 0.1,
+      "log_level": "INFO"
+    }
+  ]
+}

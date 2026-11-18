@@ -44,6 +44,13 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation error
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    ConfigValidationError(const std::string& k, const std::string& msg) : key(k), message(msg) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,12 +73,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +102,25 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const std::string& schemaFile = "") const;
+    std::vector<ConfigValidationError> getValidationErrors() const;
+    void clearValidationErrors();
+    
+    // Get validation errors count
+    size_t getValidationErrorCount() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    mutable std::vector<ConfigValidationError> validationErrors;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // INI format loading (helper for loadFromFile)
+    bool loadFromINI(const std::string& filepath) const;
 };
 
 } // namespace nlm

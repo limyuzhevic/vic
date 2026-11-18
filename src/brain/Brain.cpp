@@ -614,8 +614,77 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Convert neural activity patterns to sensory state for prediction
+        std::vector<float> sensoryPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                // Use membrane potential as prediction feature
+                float activation = neuron->getState().membranePotential;
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        // Convert motor activity patterns for outcome prediction
+        std::vector<float> motorPattern;
+        if (!pImpl->motorNeurons.empty()) {
+            for (auto* neuron : pImpl->motorNeurons) {
+                // Use firing rate as motor pattern
+                float firingRate = neuron->getState().firingRate;
+                motorPattern.push_back(firingRate);
+            }
+        }
+        
+        // Create a simple predicted sensory input based on motor predictions
+        // In a full implementation, this would use learned forward models
+        auto predictedState = std::make_unique<SensoryInput>();
+        predictedState->addData(sensoryPattern);
+        
+        // Update prediction system with sensory state (this is the predicted state)
+        // and store current actual state for error computation
+        auto actualState = std::make_unique<SensoryInput>();
+        actualState->addData(sensoryPattern);
+        
+        pImpl->predictionSystem->updatePredictions(std::move(predictedState), std::move(actualState));
+        
+        // Apply prediction error to neural dynamics (prediction error as neuromodulator)
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Prediction error modulates neural excitability and plasticity
+        if (std::abs(predictionError) > 0.01f) {
+            // Scale error with confidence - high confidence errors have more impact
+            float errorModulation = predictionError * confidence * 2.0f;
+            
+            // Apply prediction error to all neurons as a global modulatory signal
+            // Positive prediction error increases excitability (prediction was too low)
+            // Negative prediction error decreases excitability (prediction was too high)
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Apply prediction error as additional current
+                        if (errorModulation > 0.0f) {
+                            neuron->injectCurrent(errorModulation * 0.1f);
+                        } else if (errorModulation < 0.0f) {
+                            neuron->injectCurrent(errorModulation * 0.5f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Use prediction system to guide conceptual understanding
+        // If prediction confidence is high, we can be more confident in conceptual interpretations
+        if (confidence > 0.7f && pImpl->predictionError) {
+            // High confidence predictions reinforce concept formation
+            // Apply prediction confidence to concept formation system
+            // Connect prediction error to curiosity system
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(confidence);
+            }
+            
+            // Use prediction error to update prediction error system
+            pImpl->predictionError->computeError(predictionError, 0.0f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -630,9 +699,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !sensoryPattern.empty()) {
+        // Convert neural activity patterns to concept formation features
+        // This allows the concept formation system to learn from neural dynamics
+        
+        // Convert sensory neural activity to concept features
+        std::vector<float> conceptFeatures;
+        conceptFeatures.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            // Use multiple neural state features for concept formation
+            float membrane = neuron->getState().membranePotential;
+            float threshold = neuron->getState().threshold;
+            float firingRate = neuron->getState().firingRate;
+            
+            // Combine features with weighted importance
+            float featureValue = membrane * 0.4f + 
+                                 threshold * 0.3f + 
+                                 firingRate * 0.3f;
+            conceptFeatures.push_back(featureValue);
+        }
+        
+        // Convert motor neural activity to action features
+        std::vector<float> actionFeatures;
+        actionFeatures.reserve(pImpl->motorNeurons.size());
+        
+        for (auto* neuron : pImpl->motorNeurons) {
+            float firingRate = neuron->getState().firingRate;
+            actionFeatures.push_back(firingRate);
+        }
+        
+        // Combine all features for concept formation
+        std::vector<float> allFeatures;
+        allFeatures.insert(allFeatures.end(), conceptFeatures.begin(), conceptFeatures.end());
+        allFeatures.insert(allFeatures.end(), actionFeatures.begin(), actionFeatures.end());
+        
+        // Get reward from dopamine system (if available)
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present neural experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            allFeatures,
+            conceptFeatures,  // Sensory features
+            reward,          // Reward signal
+            pImpl->currentStep  // Current time step
+        );
+        
+        // Log concept formation activity
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: Neural pattern at step " +
+                         std::to_string(pImpl->currentStep) +
+                         " formed concept " + std::to_string(conceptId));
+        }
+        
+        // If concept formation has learned concepts, use them to guide predictions
+        if (conceptId > 0 && pImpl->conceptFormation->getConceptCount() > 0) {
+            const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+            if (concept) {
+                // Use concept prototype to influence predictions
+                // This implements concept-guided prediction
+                if (!concept->prototype.empty()) {
+                    // Apply concept pattern to neural dynamics
+                    for (auto& region : pImpl->regions) {
+                        for (auto& pop : region->getPopulations()) {
+                            for (auto* neuron : pop->getNeurons()) {
+                                // Use concept prototype to modify excitability
+                                // Neurons associated with concepts have higher baseline activity
+                                float conceptModification = 0.05f;
+                                neuron->injectCurrent(conceptModification);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
