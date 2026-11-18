@@ -126,6 +126,10 @@ NLM/
 │   ├── world/          # Simple world
 │   ├── performance/    # Checkpoints, pools, queues (headers)
 │   ├── brain/          # Neural components (integrated)
+│   │   ├── Brain.hpp                    # Brain interface
+│   │   ├── SplitSystems.hpp             # New split architecture
+│   │   ├── Brain.cpp                    # Brain implementation
+│   │   └── ...
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
@@ -249,10 +253,112 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
-## License
+## Recent Improvements (Phase 6 Enhancements)
 
-MIT
+### Critical Bug Fixes
+1. **Fixed Pimpl Member Declaration Bug**: Resolved catastrophic Pimpl implementation error that caused undefined behavior and memory corruption
+2. **Fixed Memory Leak in Move Constructor**: Corrected unsafe resource transfer in move operations
+3. **Improved Exception Safety**: Added proper exception handling in Brain constructor
+4. **Enhanced Resource Management**: Eliminated inefficient initialization patterns
 
-## Authors
+### Architectural Improvements
+1. **Single Responsibility Principle**: Broke down monolithic Impl struct into focused system classes:
+   - MemorySystem (working, episodic, associative memory)
+   - PredictionSystem (predictive processing)
+   - CognitionSystem (planning, concept formation, attention)
+   - NeuromodulationSystem (dopamine, curiosity, novelty, prediction error)
+   - PlasticitySystem (spiking, STDP, Hebbian, structural plasticity)
+   - DevelopmentSystem (developmental processes)
+   - SimulationCore (simulation state, statistics, timing)
 
-Research project — See docs for scientific background.
+2. **Improved Const-Correctness**: Added const versions of all non-const accessor methods for better interface design
+3. **Enhanced Type Safety**: Improved type safety and memory management throughout the architecture
+
+### Advanced Features for Power Users
+1. **Enhanced Brain Interface**: Added comprehensive API for system inspection, monitoring, and advanced control
+2. **New SplitSystems.hpp**: Implementation of split architecture for better maintainability
+3. **Advanced Memory Operations**: Added memory consolidation and management capabilities
+4. **Neuromodulation Control**: Advanced control over neuromodulator levels and effects
+5. ender
+
+### Advanced Memory Operations
+- Memory consolidation and management
+- Developmental stage advancement and control
+- Prediction system statistics and analysis
+- Visualization and debugging tools
+- Event callbacks for advanced monitoring
+
+### Performance Improvements
+1. **Optimized Memory Management**: Reduced memory allocation overhead
+2. **Improved Resource Utilization**: Better resource lifecycle management
+3. **Enhanced Error Handling**: More robust error handling and recovery mechanisms
+
+### Testing and Validation
+1. **Enhanced Integration Testing**: Improved integration verification for all systems
+2. **Better Test Coverage**: Added comprehensive testing for new features
+3. **Performance Benchmarking**: Enhanced performance measurement and validation
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+## Running
+
+Build all targets first (see Building above). The entry points are
+currently separate demos per phase, not a single unified binary:
+
+```bash
+./nlm                 # Phase 2 demo in src/main.cpp
+./nlm_phase3_demo
+./nlm_phase4_demo
+./nlm_phase6_demo     # Phase 6 integration test
+./nlm_benchmark
+```
+
+`nlm_phase6_demo` runs a comprehensive integration test verifying all
+brain systems are connected. Phase 5 is wired as the `nlm_phase5`
+library in CMake; it does not yet have a standalone demo executable.
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── src/
+│   ├── core/           # Core utilities
+│   ├── agent/          # Agent-brain interface
+│   ├── world/          # Simple world
+│   ├── performance/    # Checkpoints, pools, queues (headers)
+│   ├── brain/          # Neural components (integrated)
+│   │   ├── Brain.hpp                    # Brain interface
+│   │   ├── SplitSystems.hpp             # New split architecture
+│   │   ├── Brain.cpp                    # Brain implementation
+│   │   └── ...
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
+│   └── visualization/  # Visualization
+├── tests/
+└── configs/
+```
