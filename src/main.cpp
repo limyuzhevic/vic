@@ -235,9 +235,39 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    // Add more diverse patterns to encourage selective learning
+    std::vector<NeuronId> additionalPatternNeurons;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == NeuronType::Sensory && 
+                additionalPatternNeurons.size() < 10 &&
+                std::find(patternNeurons.begin(), patternNeurons.end(), neuron->getId()) == patternNeurons.end()) {
+                additionalPatternNeurons.push_back(neuron->getId());
+            }
+        }
+    }
+    
+    // Run with diverse stimulation patterns
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Alternate between different pattern sets to encourage diverse learning
+        std::vector<NeuronId> currentPattern;
+        if (step % 3 == 0) {
+            currentPattern = patternNeurons;  // Full pattern
+        } else if (step % 3 == 1) {
+            currentPattern = additionalPatternNeurons;  // Subset pattern
+        } else {
+            // Random subset for diversity
+            currentPattern.clear();
+            for (size_t i = 0; i < std::min<size_t>(5, patternNeurons.size()); ++i) {
+                size_t idx = step % patternNeurons.size();
+                currentPattern.push_back(patternNeurons[idx]);
+            }
+        }
+        
+        // Apply stimulation with reduced intensity
+        for (NeuronId id : currentPattern) {
+            brain->injectCurrent(id, 15.0f);  // Reduced from 30.0f
         }
         
         brain->step(step, step * 0.001);

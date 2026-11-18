@@ -167,23 +167,54 @@ void testBrainCheckpointRoundTrip() {
         }
         return 0.0f;
     };
-
+    
+    // Debug: Show initial brain state
+    std::cout << "    Initial brain state:" << std::endl;
+    std::cout << "      Neuron count: " << brain1.getTotalNeuronCount() << std::endl;
+    std::cout << "      Synapse count: " << brain1.getTotalSynapseCount() << std::endl;
+    std::cout << "      Mean weight: " << meanWeight(brain1) << std::endl;
+    std::cout << "      Membrane potential: " << firstMembrane(brain1) << std::endl;
+    std::cout << "      Pending spikes: " << brain1.getPendingSpikeEventCount() << std::endl;
+    
     double savedMeanWeight = meanWeight(brain1);
     float savedMembrane = firstMembrane(brain1);
     size_t savedPending = brain1.getPendingSpikeEventCount();
 
+    std::cout << "    Checkpoint file path: " << path << std::endl;
+    std::cout << "    Attempting to save checkpoint..." << std::endl;
+    if (!brain1.save(path)) throw std::runtime_error("checkpoint save failed");
+    std::cout << "    Checkpoint saved successfully!" << std::endl;
+    
+    // Debug: Show file size
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (file.is_open()) {
+        auto fileSize = file.tellg();
+        std::cout << "    Checkpoint file size: " << fileSize << " bytes" << std::endl;
+        file.close();
+    }
+
     nlm::Brain brain2(config);
     brain2.initialize();
+    std::cout << "    Attempting to load checkpoint into second brain..." << std::endl;
     if (!brain2.load(path)) throw std::runtime_error("checkpoint load failed");
+    std::cout << "    Checkpoint loaded successfully!" << std::endl;
+    
+    std::cout << "    Verifying restored brain state..." << std::endl;
     if (std::abs(meanWeight(brain2) - savedMeanWeight) >= 1e-6) throw std::runtime_error("mean weight not restored");
     if (std::abs(firstMembrane(brain2) - savedMembrane) >= 1e-6) throw std::runtime_error("membrane not restored");
     // Pending delayed spikes round-trip (in-flight synaptic input).
     if (brain2.getPendingSpikeEventCount() != savedPending) throw std::runtime_error("pending spikes not restored");
+    
+    std::cout << "    State verification passed!" << std::endl;
+    std::cout << "      Restored mean weight: " << meanWeight(brain2) << " (saved: " << savedMeanWeight << ")" << std::endl;
+    std::cout << "      Restored membrane: " << firstMembrane(brain2) << " (saved: " << savedMembrane << ")" << std::endl;
+    std::cout << "      Restored pending spikes: " << brain2.getPendingSpikeEventCount() << " (saved: " << savedPending << ")" << std::endl;
 
     // Continue both brains with identical steps: firing rates should
     // stay close (they are not bit-identical: per-synapse spike
     // histories and RNG state are not part of the checkpoint, see the
-    // Phase 4 report — but weights, membranes and pending spikes are).
+    // Phase 4 report — but weights, membranes and pending spikes are.
+    std::cout << "    Continuing both brains for 10 steps..." << std::endl;
     for (nlm::SimulationStep step = 60; step < 70; ++step) {
         brain1.step(step);
         brain2.step(step);
@@ -192,6 +223,8 @@ void testBrainCheckpointRoundTrip() {
     float rate2 = brain2.getAverageFiringRate();
     float denom = std::max(std::abs(rate1), 1.0f);
     if (std::abs(rate1 - rate2) / denom >= 0.25f) throw std::runtime_error("continued firing rates diverged");
+    
+    std::cout << "    Continued firing rates: brain1=" << rate1 << ", brain2=" << rate2 << ", difference=" << std::abs(rate1 - rate2) / denom << std::endl;
 
     // Mismatched structure must fail, not silently misalign.
     auto smallConfig = std::make_shared<nlm::Config>();
@@ -199,7 +232,9 @@ void testBrainCheckpointRoundTrip() {
     smallConfig->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     nlm::Brain smallBrain(smallConfig);
     smallBrain.initialize();
+    std::cout << "    Testing mismatched structure load (should fail)..." << std::endl;
     if (smallBrain.load(path)) throw std::runtime_error("mismatched-structure load should fail");
+    std::cout << "    Mismatched structure test passed!" << std::endl;
 
     std::cout << "    testBrainCheckpointRoundTrip passed (meanWeight="
               << savedMeanWeight << ", pending=" << savedPending

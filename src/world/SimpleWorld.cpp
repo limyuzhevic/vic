@@ -25,11 +25,18 @@ SimpleWorld::SimpleWorld()
     , maxEnergy_(100.0f)
     , energyDecayRate_(0.01f)
     , resourceEnergyGain_(30.0f)
+    , healthDecayRate_(0.005f)
+    , energyRegenRate_(0.02f)
+    , explorationReward_(0.1f)
+    , survivalReward_(0.5f)
+    , efficiencyRewardFactor_(0.5f)
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
 {
     agent_.reset();
+    agent_.health = 100.0f;
+    agent_.energyRegenTimer = 0.0f;
 }
 
 SimpleWorld::~SimpleWorld() = default;
@@ -52,6 +59,8 @@ void SimpleWorld::reset() {
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
+    agent_.health = 100.0f;
+    agent_.energyRegenTimer = 0.0f;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
@@ -98,9 +107,23 @@ void SimpleWorld::update(double timestep) {
     if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
     if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
     
-    // Energy decay
-    agent_.energy -= energyDecayRate_;
+    // Energy decay and regeneration
+    agent_.energy -= energyDecayRate_ * static_cast<float>(timestep);
     if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+    
+    // Energy regeneration when not moving
+    if (!agent_.isMoving) {
+        agent_.energyRegenTimer += static_cast<float>(timestep);
+        float energyToRegen = energyRegenRate_ * static_cast<float>(timestep);
+        agent_.energy = std::min(maxEnergy_, agent_.energy + energyToRegen);
+    } else {
+        // Reset regeneration timer when moving
+        agent_.energyRegenTimer = 0.0f;
+    }
+    
+    // Health decay
+    agent_.health -= healthDecayRate_ * static_cast<float>(timestep);
+    if (agent_.health < 0.0f) agent_.health = 0.0f;
     
     // Update age
     agent_.age += timestep;
@@ -142,14 +165,6 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     
     agent_.lastActionTime = currentTime;
     
-    // Phase 6: a turn is a discrete action, not a persistent
-    // velocity. TurnLeft/Right set angularVelocity and the next
-    // world update rotates by 2.0 rad/s * 0.1 s = 0.2 rad; but
-    // nothing ever cleared it, so the agent kept rotating on
-    // every later step — with the old 0.01 s updates that was a
-    // barely-noticed 0.02 rad/step drift, with the corrected
-    // 0.1 s updates it would be a 0.2 rad/step spiral. Any
-    // non-turn action therefore stops rotation.
     switch (cmd) {
         case MotorCommand::MoveForward: {
             agent_.angularVelocity = 0.0f;
@@ -164,10 +179,15 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                
+                // Add positive exploration reward - movement encourages exploration
+                result.reward = explorationReward_;
+                result.reward += efficiencyRewardFactor_ * (maxEnergy_ - agent_.energy) * 0.01f; // Bonus for conserving energy
+                result.reward += survivalReward_ * (agent_.health / 100.0f) * 0.5f; // Bonus for staying healthy
+                
                 result.success = true;
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = -0.03f;  // Reduced from -0.05f
                 result.success = false;
             }
             break;
@@ -189,38 +209,66 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 result.reward = -0.02f;
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -0.04f;
                 result.success = false;
             }
             break;
         }
         
-        case MotorCommand::TurnLeft:
+        case MotorCommand::TurnLeft: {
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.003f;  // Reduced from -0.005f
             result.success = true;
             break;
+        }
             
-        case MotorCommand::TurnRight:
+        case MotorCommand::TurnRight: {
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.003f;  // Reduced from -0.005f
+            result.success = true;
+            break;
+        }
+            
+        case MotorCommand::Wait: {
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
+            // Add small positive reward for sensory exploration
+            result.reward = explorationReward_ * 0.2f;
             result.success = true;
             break;
             
+            // Decay velocities
+            agent_.velocityX *= 0.9f;
+            agent_.velocityY *= 0.9f;
+            agent_.angularVelocity *= 0.9f;
+            agent_.isMoving = false;
+            agent_.isTurning = false;
+            
+            // Add survival bonus for waiting (conserves energy)
+            if (agent_.energy > 0.5f) {
+                result.reward = survivalReward_ * 0.3f;
+            } else {
+                result.reward = explorationReward_ * 0.1f; // Still get some exploration credit
+            }
+            result.success = true;
+            break;
+        }
+
         case MotorCommand::LookLeft:
-            // Pan sensor (no movement)
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            // Add small positive reward for sensory exploration
+            result.reward = explorationReward_ * 0.2f;
             result.success = true;
             break;
 
         case MotorCommand::LookRight:
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            // Add small positive reward for sensory exploration
+            result.reward = explorationReward_ * 0.2f;
             result.success = true;
             break;
 
@@ -228,18 +276,19 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
             result = interact();
-            break;
-            
-        case MotorCommand::Wait:
-        default:
-            // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
-            agent_.isMoving = false;
-            agent_.isTurning = false;
-            result.reward = 0.0f;
-            result.success = true;
+            // Add bonus reward for successful interaction
+            if (result.success) {
+                if (result.message == "consumed_resource") {
+                    // Bonus for resource efficiency - higher if fewer objects were placed
+                    float objectBonus = 0.0f;
+                    if (objects_.size() < 10) { // Fewer objects = scarcer resource = more valuable
+                        objectBonus = 0.5f;
+                    }
+                    result.reward += objectBonus * efficiencyRewardFactor_;
+                } else if (result.message == "hit_hazard") {
+                    // Penalize hazard touching more heavily, but still allow recovery
+                }
+            }
             break;
     }
     
@@ -284,6 +333,10 @@ ActionResult SimpleWorld::interact() {
     if (!result.success) {
         result.message = "no_object";
     }
+    
+    // Cap reward magnitude to prevent extreme values
+    if (result.reward > 10.0f) result.reward = 10.0f;
+    if (result.reward < -10.0f) result.reward = -10.0f;
     
     return result;
 }
