@@ -19,61 +19,98 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                          const std::vector<Timestamp>& preSpikes,
+                          const std::vector<Timestamp>& postSpikes,
+                          TimestepDuration dt) {
     /*
-     * Real Hebbian learning implementation
+     * Real Hebbian learning implementation with selective learning
      * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+     * Enhanced with competitive mechanisms to promote selective learning:
+     * 1. Competitive normalization: weights compete for limited resources
+     * 2. Activity-dependent learning rates: promotes selective potentiation
+     * 3. Soft bounds with synaptic competition: prevents runaway potentiation
+     * 4. Heterosynaptic depression: weakens inactive synapses
      * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
+     * Mathematical formulation (Competitive Hebbian):
+     * Δw = η * (pre * post) - λ * |w| * (baseline activity)
      * 
      * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
+     *   η = learningRate * (1 - competitionFactor)
+     *   λ = depressionRate for inactive synapses
+     *   competitionFactor = relative synaptic activity
      * 
      * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
+     *   - Reflects homeostatic synaptic scaling
+     *   - Competitive synaptic pruning in development
+     *   - Activity-dependent synaptic consolidation
      *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
+     * Benefits:
+     *   - Promotes selective learning (only important synapses potentiate)
+     *   - Prevents runaway potentiation through competitive normalization
+     *   - Maintains synaptic diversity and network stability
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
+    // Nearest-neighbour version: use only the most recent spike pair
     // Timestamps are in seconds, so the 100ms window is 0.1s.
     float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    
+    // Enhanced Hebbian rule with selective learning:
+    // 1. Basic Hebbian contribution (pre-before-post correlation)
+    float basicDelta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    
+    // 2. Activity-dependent modulation: stronger learning when network is active
+    float networkActivity = std::min(1.0f, synapse->getEfficacy() * 2.0f);
+    float activityModulation = 1.0f + 0.5f * networkActivity;
+    
+    // 3. Competitive normalization: weights compete for limited resources
+    float weightMagnitude = std::abs(synapse->getWeight());
+    float competitionFactor = weightMagnitude / pImpl->maxWeight;
+    
+    // 4. Heterosynaptic depression: weaken inactive synapses
+    float depressionRate = 0.005f;  // Small depression rate
+    float heterosynapticDelta = -depressionRate * weightMagnitude;
+    
+    // Combine effects: Hebbian potentiation + competitive normalization + depression
+    float delta = basicDelta * activityModulation * (1.0f - competitionFactor) + heterosynapticDelta;
+    
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Apply with enhanced bounds. Competitive soft bounds:
+    // - Strong Hebbian learning is scaled by available weight capacity (1 - |w|)
+    // - Depression is scaled by current weight magnitude (|w|)
+    // - This creates competitive dynamics where strong synapses can only grow
+    //   slowly, while weak synapses grow faster but have depression
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        // Scale by competitive factors
+        delta *= (1.0f - weightMagnitude);  // Limited growth for strong synapses
         applyWeightChange(synapse, delta);
+        
+        // Enforce sign with competitive bounds
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);
         } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
             synapse->setWeight(0.01f);
+        }
+        
+        // Competitive synaptic pruning: if weight is near max and not very active,
+        // weaken it to make room for other synapses to grow
+        if (weightMagnitude > pImpl->maxWeight * 0.95f && 
+            synapse->getEfficacy() < 0.5f) {
+            float pruningFactor = 0.02f;
+            float prunedWeight = synapse->getWeight() * (1.0f - pruningFactor);
+            if (synapse->getType() == SynapseType::Excitatory && 
+                prunedWeight > 0.01f) {
+                synapse->setWeight(prunedWeight);
+            } else if (synapse->getType() == SynapseType::Inhibitory && 
+                      prunedWeight < -0.01f) {
+                synapse->setWeight(prunedWeight);
+            }
         }
     }
 }

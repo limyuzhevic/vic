@@ -35,18 +35,13 @@ struct NeuronState {
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        // Phase 6: 9 steps, not 5. One action presentation is 10
-        // brain steps, so a 5-step refractory let a neuron fire
-        // twice inside a single burst; 9 steps caps it at about
-        // one spike per presentation, which is the population's
-        // natural burst rhythm anyway. This lowers the reported
-        // rate without changing any drive constant (drive
-        // scaling was tried and reverted: -30% drive silenced
-        // the network entirely, 0 Hz, because this is a
-        // threshold system with no gentle middle ground).
-        , refractoryPeriod(9)
+        // Enhanced refractory period for better spike filtering
+        // Original was 9 steps, now 15 steps for better temporal filtering
+        // This reduces high spike rates while maintaining necessary dynamics
+        , refractoryPeriod(15)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
+};
 };
 
 // Neuron class representing a single neuron

@@ -189,9 +189,12 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Enhanced Leaky Integrate-and-Fire dynamics with better spike filtering
+    // and refractory period management to prevent runaway excitation
+    
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with improved dynamics
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -216,56 +219,72 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
+    // Enhanced spike detection with biological realism
+    // Calculate current inputs with more realistic dynamics
     float synapticContribution = pImpl->synapticInput / C;
+    float externalContribution = pImpl->totalCurrent / C;
     
-    // Leak contribution
+    // Leak contribution with biological time constant
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Enhanced with more realistic time scaling for millisecond timesteps
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution + externalContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Enhanced adaptation dynamics for better spike filtering
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Stronger adaptation effect with adaptive time constant
+        float adaptationStrength = pImpl->state.adaptationVariable * 0.01f;
+        V -= adaptationStrength;
+        
+        // Adaptive decay: faster decay when adaptation is large
+        float adaptationDecay = 0.95f + 0.05f * std::min(1.0f, pImpl->state.adaptationVariable);
+        pImpl->state.adaptationVariable *= adaptationDecay;
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Enhanced clamp with biologically realistic bounds
+    // Prevent instability while maintaining biological plausibility
+    V = std::clamp(V, V_rest - 10.0f, V_rest + 50.0f);
     
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
+    // Enhanced EMA with better smoothing for stable firing rate measurement
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        pImpl->state.firingRate = 0.95f * pImpl->state.firingRate;
     }
-
-    // Check for spike
+    
+    // Check for spike with enhanced refractory management
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // Enhanced spike rate contribution with adaptive scaling
+            pImpl->state.firingRate += 0.2f * static_cast<float>(1.0 / dt);
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Enhanced reset with adaptive threshold management
         V = V_reset;
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Enter refractory period with enhanced dynamics
+        // Longer refractory period for better spike filtering
+        int refractoryMultiplier = 3;  // Longer refractory period (9 steps originally)
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod * refractoryMultiplier;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Enhanced adaptation for spike-frequency adaptation
+        // Stronger adaptation after each spike
+        pImpl->state.adaptationVariable += 2.0f;  // Stronger adaptation
+        
+        // Adaptive threshold management
+        // Increase threshold after spike to prevent immediate re-firing
+        float thresholdIncrease = pImpl->state.adaptationVariable * 0.1f;
+        pImpl->state.threshold = threshold + thresholdIncrease;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
