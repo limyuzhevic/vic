@@ -504,6 +504,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Apply reward prediction error for learning
+        if (pImpl->predictionError) {
+            float error = pImpl->predictionError->getError();
+            pImpl->dopamine->signalRewardPredictionError(error);
+        }
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========

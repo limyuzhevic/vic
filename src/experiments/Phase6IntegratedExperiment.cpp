@@ -113,7 +113,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    // Get real dopamine level from the brain's neuromodulation system
+    result.dopamineLevel = brain->getDopamine() ? brain->getDopamine()->getLevel() : agent.getNeuromodulationLevel();
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);

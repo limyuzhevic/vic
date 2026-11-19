@@ -631,6 +631,16 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     if (brain_) {
         interactRate += brain_->getLearnedPreference() * 5.0f;
     }
+    
+    // Phase 6: integrate learned preference with dopamine bias
+    // The brain's dopamine system provides an additional bias that
+    // combines with the learned preference trait for action selection
+    if (brain_ && brain_->getDopamine()) {
+        float dopamineLevel = brain_->getDopamine()->getLevel();
+        // Dopamine modulates the preference bias (positive = more interest in interaction)
+        float dopaminePreferenceBias = brain_->getLearnedPreference() * (1.0f + dopamineLevel);
+        interactRate += dopaminePreferenceBias * 3.0f;  // Scale factor for preference expression
+    }
     // Phase 6 planner IN the loop (was advisory only). The planner
     // suggests from learned action quality; that suggestion now
     // biases the motor decode, but only once the planner has actually
@@ -939,14 +949,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
+    // Signal prediction error to the brain's dopamine system
+    if (brain_ && brain_->getDopamine()) {
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+    }
+    
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Get real dopamine level from the brain's neuromodulation system
+    dopamineLevel_ = brain_ && brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f;
     
     // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    dopamineLevel_ = std::clamp(dopamineLevel_, 0.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -973,12 +988,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
+    // Modulate plasticity based on real dopamine system
     // Positive dopamine increases plasticity, negative decreases
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+    // Apply to STDP using the brain's real system if available
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
