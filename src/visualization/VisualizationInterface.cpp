@@ -5,8 +5,30 @@ namespace nlm {
 struct VisualizationInterface::Impl {
     bool active;
     double updateRate;
+    double lastUpdateTime;
     
-    Impl() : active(false), updateRate(30.0) {}
+    Impl() : active(false), updateRate(30.0), lastUpdateTime(0.0) {}
+    
+    void update() {
+        if (!active) return;
+        
+        // Simple update loop
+        double currentTime = getCurrentTime();
+        if (currentTime - lastUpdateTime >= 1.0 / updateRate) {
+            lastUpdateTime = currentTime;
+            updateVisualizationData();
+        }
+    }
+    
+    void updateVisualizationData() {
+        // Placeholder for visualization data updates
+    }
+    
+    double getCurrentTime() const {
+        // Simple time simulation
+        static double time = 0.0;
+        return time++ * 0.01;
+    }
 };
 
 VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
@@ -14,18 +36,18 @@ VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
-    pImpl->active = false;
+    pImpl->active = true;
     return true;
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    pImpl->update();
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    if (pImpl->active) {
+        renderVisualization();
+    }
 }
 
 void VisualizationInterface::close() {
@@ -45,19 +67,62 @@ double VisualizationInterface::getUpdateRate() const {
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    if (pImpl->active) {
+        renderNetworkVisualization(brain);
+    }
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    if (pImpl->active) {
+        renderActivityVisualization(brain);
+    }
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    if (pImpl->active) {
+        renderSpikeVisualization(spikes);
+    }
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    if (pImpl->active) {
+        renderWeightVisualization(brain);
+    }
+}
+
+void VisualizationInterface::renderVisualization() {
+    // Basic visualization rendering
+    renderNetwork();
+    renderActivity();
+    renderUI();
+}
+
+void VisualizationInterface::renderNetwork() {
+    // Placeholder network rendering
+}
+
+void VisualizationInterface::renderActivity() {
+    // Placeholder activity rendering
+}
+
+void VisualizationInterface::renderUI() {
+    // Placeholder UI rendering
+}
+
+void VisualizationInterface::renderNetworkVisualization(const Brain& brain) {
+    // Placeholder network visualization
+}
+
+void VisualizationInterface::renderActivityVisualization(const Brain& brain) {
+    // Placeholder activity visualization
+}
+
+void VisualizationInterface::renderSpikeVisualization(const std::vector<SpikeEvent>& spikes) {
+    // Placeholder spike visualization
+}
+
+void VisualizationInterface::renderWeightVisualization(const Brain& brain) {
+    // Placeholder weight visualization
 }
 
 } // namespace nlm
