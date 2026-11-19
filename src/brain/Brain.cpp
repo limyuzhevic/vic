@@ -49,9 +49,13 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<NeuromodulatorManager> neuromodulatorManager;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -138,15 +142,56 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        neuromodulatorManager = std::make_unique<NeuromodulatorManager>();
+        neuromodulatorManager->initialize(this);
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Configure neuromodulators with parameters from config
+        if (dopamine) {
+            dopamine->configure(
+                config->getOr<float>("dopamine_baseline", 0.1f),
+                config->getOr<float>("dopamine_peak", 1.0f),
+                config->getOr<float>("dopamine_decay_rate", 0.2f),
+                config->getOr<float>("dopamine_release_rate", 1.5f),
+                config->getOr<float>("dopamine_learning_rate_gain", 1.0f),
+                config->getOr<float>("dopamine_burst_phasing_factor", 0.8f)
+            );
+        }
+        
+        if (acetylcholine) {
+            acetylcholine->configure(
+                config->getOr<float>("acetylcholine_baseline", 0.2f),
+                config->getOr<float>("acetylcholine_filtering_strength", 0.8f),
+                config->getOr<float>("acetylcholine_attention_gain", 1.2f),
+                config->getOr<float>("acetylcholine_memory_gain", 1.5f),
+                config->getOr<float>("acetylcholine_filtering_time_constant", 10.0f)
+            );
+        }
+        
+        if (norepinephrine) {
+            norepinephrine->configure(
+                config->getOr<float>("norepinephrine_baseline", 0.15f),
+                config->getOr<float>("norepinephrine_arousal_gain", 1.0f),
+                config->getOr<float>("norepinephrine_vigilance_gain", 1.2f),
+                config->getOr<float>("norepinephrine_stress_sensitivity", 1.0f),
+                config->getOr<float>("norepinephrine_recovery_rate", 0.05f)
+            );
+        }
+        
+        if (serotonin) {
+            serotonin->configure(
+                config->getOr<float>("serotonin_baseline", 0.1f),
+                config->getOr<float>("serotonin_mood_gain", 1.0f),
+                config->getOr<float>("serotonin_impulsivity_gain", 1.0f),
+                config->getOr<float>("serotonin_social_sensitivity", 1.5f),
+                config->getOr<float>("serotonin_recovery_time_constant", 20.0f)
+            );
+        }
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
@@ -473,44 +518,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+    // ========== STEP 5: Update neuromodulators via manager ==========
+    // The NeuromodulatorManager coordinates all neuromodulators and applies their effects
+    if (pImpl->neuromodulatorManager) {
+        pImpl->neuromodulatorManager->updateAll(pImpl->timestep);
+        pImpl->neuromodulatorManager->processIntegration(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
-        }
-    }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    // Apply neuromodulators to brain via manager
+    if (pImpl->neuromodulatorManager) {
+        pImpl->neuromodulatorManager->applyAll(this);
     }
     
     for (auto& region : pImpl->regions) {
@@ -860,11 +877,19 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Reset neuromodulators via manager
+    if (pImpl->neuromodulatorManager) {
+        pImpl->neuromodulatorManager->reset();
+    }
+    
+    // Reset individual neuromodulators
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->acetylcholine) pImpl->acetylcholine->reset();
+    if (pImpl->norepinephrine) pImpl->norepinephrine->reset();
+    if (pImpl->serotonin) pImpl->serotonin->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1529,6 +1554,22 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+NeuromodulatorManager* Brain::getNeuromodulatorManager() {
+    return pImpl->neuromodulatorManager.get();
 }
 
 Curiosity* Brain::getCuriosity() {

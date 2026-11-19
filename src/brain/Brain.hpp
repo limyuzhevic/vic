@@ -27,6 +27,10 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class NeuromodulatorManager;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -172,10 +176,22 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory modulation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and impulsivity modulation
+    Serotonin* getSerotonin();
+    
+    // Neuromodulator manager
+    NeuromodulatorManager* getNeuromodulatorManager();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
