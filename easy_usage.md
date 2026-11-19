@@ -12,6 +12,44 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## 🚀 The Simplest Possible Way
+
+### One-Liner Version
+
+If you want to get started immediately, here's the absolute simplest way to create and run a brain:
+
+```python
+import pynlm
+
+# ONE LINE to create a brain and make it think!
+brain = pynlm.simpleBrain()  # This is your instant brain!
+brain.start()                # Start thinking
+
+print(f"Your brain has {brain.getTotalNeuronCount()} neurons!")
+print(f"It fired {brain.getTotalSpikeCount()} times!")
+```
+
+### Traditional Way (Recommended for Learning)
+
+If you want to understand the traditional way, here's the step-by-step approach:
+
+```python
+import pynlm
+
+# Step 소리
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Step 2
+brain.initialize()
+
+# Step  Academy
+brain.step(0)
+
+# See results
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+```
+
 ---
 
 ## The 3 Things You Need to Know

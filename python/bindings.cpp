@@ -424,10 +424,62 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // ==================== SIMPLE API FOR BEGINNERS ====================
+
+    m.def("simpleBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize simple brain");
+        }
+        return brain;
+    }, "Create a simple, ready-to-use brain for beginners");
+
+    m.def("simpleAgent", []() -> std::pair<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>> {
+        auto brain = simpleBrain();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_pair(brain, agent);
+    }, "Create a simple agent (brain + agent interface) for beginners");
+
+    m.def("simpleBrainInWorld", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto brain = simpleBrain();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete simple agent with brain and world for beginners");
+
+    m.def("quickSimulation", [](int steps) {
+        auto brain = simpleBrain();
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        return std::make_pair(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSpikeCount()
+        );
+    }, py::arg("steps"), "Run a quick brain simulation and return (neuron_count, spike_count)");
+
+    m.def("quickAgentSimulation", [](int steps) {
+        auto [brain, world, agent] = simpleBrainInWorld();
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("steps"), "Run a quick agent simulation and return (spikes, curiosity, novelty)");
 
 } // namespace nlm
