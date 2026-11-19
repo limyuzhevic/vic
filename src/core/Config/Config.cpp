@@ -84,9 +84,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Use YAML-like format for better readability and tool support
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << std::chrono::system_clock::now() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Store source information in comments
+        file << "# Source: ";
+        switch (entry.source) {
+            case ConfigSource::Default: file << "default"; break;
+            case ConfigSource::File: file << "file"; break;
+            case ConfigSource::CommandLine: file << "command-line"; break;
+            case ConfigSource::Runtime: file << "runtime"; break;
+        }
+        file << "\n";
+        
+        // Format values based on type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]\n\n";
+            } else {
+                // For numeric types
+                file << entry.key << " = " << value << "\n\n";
+            }
+        }, entry.value);
     }
     
     return true;

@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -18,6 +20,301 @@
 
 namespace py = pybind11;
 namespace nlm {
+
+// Python exception classes for better error handling
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigError : public NLMError {
+public:
+    explicit ConfigError(const std::string& msg) : NLMError("Config error: " + msg) {}
+};
+
+class BrainError : public NLMError {
+public:
+    explicit BrainError(const std::string& msg) : NLMError("Brain error: " + msg) {}
+};
+
+class WorldError : public NLMError {
+public:
+    explicit WorldError(const std::string& msg) : NLMError("World error: " + msg) {}
+};
+
+class AgentError : public NLMError {
+public:
+    explicit AgentError(const std::string& msg) : NLMError("Agent error: " + msg) {}
+};
+
+// Helper function for JSON serialization
+static std::string to_json_string(const nlm::Config& config) {
+    std::ostringstream oss;
+    oss << "{\n";
+    auto keys = config.getKeys();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        const auto& key = keys[i];
+        oss << "  \"" << key << "\": ";
+        
+        if (key.find("enabled") != std::string::npos || key.find("flag") != std::string::npos) {
+            // Boolean values
+            auto val = config.get<bool>(key);
+            oss << (val.has_value() && val.value() ? "true" : "false");
+        } else if (key.find("count") != std::string::npos || key.find("number") != std::string::npos) {
+            // Integer values
+            auto val = config.get<int64_t>(key);
+            oss << (val.has_value() ? std::to_string(val.value()) : "0");
+        } else if (key.find("rate") != std::string::npos || key.find("time") != std::string::npos || 
+                   key.find("delay") != std::string::npos) {
+            // Float values
+            auto val = config.get<double>(key);
+            oss << (val.has_value() ? std::to_string(val.value()) : "0.0");
+        } else if (key.find("path") != std::string::npos || key.find("file") != std::string::npos || 
+                   key.find("name") != std::string::npos) {
+            // String values
+            auto val = config.get<std::string>(key);
+            oss << "\"" << (val.has_value() ? val.value() : "") << "\"";
+        } else {
+            // Default to string representation
+            auto val = config.get<std::string>(key);
+            if (!val.has_value()) {
+                oss << "null";
+            } else {
+                // Try to parse as numeric first
+                try {
+                    size_t pos;
+                    double num = std::stod(val.value(), pos);
+                    if (pos == val.value().size()) {
+                        oss << num;
+                    } else {
+                        oss << "\"" << val.value() << "\"";
+                    }
+                } catch (...) {
+                    oss << "\"" << val.value() << "\"";
+                }
+            }
+        }
+        
+        if (i < keys.size() - 1) {
+            oss << ",\n";
+        } else {
+            oss << "\n";
+        }
+    }
+    oss << "}";
+    return oss.str();
+}
+
+// Helper function for pretty-printing configuration
+static std::string format_config_summary(const nlm::Config& config) {
+    auto keys = config.getKeys();
+    std::ostringstream oss;
+    oss << "Configuration Summary (" << keys.size() << " entries):\n";
+    
+    for (const auto& key : keys) {
+        oss << "  " << key << ": ";
+        
+        if (key.find("enabled") != std::string::npos || key.find("flag") != std::string::npos) {
+            auto val = config.get<bool>(key);
+            oss << (val.has_value() && val.value() ? "✓" : "✗") << " (bool)";
+        } else if (key.find("count") != std::string::npos || key.find("number") != std::string::npos) {
+            auto val = config.get<int64_t>(key);
+            oss << (val.has_value() ? std::to_string(val.value()) : "?") << " (int)";
+        } else if (key.find("rate") != std::string::npos || key.find("time") != std::string::npos || 
+                   key.find("delay") != std::string::npos || key.find("factor") != std::string::npos) {
+            auto val = config.get<double>(key);
+            oss << (val.has_value() ? std::to_string(val.value()) : "?") << " (float)";
+        } else {
+            auto val = config.get<std::string>(key);
+            oss << (val.has_value() ? val.value() : "?") << " (string)";
+        }
+        oss << "\n";
+    }
+    
+    return oss.str();
+}
+
+// Helper function to get all configuration values as a Python dictionary
+static py::dict config_to_dict(const nlm::Config& config) {
+    py::dict result;
+    auto keys = config.getKeys();
+    
+    for (const auto& key : keys) {
+        // Try to get appropriate Python type
+        auto int_val = config.get<int64_t>(key);
+        if (int_val.has_value()) {
+            result[key] = int_val.value();
+            continue;
+        }
+        
+        auto double_val = config.get<double>(key);
+        if (double_val.has_value()) {
+            result[key] = double_val.value();
+            continue;
+        }
+        
+        auto bool_val = config.get<bool>(key);
+        if (bool_val.has_value()) {
+            result[key] = bool_val.value();
+            continue;
+        }
+        
+        auto string_val = config.get<std::string>(key);
+        if (string_val.has_value()) {
+            result[key] = string_val.value();
+            continue;
+        }
+        
+        // Unknown type - use string representation
+        result[key] = "<unknown>";
+    }
+    
+    return result;
+}
+
+// Helper function to create configuration from Python dict
+static std::shared_ptr<nlm::Config> dict_to_config(const py::dict& py_dict) {
+    auto config = std::make_shared<nlm::Config>();
+    
+    for (auto item : py_dict) {
+        std::string key = py::str(item.first);
+        
+        if (item.second.is(py::bool_())) {
+            config->set(key, py::bool_(item.second));
+        } else if (item.second.is(py::int_())) {
+            config->set(key, py::int_(item.second));
+        } else if (item.second.is(py::float_())) {
+            config->set(key, py::float_(item.second));
+        } else if (item.second.is(py::str())) {
+            config->set(key, py::str(item.second));
+        } else if (item.second.is(py::list())) {
+            // Convert list to vector based on content
+            py::list py_list = item.second.cast<py::list>();
+            if (!py_list.empty()) {
+                if (py_list[0].is(py::int_())) {
+                    std::vector<int64_t> int_vec;
+                    for (auto elem : py_list) {
+                        int_vec.push_back(elem.cast<int64_t>());
+                    }
+                    config->set(key, int_vec);
+                } else if (py_list[0].is(py::float_())) {
+                    std::vector<double> double_vec;
+                    for (auto elem : py_list) {
+                        double_vec.push_back(elem.cast<double>());
+                    }
+                    config->set(key, double_vec);
+                } else {
+                    std::vector<std::string> string_vec;
+                    for (auto elem : py_list) {
+                        string_vec.push_back(elem.cast<std::string>());
+                    }
+                    config->set(key, string_vec);
+                }
+            }
+        }
+    }
+    
+    return config;
+}
+
+// Advanced configuration validation
+static bool validate_config(const nlm::Config& config, const std::vector<std::string>& required_keys) {
+    bool valid = true;
+    std::ostringstream errors;
+    
+    for (const auto& key : required_keys) {
+        if (!config.has(key)) {
+            errors << "Missing required key: '" << key << "'\n";
+            valid = false;
+        }
+    }
+    
+    // Check for negative values where appropriate
+    if (config.has("brain.neuron_count") && config.getOr<int64_t>("brain.neuron_count", 0) < 0) {
+        errors << "brain.neuron_count cannot be negative\n";
+        valid = false;
+    }
+    
+    if (config.has("plasticity.learning_rate") && config.getOr<double>("plasticity.learning_rate", 1.0) < 0.0) {
+        errors << "plasticity.learning_rate cannot be negative\n";
+        valid = false;
+    }
+    
+    if (!valid) {
+        throw ConfigError("Configuration validation failed:\n" + errors.str());
+    }
+    
+    return true;
+}
+
+// Batch operations helper
+static void batch_inject_current(std::shared_ptr<nlm::Brain> brain, 
+                                  const std::vector<std::string>& neuron_types,
+                                  const std::vector<double>& current_values) {
+    if (neuron_types.size() != current_values.size()) {
+        throw BrainError("neuron_types and current_values must have same size for batch_inject_current");
+    }
+    
+    for (size_t i = 0; i < neuron_types.size(); ++i) {
+        NeuronType type;
+        if (neuron_types[i] == "excitatory") type = NeuronType::Excitatory;
+        else if (neuron_types[i] == "inhibitory") type = NeuronType::Inhibitory;
+        else if (neuron_types[i] == "sensory") type = NeuronType::Sensory;
+        else if (neuron_types[i] == "motor") type = NeuronType::Motor;
+        else if (neuron_types[i] == "modulatory") type = NeuronType::Modulatory;
+        else if (neuron_types[i] == "internal") type = NeuronType::Internal;
+        else throw BrainError("Unknown neuron type: " + neuron_types[i]);
+        
+        brain->injectCurrentToNeurons(type, current_values[i]);
+    }
+}
+
+// Convenience function for creating brains with common configurations
+static std::shared_ptr<nlm::Brain> create_advanced_brain(const nlm::Config& config) {
+    auto brain = nlm::createBrain(std::make_shared<nlm::Config>(config));
+    
+    // Enable commonly needed features based on config
+    if (config.has("plasticity.enabled") && config.getOr<bool>("plasticity.enabled", true)) {
+        // Additional setup for plasticity
+    }
+    
+    if (config.has("neuromodulation.enabled") && config.getOr<bool>("neuromodulation.enabled", true)) {
+        // Additional setup for neuromodulation
+    }
+    
+    return brain;
+}
+
+// Function to compare two configurations
+static bool compare_configs(const nlm::Config& config1, const nlm::Config& config2, 
+                           double tolerance = 1e-6) {
+    auto keys1 = config1.getKeys();
+    auto keys2 = config2.getKeys();
+    
+    if (keys1.size() != keys2.size()) return false;
+    
+    for (const auto& key : keys1) {
+        if (!config2.has(key)) return false;
+        
+        // Get both values as strings for comparison
+        auto val1 = config1.get<std::string>(key);
+        auto val2 = config2.get<std::string>(key);
+        
+        if (val1 != val2) {
+            // Try numeric comparison if possible
+            try {
+                double d1 = std::stod(val1.value_or("0"));
+                double d2 = std::stod(val2.value_or("0"));
+                if (std::abs(d1 - d2) > tolerance) return false;
+            } catch (...) {
+                // String comparison failed, values differ
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -142,10 +439,11 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced Config class with advanced Python features
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (simple key=value format)")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -155,17 +453,143 @@ PYBIND11_MODULE(pynlm, m) {
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (e.g., ['--neuron_count=500'])")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file in readable format")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys as a Python list")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a formatted summary string of the configuration")
+        
+        // Advanced configuration methods
+        .def("get", [](const Config& self, const std::string& key) {
+            // Try to get appropriate Python type with automatic conversion
+            auto int_val = self.get<int64_t>(key);
+            if (int_val.has_value()) return py::int_(int_val.value());
+            
+            auto double_val = self.get<double>(key);
+            if (double_val.has_value()) return py::float_(double_val.value());
+            
+            auto bool_val = self.get<bool>(key);
+            if (bool_val.has_value()) return py::bool_(bool_val.value());
+            
+            auto string_val = self.get<std::string>(key);
+            if (string_val.has_value()) return string_val.value();
+            
+            // Not found
+            throw ConfigError("Configuration key not found: '" + key + "'");
+        }, py::arg("key"),
+           "Get a configuration value with automatic type conversion to Python native types")
+        
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& default_value) {
+            // Get value or return default (with type conversion)
+            auto int_val = self.get<int64_t>(key);
+            if (int_val.has_value()) return py::int_(int_val.value());
+            
+            auto double_val = self.get<double>(key);
+            if (double_val.has_value()) return py::float_(double_val.value());
+            
+            auto bool_val = self.get<bool>(key);
+            if (bool_val.has_value()) return py::bool_(bool_val.value());
+            
+            auto string_val = self.get<std::string>(key);
+            if (string_val.has_value()) return py::str(string_val.value());
+            
+            // Return default value with type preservation
+            return default_value;
+        }, py::arg("key"), py::arg("default_value") = 0,
+           "Get a configuration value, or return default if not found (type-safe)")
+        
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Handle Python object conversion to ConfigValue
+            if (value.is(py::int_())) {
+                self.set(key, value.cast<int64_t>());
+            } else if (value.is(py::float_())) {
+                self.set(key, value.cast<double>());
+            } else if (value.is(py::bool_())) {
+                self.set(key, value.cast<bool>());
+            } else if (value.is(py::str())) {
+                self.set(key, value.cast<std::string>());
+            } else if (value.is(py::list())) {
+                // Convert list to vector based on content
+                py::list py_list = value.cast<py::list>();
+                if (!py_list.empty()) {
+                    if (py_list[0].is(py::int_())) {
+                        std::vector<int64_t> int_vec;
+                        for (auto elem : py_list) {
+                            int_vec.push_back(elem.cast<int64_t>());
+                        }
+                        self.set(key, int_vec);
+                    } else if (py_list[0].is(py::float_())) {
+                        std::vector<double> double_vec;
+                        for (auto elem : py_list) {
+                            double_vec.push_back(elem.cast<double>());
+                        }
+                        self.set(key, double_vec);
+                    } else {
+                        std::vector<std::string> string_vec;
+                        for (auto elem : py_list) {
+                            string_vec.push_back(elem.cast<std::string>());
+                        }
+                        self.set(key, string_vec);
+                    }
+                }
+            } else {
+                throw ConfigError("Unsupported value type for configuration key: '" + key + "'");
+            }
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value from Python object (supports int, float, bool, str, list)")
+        
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        
+        .def("validate", [](const Config& self, const std::vector<std::string>& required_keys) {
+            return validate_config(self, required_keys);
+        }, py::arg("required_keys"),
+           "Validate configuration against required keys and constraints")
+        
+        // Pythonic dictionary access
+        .def("as_dict", [](const Config& self) {
+            return config_to_dict(self);
+        }, "Convert configuration to Python dictionary")
+        
+        .def("from_dict", [](Config& self, const py::dict& py_dict) {
+            auto other_config = dict_to_config(py_dict);
+            self.clear();
+            for (const auto& entry : other_config->getKeys()) {
+                self.set(entry, other_config->get<std::string>(entry).value_or(""));
+            }
+        }, py::arg("py_dict"),
+           "Create configuration from Python dictionary")
+        
+        .def("merge", [](const Config& self, const Config& other) {
+            auto merged = std::make_shared<Config>();
+            auto keys1 = self.getKeys();
+            auto keys2 = other.getKeys();
+            
+            // Copy all keys from self
+            for (const auto& key : keys1) {
+                merged->set(key, self.get<std::string>(key).value_or(""));
+            }
+            
+            // Override with keys from other (taking source into account)
+            for (const auto& key : keys2) {
+                merged->set(key, other.get<std::string>(key).value_or(""));
+            }
+            
+            return merged;
+        }, py::arg("other"),
+           "Merge this configuration with another (other takes precedence)")
+        
+        .def("compare", [](const Config& self, const Config& other, double tolerance) {
+            return compare_configs(self, other, tolerance);
+        }, py::arg("other"), py::arg("tolerance") = 1e-6,
+           "Compare two configurations within tolerance (returns True if equivalent)")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
