@@ -1,10 +1,21 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# Clean and organized CMakeLists.txt with modern features
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Modern CMake features (CMake 3.20+)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
+    # Enable generator expressions for conditional compilation
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    
+    # Enable packaging support
+    include(CPack)
+    
+    # Set package properties
+    set(CPACK_PACKAGE_NAME "NLM")
+    set(CPACK_PACKAGE_VERSION "0.1.0")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Neural Learning Machine - Experimental Brain Simulation")
+    set(CPACK_PACKAGE_CONTACT "nlm-project@example.com")
+endif()
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -132,7 +143,7 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (refactored for better maintainability)
 add_executable(nlm
     src/main.cpp
 )
@@ -158,11 +169,17 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
+# Phase 6 enhanced demo (configurable with better parameter tuning)
+add_executable(nlm_phase6_enhanced_demo
+    src/experiments/Phase6EnhancedDemo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Phase 6 integration fixer (demonstrates issues and provides fixes)
+add_executable(nlm_phase6_fixer
+    src/experiments/Phase6Fixer.cpp
+)
+target_link_libraries(nlm_phase6_fixer PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
@@ -173,7 +190,7 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
-# Benchmark executable
+# Benchmark executable (performance measurement)
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
@@ -205,8 +222,11 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
+# Include configuration files in the build
+install(DIRECTORY configs/ DESTINATION configs)
+
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_phase6_enhanced_demo nlm_phase6_fixer nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
