@@ -214,34 +214,93 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Real synaptic dynamics implementation:
+    // 1. Update short-term plasticity (STP) using Tsodyks-Markram model
+    // 2. Decay eligibility trace for reward-modulated learning
+    // 3. Update synaptic efficacy based on usage history
+    // 4. Enforce weight bounds to prevent instability
+    // 5. Update last spike times for STP calculations
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    TimestepDuration dt = 0.001;  // 1ms simulation timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Step 1: Update short-term plasticity (STP) state
+    // Tsodyks-Markram model: U = utilization, x = depression, y = facilitation
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        
+        // Decay facilitation (y) towards baseline
+        float dy = dt * (1.0f - pImpl->shortTermFacilitation) / Impl::STP_FACILITATION_TAU;
+        pImpl->shortTermFacilitation = std::max(0.0f, pImpl->shortTermFacilitation - dy);
+        
+        // Update utilization (U) based on current facilitation
+        float U = Impl::STP_U_MAX * pImpl->shortTermFacilitation;
+        
+        // Calculate available resources: x = x * exp(-dt/tau_x) + (1-x) * U
+        if (pImpl->lastPreSpikeTime > 0.0f) {
+            float dx = dt * pImpl->shortTermDepression / Impl::STP_DEPRESSION_TAU;
+            pImpl->shortTermDepression = std::max(0.0f, pImpl->shortTermDepression - dx);
+            
+            // Apply depression during spike
+            pImpl->shortTermDepression *= (1.0f - U);
+        } else {
+            // Recovery from depression towards 1.0
+            float dx = dt * (1.0f - pImpl->shortTermDepression) / Impl::STP_DEPRESSION_TAU;
+            pImpl->shortTermDepression = std::min(1.0f, pImpl->shortTermDepression + dx);
+        }
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Step 2: Decay eligibility trace for reward-modulated learning
+    decayEligibilityTrace(0.001f);  // Fast decay: 1ms time constant
+    
+    // Step 3: Update synaptic efficacy based on usage history
+    // Efficacy increases with recent spike history, decays otherwise
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        float efficacyDecay = std::exp(-timeSincePre / 100.0f);  // 100ms decay
+        pImpl->efficacy = std::max(0.0f, pImpl->efficacy * efficacyDecay);
+        
+        // Add usage boost for recent spikes
+        if (timeSincePre < 50.0f) {  // Within 50ms
+            pImpl->efficacy = std::min(2.0f, pImpl->efficacy + 0.1f);
+        }
+    } else {
+        // Slow spontaneous decay
+        pImpl->efficacy *= 0.999f;
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Step 4: Enforce synaptic weight bounds to maintain stability
+    float weightChangeRate = 0.01f;  // Max weight change per timestep
+    // Weight can drift slowly towards zero (homeostatic scaling)
+    float homeostasisTarget = 0.0f;
+    float weightDrift = (homeostasisTarget - pImpl->weight) * weightChangeRate;
+    pImpl->weight += weightDrift;
     
-    // Clamp weight bounds
+    // Clamp weight to physical bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Step 5: Update last spike times for next STP calculation
+    // This is handled externally by recordPreSpike/recordPostSpike calls
+    
+    // Step 6: Update plasticity flags based on spike history
+    // STDP window integration: check for paired pre/post spikes
+    if (!pImpl->preSpikeHistory.empty() && !pImpl->postSpikeHistory.empty()) {
+        // Check for spike pairs within STDP window (~20ms)
+        Timestamp now = static_cast<Timestamp>(currentTime);
+        float stdpWindow = 20.0f;  // ms
+        
+        // Enable plasticity if we have relevant spike history
+        bool hasRelevantSpikes = false;
+        for (auto timestamp : pImpl->preSpikeHistory) {
+            if (now - timestamp < stdpWindow) {
+                hasRelevantSpikes = true;
+                break;
+            }
+        }
+        
+        if (hasRelevantSpikes) {
+            pImpl->plasticityFlags.stdp = true;
+        }
+    }
 }
 
 void Synapse::reset() {

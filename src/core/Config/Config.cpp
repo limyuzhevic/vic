@@ -1,3 +1,4 @@
+// Include necessary headers
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
@@ -19,9 +20,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -177,62 +175,322 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+    return true;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    }
+    
+    return true;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+bool Config::has(const std::string& key) const {
+    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+}
+
+void Config::remove(const std::string& key) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }),
+        pImpl->entries.end()
+    );
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+void Config::clear() {
+    pImpl->entries.clear();
+}
+
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
+
+ConfigValidationResult Config::validate() const {
+    ConfigValidationResult result;
+    
+    // Check for duplicate keys
+    std::unordered_map<std::string, size_t> keyCount;
+    for (const auto& entry : pImpl->entries) {
+        keyCount[entry.key]++;
+    }
+    
+    for (const auto& [key, count] : keyCount) {
+        if (count > 1) {
+            result.addWarning("Duplicate configuration key: " + key);
+        }
+    }
+    
+    // Basic type validation for known keys
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == "random_seed") {
+            if (!std::holds_alternative<int64_t>(entry.value) && 
+                !std::holds_alternative<int>(entry.value)) {
+                result.addError("random_seed should be an integer");
+            }
+        } else if (entry.key == "simulation_timestep") {
+            if (!std::holds_alternative<double>(entry.value)) {
+                result.addError("simulation_timestep should be a floating point number");
+            }
+        } else if (entry.key == "neuron_count") {
+            if (!std::holds_alternative<int64_t>(entry.value) && 
+                !std::holds_alternative<size_t>(entry.value)) {
+                result.addError("neuron_count should be an integer");
+            }
+        } else if (entry.key == "region_count") {
+            if (!std::holds_alternative<int64_t>(entry.value) && 
+                !std::holds_alternative<size_t>(entry.value)) {
+                result.addError("region_count should be an integer");
+            }
+        } else if (entry.key == "connection_probability") {
+            if (!std::holds_alternative<double>(entry.value) || 
+                std::get<double>(entry.value) < 0.0 || 
+                std::get<double>(entry.value) > 1.0) {
+                result.addError("connection_probability should be a number between 0.0 and 1.0");
+            }
+        }
+    }
+    
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+bool Config::validateAndFix(ConfigValidationResult& result) {
+    // Try to fix validation issues automatically
+    bool fixed = false;
+    
+    for (auto& entry : pImpl->entries) {
+        if (entry.key == "connection_probability") {
+            if (!std::holds_alternative<double>(entry.value)) {
+                // Try to convert to double
+                if (std::holds_alternative<int64_t>(entry.value)) {
+                    entry.value = static_cast<double>(std::get<int64_t>(entry.value));
+                    fixed = true;
+                    result.addWarning("connection_probability converted to double: " + std::to_string(std::get<double>(entry.value)));
+                }
+            }
+            // Clamp to valid range
+            if (std::holds_alternative<double>(entry.value)) {
+                double& value = std::get<double>(entry.value);
+                if (value < 0.0) {
+                    value = 0.0;
+                    fixed = true;
+                    result.addWarning("connection_probability clamped to minimum value (0.0)");
+                } else if (value > 1.0) {
+                    value = 1.0;
+                    fixed = true;
+                    result.addWarning("connection_probability clamped to maximum value (1.0)");
+                }
+            }
         }
-    }, it->value);
+    }
+    
+    return fixed;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+ConfigValidationResult Config::validateWithSchema(const std::vector<ConfigSchema>& schema) const {
+    ConfigValidationResult result;
+    
+    // Check required keys
+    for (const auto& schemaEntry : schema) {
+        bool keyFound = false;
+        for (const auto& configEntry : pImpl->entries) {
+            if (configEntry.key == schemaEntry.key) {
+                keyFound = true;
+                
+                // Check type
+                if (!checkType(schemaEntry.expectedType, configEntry.value)) {
+                    result.addError("Key " + schemaEntry.key + ": expected type " + 
+                                  typeToString(schemaEntry.expectedType) + 
+                                  ", got " + typeToString(configEntry.value));
+                }
+                
+                // Check range for numeric types
+                if (std::holds_alternative<double>(schemaEntry.expectedType) ||
+                    std::holds_alternative<float>(schemaEntry.expectedType) ||
+                    std::holds_alternative<int64_t>(schemaEntry.expectedType) ||
+                    std::holds_alternative<int>(schemaEntry.expectedType)) {
+                    
+                    double configValue = getNumericValue(configEntry.value);
+                    if (!schemaEntry.validRange.empty() && 
+                        (configValue < schemaEntry.validRange[0] || configValue > schemaEntry.validRange[1])) {
+                        result.addError("Key " + schemaEntry.key + ": value " + std::to_string(configValue) + 
+                                      " outside valid range [" + std::to_string(schemaEntry.validRange[0]) + 
+                                      ", " + std::to_string(schemaEntry.validRange[1]) + "]");
+                    }
+                }
+                
+                break;
+            }
+        }
+        
+        if (schemaEntry.required && !keyFound) {
+            result.addError("Missing required key: " + schemaEntry.key + ". " + schemaEntry.description);
+        }
+    }
+    
+    return result;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::checkType(const ConfigValue& expected, const ConfigValue& actual) const {
+    auto expectedType = expected.index();
+    auto actualType = actual.index();
+    
+    // Allow some type flexibility for numeric types
+    if (expectedType == actualType) {
+        return true;
+    }
+    
+    // Allow int -> int64 conversion
+    if (expectedType == typeid(int64_t) && actualType == typeid(int)) {
+        return true;
+    }
+    if (expectedType == typeid(int) && actualType == typeid(int64_t)) {
+        return true;
+    }
+    
+    // Allow double -> float conversion
+    if (expectedType == typeid(double) && actualType == typeid(float)) {
+        return true;
+    }
+    if (expectedType == typeid(float) && actualType == typeid(double)) {
+        return true;
+    }
+    
+    // Don't allow string -> numeric or vice versa
+    return false;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::string Config::typeToString(const ConfigValue& value) const {
+    std::string typeName;
+    std::visit([&typeName](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            typeName = "int";
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            typeName = "int64_t";
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            typeName = "uint64_t";
+        } else if constexpr (std::is_same_v<T, float>) {
+            typeName = "float";
+        } else if constexpr (std::is_same_v<T, double>) {
+            typeName = "double";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            typeName = "bool";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            typeName = "string";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            typeName = "std::vector<int>";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            typeName = "std::vector<double>";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            typeName = "std::vector<std::string>";
+        }
+    }, value);
+    return typeName;
+}
 
-} // namespace nlm
+double Config::getNumericValue(const ConfigValue& value) const {
+    double result = 0.0;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, float>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
+
+std::vector<ConfigSchema> Config::getDefaultSchema() const {
+    std::vector<ConfigSchema> schema;
+    
+    // Add schema entries for commonly used configuration keys
+    schema.emplace_back("random_seed", 0, true, "Random seed for reproducible experiments");
+    schema.emplace_back("simulation_timestep", 0.001, true, "Simulation timestep in seconds");
+    schema.emplace_back("neuron_count", 1000, true, "Number of neurons in the brain");
+    schema.emplace_back("region_count", 1, true, "Number of brain regions");
+    schema.emplace_back("connection_probability", 0.1f, true, "Connection probability for random connectivity", {0.0f, 1.0f});
+    schema.emplace_back("plasticity_learning_rate", 0.01f, false, "Plasticity learning rate", {0.0f, 1.0f});
+    schema.emplace_back("stdp_ltp_weight", 0.01f, false, "STDP long-term potentiation weight", {0.0f, 1.0f});
+    schema.emplace_back("stdp_ltd_weight", 0.012f, false, "STDP long-term depression weight", {0.0f, 1.0f});
+    
+    return schema;
+}

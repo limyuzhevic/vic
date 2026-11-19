@@ -44,17 +44,36 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    ConfigValue expectedType;
+    bool required;
+    std::string description;
+    std::vector<float> validRange;  // For numeric values
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    ConfigSchema(const std::string& k, const ConfigValue& type, bool req = false, 
+                 const std::string& desc = "", const std::vector<float>& range = {})
+        : key(k), expectedType(type), required(req), description(desc), validRange(range) {}
+};
+
+// Configuration validation result
+struct ConfigValidationResult {
+    bool valid;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    ConfigValidationResult() : valid(true) {}
+    
+    void addError(const std::string& error) {
+        errors.push_back(error);
+        valid = false;
+    }
+    
+    void addWarning(const std::string& warning) {
+        warnings.push_back(warning);
+    }
+};
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);

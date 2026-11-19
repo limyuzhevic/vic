@@ -373,39 +373,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // ========== STEP 2: Update all neurons (LIF dynamics) with batch processing ==========
+    // Batch process neurons to optimize cache locality and reduce function call overhead
     for (auto& region : pImpl->regions) {
+        // Collect all neurons from all populations in this region
+        std::vector<Neuron*> allNeurons;
+        allNeurons.reserve(100);  // Pre-allocate for common population sizes
+        
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
+                allNeurons.push_back(neuron);
             }
+        }
+        
+        // Process neurons in batch
+        for (auto* neuron : allNeurons) {
+            neuron->stepLIF(currentTime, pImpl->timestep);
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // ========== STEP 3: Detect spikes and schedule spike events with batch processing ==========
+    // Batch process neurons to detect spikes and prepare synapse updates
     for (auto& region : pImpl->regions) {
+        // Collect all neurons from all populations in this region
+        std::vector<Neuron*> allNeurons;
+        std::vector<Population*> allPopulations;
+        
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
+                allNeurons.push_back(neuron);
+            }
+            allPopulations.push_back(pop.get());
+        }
+        
+        // Pre-compute synapse maps for O(1) access
+        std::unordered_map<NeuronId, std::vector<Synapse*>> synapsesToNeuronMap;
+        std::unordered_map<NeuronId, std::vector<Synapse*>> synapsesFromNeuronMap;
+        
+        for (auto& pop : region->getPopulations()) {
+            for (auto* syn : pop->getSynapses()) {
+                // Index synapses for O(1) lookup during spike processing
+                if (syn->getDestinationNeuron() != INVALID_NEURON_ID) {
+                    synapsesToNeuronMap[syn->getDestinationNeuron()].push_back(syn);
+                }
+                if (syn->getSourceNeuron() != INVALID_NEURON_ID) {
+                    synapsesFromNeuronMap[syn->getSourceNeuron()].push_back(syn);
+                }
+            }
+        }
+        
+        // Process neurons for spike detection and synapse preparation
+        for (auto* neuron : allNeurons) {
+            // Check if neuron just fired this step
+            const auto& state = neuron->getState();
+            bool justFired = (state.firingState == FiringState::Refractory &&
+                             state.lastSpikeTime >= 0.0f &&
+                             std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+            if (justFired) {
+                // Neuron fired this step - queue the spike
+                SpikeEvent event(neuron->getId(), currentTime, currentStep);
+                pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
+                // Record post-synaptic spike for incoming synapses (plasticity)
+                auto it = synapsesToNeuronMap.find(neuron->getId());
+                if (it != synapsesToNeuronMap.end()) {
+                    for (Synapse* syn : it->second) {
                         syn->recordPostSpike(currentTime);
                     }
+                }
 
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
+                // Get outgoing synapses and schedule delayed spike events
+                auto itFrom = synapsesFromNeuronMap.find(neuron->getId());
+                if (itFrom != synapsesFromNeuronMap.end()) {
+                    for (Synapse* syn : itFrom->second) {
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -428,26 +471,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
                     }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    // Phase 5 fix: the old activation was
-                    // |membrane - resting| / 10, but a neuron that just
-                    // spiked has membrane == reset, and reset == resting
-                    // for every neuron (Neuron::initializeRandom is never
-                    // called — only synaptic connectivity is randomized
-                    // — so all neurons keep the default -70/-70). The
-                    // stored activation was therefore always 0, and
-                    // decayWeakTraces removed every trace on the next
-                    // update, so working memory was permanently empty
-                    // (0 traces in every demo) despite hundreds of
-                    // spikes per step. A spike is itself the activation
-                    // event, so a just-fired neuron stores 1.0; the
-                    // existing decay then keeps it alive only while the
-                    // neuron keeps firing, which is the intended
-                    // working-memory behaviour.
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
-                    }
+                }
+                
+                // Store to working memory - neurons that fire become part of working memory
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
                 }
             }
         }

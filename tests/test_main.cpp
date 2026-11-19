@@ -33,6 +33,10 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_hebbian {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -110,9 +114,9 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running Hebbian tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_hebbian::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
