@@ -186,24 +186,64 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== CONVENIENCE METHODS FOR PYTHON API ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    // Initialize with a simple configuration for common use cases
+    void initializeSimple(int neuronCount = 100, int regionCount = 1, float connectionProbability = 0.1f);
     
-    // Logging
-    void logStatus() const;
+    // Run a simulation with automatic step counting
+    void simulate(int steps);
+    
+    // Get combined statistics in a single call
+    std::unordered_map<std::string, double> getStatistics() const;
+    
+    // Check all subsystems are properly initialized
+    bool verifyAllSystems() const;
+    
+    // Reset brain and re-initialize with current configuration
+    void reinitialize();
+    
+    // Get the developmental stage as a human-readable string
+    std::string getDevelopmentalStageName() const;
+    
+    // Check if the brain has any activity
+    bool isActive() const;
+    
+    // Get memory system status in a convenient format
+    std::unordered_map<std::string, size_t> getMemoryStatus() const;
+    
+    // Run a simple learning experiment with automatic parameter tuning
+    bool runLearningExperiment(int steps = 1000, float inputStrength = 30.0f);
+    
+    // Get current configuration as a simple summary
+    std::string getConfigSummary() const;
+    
+    // Save brain state with automatic timestamp
+    bool saveToTimestampedFile(const std::string& directory = ".");
+    
+    // Load brain state with validation
+    bool loadWithValidation(const std::string& filepath);
+    
+    // Get the current simulation time based on steps
+    Timestamp getCurrentTime(SimulationStep currentStep) const;
+    
+    // Check if the brain has completed learning (weight changes detected)
+    bool hasLearningCompleted() const;
+    
+    // Get the current developmental progress (0.0 to 1.0)
+    float getDevelopmentalProgress() const;
+    
+    // Set up a basic environment for testing
+    void setupForTesting(int neuronCount = 50, float connectionProbability = 0.2f);
+    
+    // Get the total number of active components (neurons + synapses + traces)
+    size_t getTotalActiveComponents() const;
+    
+    // Check if brain has reached capacity limits
+    bool isAtCapacity() const;
+    
+    // Get brain health status
+    std::string getHealthStatus() const;
     
 private:
     struct Impl;

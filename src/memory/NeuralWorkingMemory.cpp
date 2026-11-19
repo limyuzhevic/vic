@@ -266,6 +266,11 @@ void NeuralWorkingMemory::decayWeakTraces() {
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
         if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
     }
+    
+    // Debug: log active traces count
+    if (brain_) {
+        NLM_LOG_INFO("Working memory: active traces after decay = " + std::to_string(activeTraces_.size()));
+    }
 }
 
 // AttentionalSelection Implementation

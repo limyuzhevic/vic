@@ -19,36 +19,107 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to parse as JSON first
+    try {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Simple JSON parsing for basic types
+        size_t pos = 0;
+        while ((pos = content.find('"', pos)) != std::string::npos) {
+            size_t keyEnd = content.find('"', pos + 1);
+            if (keyEnd == std::string::npos) break;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n')) {
+                pos++;
             }
             
-            set(key, value, ConfigSource::File);
+            if (pos < content.size() && content[pos] == ':') {
+                pos++; // Skip colon
+                while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t')) {
+                    pos++;
+                }
+                
+                if (pos < content.size() && content[pos] == '\"') {
+                    // String value
+                    size_t valueStart = pos + 1;
+                    size_t valueEnd = content.find('\"', valueStart);
+                    if (valueEnd != std::string::npos) {
+                        std::string value = content.substr(valueStart, valueEnd - valueStart);
+                        set(key, value, ConfigSource::File);
+                        pos = valueEnd + 1;
+                    }
+                } else if (pos < content.size() && (content[pos] == '-' || std::isdigit(content[pos]))) {
+                    // Numeric value
+                    size_t valueEnd = pos;
+                    while (valueEnd < content.size() && (std::isdigit(content[valueEnd]) || content[valueEnd] == '.' || content[valueEnd] == '-' || content[valueEnd] == 'e' || content[valueEnd] == 'E')) {
+                        valueEnd++;
+                    }
+                    std::string valueStr = content.substr(pos, valueEnd - pos);
+                    
+                    // Try to parse as int
+                    try {
+                        int intVal = std::stoi(valueStr);
+                        set(key, intVal, ConfigSource::File);
+                    } catch (...) {
+                        // Try as double
+                        try {
+                            double doubleVal = std::stod(valueStr);
+                            set(key, doubleVal, ConfigSource::File);
+                        } catch (...) {
+                            // Try as bool
+                            if (valueStr == "true" || valueStr == "false") {
+                                bool boolVal = (valueStr == "true");
+                                set(key, boolVal, ConfigSource::File);
+                            }
+                        }
+                    }
+                    pos = valueEnd;
+                }
+            }
+            
+            // Skip to next key
+            while (pos < content.size() && content[pos] != ',') pos++;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("JSON parsing error: ") + e.what());
+        // Fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -81,12 +152,50 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << val[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
