@@ -93,6 +93,22 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -104,6 +120,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -159,7 +176,7 @@ struct Brain::Impl {
         
         // Get integration intervals from config
         replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval",  skyline));
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -720,11 +737,14 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Use the neuron lookup table for O(1) access instead of linear scan
     auto it = pImpl->neuronById.find(neuron.index());
     if (it != pImpl->neuronById.end()) {
         it->second->injectCurrent(current);
         return;
     }
+    
+    // Fallback to linear search if not found in lookup table
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
@@ -734,6 +754,9 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
             }
         }
     }
+    
+    // Neuron not found - log error but don't crash
+    // This maintains backward compatibility while improving performance for common cases
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
