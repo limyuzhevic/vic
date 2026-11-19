@@ -1,3 +1,20 @@
+// NLM (熙然) - Neural Learning Machine
+// Phase 2: Real Neural Computation
+//
+// This phase implements real spiking neural computation with:
+// - Leaky Integrate-and-Fire (LIF) neurons
+// - Event-driven spike propagation with synaptic delays
+// - STDP and Hebbian plasticity
+// - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced Python bindings with additional functionality:
+// - JSON configuration support
+// - Advanced simulation control
+// - Performance monitoring
+// - Debugging utilities
+// - Context managers
+// - Enhanced error handling
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -5,6 +22,13 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <iomanip>
+#include <numeric>
+#include <sstream>
+#include <iomanip>
+
+// Include enhanced Python bindings
+#include "../src/core/PythonBindingsEnhancement.hpp"
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -428,6 +452,9 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Apply enhanced Python bindings
+    nlm::python::extendPythonModule(m);
 }
 
 } // namespace nlm
