@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+This is the simplest possible guide to get you started with NLM. Copy-paste these examples and they'll work immediately.
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -12,37 +14,29 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
----
-
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
 
----
-
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain (3 lines)
 
 ```python
 import pynlm
 
-# Step 1: Make a brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
 brain.initialize()
 
-# Step 3: Make it think for 100 steps
 for i in range(100):
-    brain.step(i)  # One step of thinking
+    brain.step(i)
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (11 lines)
 
 ```python
 import pynlm
@@ -71,8 +65,6 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -82,8 +74,6 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
 | Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
 
 ## The Simplest Possible Example
 
@@ -101,8 +91,6 @@ brain.step(0)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
-
----
 
 ## Common Patterns
 
@@ -153,8 +141,6 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
----
-
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
@@ -178,8 +164,6 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
-
----
 
 ## Mini Projects
 
@@ -254,8 +238,6 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
----
-
 ## Quick Reference
 
 | What you want | Code |
@@ -268,8 +250,6 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
-
----
 
 ## Troubleshooting
 
@@ -284,8 +264,6 @@ print("Agent simulation complete!")
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
-
----
 
 ## Next Steps
 

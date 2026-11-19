@@ -1,0 +1,686 @@
+# NLM Advanced Usage - Example Scripts
+
+This directory contains advanced example scripts demonstrating NLM capabilities.
+
+## Overview
+
+These scripts showcase the advanced features and capabilities of the NLM Python bindings, including performance optimizations, learning sessions, and complex simulations.
+
+## Example Scripts
+
+### 1. advanced_learning.py
+
+This script demonstrates advanced learning techniques using NLM.
+
+```python
+import pynlm
+import time
+import statistics
+
+def advanced_learning_example():
+    """Advanced learning example with multiple agents and configurations."""
+    
+    print("=== NLM Advanced Learning Example ===\n")
+    
+    # Create a base configuration
+    base_config = {
+        "brain.neuron_count": 2000,
+        "brain.synapse_density": 0.15,
+        "plasticity.stdp.learning_rate": 0.002,
+        "plasticity.hebbian.enable": True,
+        "plasticity.structural.enable": True,
+        "neuromod.dopamine.scale": 1.0,
+        "neuromod.curiosity.enable": True,
+        "neuromod.novelty.enable": True,
+        "simulation_timestep": 0.001
+    }
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+    world.reset()
+    
+    # Run comparison test with different configurations
+    configurations = [
+        {
+            "name": "High Plasticity",
+            "config": {
+                **base_config,
+                "plasticity.stdp.learning_rate": 0.005,
+                "plasticity.hebbian.enable": True,
+                "plasticity.structural.enable": True,
+                "neuromod.curiosity.enable": True
+            }
+        },
+        {
+            "name": "Low Plasticity",
+            "config": {
+                **base_config,
+                "plasticity.stdp.learning_rate": 0.0005,
+                "plasticity.hebbian.enable": False,
+                "plasticity.structural.enable": False,
+                "neuromod.curiosity.enable": False
+            }
+        },
+        {
+            "name": "Balanced",
+            "config": {
+                **base_config,
+                "plasticity.stdp.learning_rate": 0.001,
+                "plasticity.hebbian.enable": True,
+                "plasticity.structural.enable": True,
+                "neuromod.curiosity.enable": True,
+                "neuromod.novelty.enable": True
+            }
+        }
+    ]
+    
+    results = {}
+    
+    for config_data in configurations:
+        print(f"Testing configuration: {config_data['name']}")
+        
+        # Create config from JSON-like string
+        config_json = json.dumps(config_data['config'])
+        config = pynlm.createDefaultConfig()
+        config.loadJson(config_json)
+        
+        # Create brain and agent
+        brain = pynlm.createBrain(config)
+        agent = pynlm.createAgentBrain(brain)
+        
+        # Reset world for each test
+        world.reset()
+        agent.initialize(world)
+        
+        # Enable all learning systems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # Run learning session
+        start_time = time.time()
+        agent.runLearningSession(world, 2000, verbose=False)
+        duration = time.time() - start_time
+        
+        # Collect results
+        learning_data = {
+            "config_name": config_data['name'],
+            "duration": duration,
+            "final_curiosity": agent.getCuriosityLevel(),
+            "final_novelty": agent.getNoveltyLevel(),
+            "final_concepts": agent.getConceptCount(),
+            "final_prediction_error": agent.getPredictionError(),
+            "final_neuromodulation": agent.getNeuromodulationLevel(),
+            "development_stage": agent.getDevelopmentalStage(),
+            "brain_stats": brain.getPerformanceStats(),
+            "agent_stats": agent.getAgentStats()
+        }
+        
+        results[config_data['name']] = learning_data
+        
+        print(f"  Completed in {duration:.2f}s")
+        print(f"  Final curiosity: {learning_data['final_curiosity']:.3f}")
+        print(f"  Final concepts: {learning_data['final_concepts']}")
+        print(f"  Final prediction error: {learning_data['final_prediction_error']:.3f}")
+        print()
+    
+    # Analyze and compare results
+    print("=== Analysis Results ===")
+    
+    curiosity_levels = [r['final_curiosity'] for r in results.values()]
+    concept_counts = [r['final_concepts'] for r in results.values()]
+    prediction_errors = [r['final_prediction_error'] for r in results.values()]
+    
+    print(f"Average curiosity: {statistics.mean(curiosity_levels):.3f}")
+    print(f"Average concepts learned: {statistics.mean(concept_counts)}")
+    print(f"Average prediction error: {statistics.mean(prediction_errors):.3f}")
+    print(f"Most concepts learned: {max(results.keys(), key=lambda k: results[k]['final_concepts'])}")
+    print(f"Highest curiosity: {max(results.keys(), key=lambda k: results[k]['final_curiosity'])}")
+    
+    # Save results
+    with open('advanced_learning_results.json', 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\nResults saved to 'advanced_learning_results.json'")
+    
+    return results
+
+if __name__ == "__main__":
+    import json
+    results = advanced_learning_example()
+```
+
+### 2. performance_benchmark.py
+
+Performance benchmark comparing different optimization strategies.
+
+```python
+import pynlm
+import time
+import statistics
+from concurrent.futures import ThreadPoolExecutor
+
+def performance_benchmark():
+    """Benchmark different performance optimization strategies."""
+    
+    print("=== NLM Performance Benchmark ===\n")
+    
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 5000)
+    config.set("brain.synapse_density", 0.05)
+    
+    test_scenarios = [
+        {"name": "Small Brain", "neurons": 1000, "steps": 500},
+        {"name": "Medium Brain", "neurons": 5000, "steps": 2000},
+        {"name": "Large Brain", "neurons": 10000, "steps": 5000}
+    ]
+    
+    results = {}
+    
+    for scenario in test_scenarios:
+        print(f"Testing {scenario['name']} ({scenario['neurons']} neurons, {scenario['steps']} steps)")
+        
+        # Test different optimization strategies
+        strategies = [
+            "sequential",      # Simple sequential processing
+            "batch",           # Batch processing with progress reporting
+            "optimized"        # Optimized with performance monitoring
+        ]
+        
+        strategy_results = {}
+        
+        for strategy in strategies:
+            print(f"  Strategy: {strategy}")
+            
+            # Configure strategy-specific parameters
+            if strategy == "sequential":
+                config = pynlm.createDefaultConfig()
+                config.set("brain.neuron_count", scenario['neurons'])
+            elif strategy == "batch":
+                config = pynlm.createDefaultConfig()
+                config.set("brain.neuron_count", scenario['neurons'])
+            else:  # optimized
+                config = pynlm.createDefaultConfig()
+                config.set("brain.neuron_count", scenario['neurons'])
+                # Enable all optimizations
+                # This would require access to internal optimization flags
+            
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Run benchmark
+            start_time = time.time()
+            
+            if strategy == "sequential":
+                for i in range(scenario['steps']):
+                    brain.step(i)
+            elif strategy == "batch":
+                brain.stepMultiple(scenario['steps'])
+            else:  # optimized
+                brain.simulateAndMonitor(scenario['steps'], collectStats=True)
+            
+            duration = time.time() - start_time
+            steps_per_second = scenario['steps'] / duration
+            
+            stats = brain.getPerformanceStats()
+            
+            strategy_results[strategy] = {
+                "duration": duration,
+                "steps_per_second": steps_per_second,
+                "final_spikes": stats[3],  # Total spikes from stats
+                "memory_usage": f"~{stats[0]}",  # Approximate memory
+                "performance": steps_per_second
+            }
+            
+            print(f"    Duration: {duration:.2f}s ({steps_per_second:.0f} steps/s)")
+            print(f"    Final spikes: {strategy_results[strategy]['final_spikes']}")
+        
+        results[scenario['name']] = strategy_results
+        print()
+    
+    # Comparative analysis
+    print("=== Performance Analysis ===")
+    
+    print("\nPerformance by Strategy:")
+    for strategy in ["sequential", "batch", "optimized"]:
+        speeds = []
+        for scenario in test_scenarios:
+            if strategy in results[scenario['name']]:
+                speeds.append(results[scenario['name']][strategy]['steps_per_second'])
+        
+        if speeds:
+            avg_speed = statistics.mean(speeds)
+            std_speed = statistics.stdev(speeds) if len(speeds) > 1 else 0
+            print(f"  {strategy:10s}: {avg_speed:8.0f} ± {std_speed:6.0f} steps/s")
+    
+    # Save benchmark results
+    with open('performance_benchmark_results.json', 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\nBenchmark results saved to 'performance_benchmark_results.json'")
+    
+    return results
+
+if __name__ == "__main__":
+    import json
+    results = performance_benchmark()
+```
+
+### 3. complex_simulation.py
+
+Complex multi-agent simulation with advanced learning dynamics.
+
+```python
+import pynlm
+import time
+import numpy as np
+
+def complex_simulation_example():
+    """Complex multi-agent simulation with advanced learning dynamics."""
+    
+    print("=== NLM Complex Multi-Agent Simulation ===\n")
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+    world.reset()
+    
+    # Create multiple agents with different characteristics
+    agent_configs = [
+        {
+            "name": "Curiosity-Driven",
+            "neuron_count": 3000,
+            "plasticity": "high",
+            "curiosity_enabled": True,
+            "reward_modulation": True
+        },
+        {
+            "name": "Habit-Based",
+            "neuron_count": 3000,
+            "plasticity": "low",
+            "curiosity_enabled": False,
+            "reward_modulation": True
+        },
+        {
+            "name": "Balanced",
+            "neuron_count": 3000,
+            "plasticity": "medium",
+            "curiosity_enabled": True,
+            "reward_modulation": True
+        }
+    ]
+    
+    agents = []
+    brains = []
+    
+    # Create agents
+    for config in agent_configs:
+        print(f"Creating {config['name']} agent...")
+        
+        # Create config
+        agent_config = pynlm.createDefaultConfig()
+        agent_config.set("brain.neuron_count", config['neuron_count'])
+        agent_config.set("plasticity.stdp.learning_rate", 0.001)
+        
+        if config['plasticity'] == 'high':
+            agent_config.set("plasticity.stdp.learning_rate", 0.005)
+            agent_config.set("plasticity.hebbian.enable", True)
+            agent_config.set("plasticity.structural.enable", True)
+        elif config['plasticity'] == 'low':
+            agent_config.set("plasticity.stdp.learning_rate", 0.0001)
+            agent_config.set("plasticity.hebbian.enable", False)
+            agent_config.set("plasticity.structural.enable", False)
+        else:  # medium
+            agent_config.set("plasticity.stdp.learning_rate", 0.001)
+            agent_config.set("plasticity.hebbian.enable", True)
+            agent_config.set("plasticity.structural.enable", True)
+        
+        if config['curiosity_enabled']:
+            agent_config.set("neuromod.curiosity.enable", True)
+        
+        # Create brain and agent
+        brain = pynlm.createBrain(agent_config)
+        agent = pynlm.createAgentBrain(brain)
+        
+        brains.append(brain)
+        agents.append(agent)
+    
+    # Run multi-agent simulation
+    print("\nRunning multi-agent simulation...")
+    start_time = time.time()
+    
+    for episode in range(100):
+        # Reset all agents and world
+        for brain, agent in zip(brains, agents):
+            brain.reset()
+            agent.reset()
+        
+        world.reset()
+        
+        # Run episode with all agents
+        for step in range(200):
+            # Update world
+            world.update(0.1)
+            
+            # Each agent interacts with the world
+            for i, (agent, brain) in enumerate(zip(agents, brains)):
+                # Process sensory input
+                percept = world.getSensoryPercept()
+                agent.processSensoryInput(percept)
+                
+                # Run brain step
+                brain.step(step)
+                
+                # Decode and apply action
+                action = agent.decodeMotorCommand()
+                world.applyMotorCommand(action, world.getSimulationTime())
+                
+                # Apply reward modulation
+                internal = percept.getInternal()
+                reward = internal.empty() ? 0.0f : internal[0]
+                agent.applyRewardModulation(reward, 0.0f)
+                
+                # Update development
+                agent.updateDevelopment(0.1)
+        
+        # Log episode progress
+        if episode % 10 == 0:
+            print(f"Episode {episode}: ")
+            
+            for i, (agent, brain, config) in enumerate(zip(agents, brains, agent_configs)):
+                curiosity = agent.getCuriosityLevel()
+                concepts = agent.getConceptCount()
+                prediction_error = agent.getPredictionError()
+                print(f"  {config['name']:15s}: curiosity={curiosity:.3f}, concepts={concepts}, prediction_error={prediction_error:.3f}")
+            
+            print()
+    
+    duration = time.time() - start_time
+    
+    print(f"Simulation completed in {duration:.2f} seconds")
+    
+    # Analyze agent interactions
+    print("\n=== Agent Interaction Analysis ===")
+    
+    final_states = []
+    for i, (agent, brain, config) in enumerate(zip(agents, brains, agent_configs)):
+        state = {
+            "name": config['name'],
+            "final_curiosity": agent.getCuriosityLevel(),
+            "final_concepts": agent.getConceptCount(),
+            "final_prediction_error": agent.getPredictionError(),
+            "total_spikes": brain.getTotalSpikeCount(),
+            "development_stage": agent.getDevelopmentalStage()
+        }
+        final_states.append(state)
+        
+        print(f"{config['name']}:")
+        print(f"  Final curiosity: {state['final_curiosity']:.3f}")
+        print(f"  Concepts learned: {state['final_concepts']}")
+        print(f"  Prediction error: {state['final_prediction_error']:.3f}")
+        print(f"  Total spikes: {state['total_spikes']}")
+        print(f"  Development stage: {state['development_stage']}")
+    
+    # Determine most successful agent
+    most_concepts = max(final_states, key=lambda x: x['final_concepts'])
+    highest_curiosity = max(final_states, key=lambda x: x['final_curiosity'])
+    
+    print(f"\n=== Summary ===")
+    print(f"Most concepts learned: {most_concepts['name']} ({most_concepts['final_concepts']} concepts)")
+    print(f"Highest curiosity: {highest_curiosity['name']} ({highest_curiosity['final_curiosity']:.3f})")
+    
+    # Save simulation results
+    simulation_results = {
+        "duration": duration,
+        "agents": final_states,
+        "config": agent_configs,
+        "final_world_state": {
+            "width": world.getWidth(),
+            "height": world.getHeight(),
+            "simulation_time": world.getSimulationTime()
+        }
+    }
+    
+    with open('complex_simulation_results.json', 'w') as f:
+        json.dump(simulation_results, f, indent=2)
+    
+    print(f"\nSimulation results saved to 'complex_simulation_results.json'")
+    
+    return simulation_results
+
+if __name__ == "__main__":
+    import json
+    results = complex_simulation_example()
+```
+
+### 4. optimization_comparison.py
+
+Compare different optimization strategies and configurations.
+
+```python
+import pynlm
+import time
+import statistics
+
+def optimization_comparison():
+    """Compare different optimization strategies and configurations."""
+    
+    print("=== NLM Optimization Comparison ===\n")
+    
+    # Test different configurations
+    test_configs = [
+        {
+            "name": "Standard",
+            "config": {
+                "brain.neuron_count": 2000,
+                "brain.synapse_density": 0.1,
+                "plasticity.stdp.learning_rate": 0.001,
+                "plasticity.hebbian.enable": True,
+                "plasticity.structural.enable": True,
+                "neuromod.curiosity.enable": True,
+                "neuromod.novelty.enable": True
+            }
+        },
+        {
+            "name": "High Performance",
+            "config": {
+                "brain.neuron_count": 3000,
+                "brain.synapse_density": 0.15,
+                "plasticity.stdp.learning_rate": 0.002,
+                "plasticity.hebbian.enable": True,
+                "plasticity.structural.enable": True,
+                "neuromod.curiosity.enable": True,
+                "neuromod.novelty.enable": True,
+                "simulation_timestep": 0.0005
+            }
+        },
+        {
+            "name": "Memory Efficient",
+            "config": {
+                "brain.neuron_count": 1500,
+                "brain.synapse_density": 0.08,
+                "plasticity.stdp.learning_rate": 0.0005,
+                "plasticity.hebbian.enable": True,
+                "plasticity.structural.enable": False,
+                "neuromod.curiosity.enable": False,
+                "neuromod.novelty.enable": False
+            }
+        }
+    ]
+    
+    results = {}
+    
+    for test_case in test_configs:
+        print(f"Testing {test_case['name']} configuration...")
+        
+        # Create config
+        config_json = json.dumps(test_case['config'])
+        config = pynlm.createDefaultConfig()
+        config.loadJson(config_json)
+        
+        # Create world and agent
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        brain = pynlm.createBrain(config)
+        agent = pynlm.createAgentBrain(brain)
+        
+        # Configure agent learning
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(test_case['config'].get("plasticity.structural.enable", False))
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(test_case['config'].get("neuromod.curiosity.enable", True))
+        
+        # Run multiple test sessions
+        session_results = []
+        for session in range(5):
+            print(f"  Session {session + 1}/5...")
+            
+            start_time = time.time()
+            
+            # Run session
+            for step in range(500):
+                world.update(0.1)
+                agent.processSensoryInput(world.getSensoryPercept())
+                brain.step(step)
+                world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+                agent.applyRewardModulation(world.getSensoryPercept().getInternal()[0], 0.0)
+                agent.updateDevelopment(0.1)
+            
+            duration = time.time() - start_time
+            
+            session_data = {
+                "session": session + 1,
+                "duration": duration,
+                "steps_per_second": 500 / duration,
+                "final_curiosity": agent.getCuriosityLevel(),
+                "final_concepts": agent.getConceptCount(),
+                "final_prediction_error": agent.getPredictionError(),
+                "total_spikes": brain.getTotalSpikeCount()
+            }
+            
+            session_results.append(session_data)
+            
+            # Reset for next session
+            agent.reset()
+            brain.reset()
+            world.reset()
+        
+        # Calculate statistics for this configuration
+        durations = [s['duration'] for s in session_results]
+        speeds = [s['steps_per_second'] for s in session_results]
+        curiosity_levels = [s['final_curiosity'] for s in session_results]
+        concept_counts = [s['final_concepts'] for s in session_results]
+        
+        config_stats = {
+            "name": test_case['name'],
+            "sessions": 5,
+            "avg_duration": statistics.mean(durations),
+            "avg_speed": statistics.mean(speeds),
+            "speed_std": statistics.stdev(speeds) if len(speeds) > 1 else 0,
+            "avg_curiosity": statistics.mean(curiosity_levels),
+            "avg_concepts": statistics.mean(concept_counts),
+            "min_concepts": min(concept_counts),
+            "max_concepts": max(concept_counts),
+            "avg_prediction_error": statistics.mean([s['final_prediction_error'] for s in session_results])
+        }
+        
+        results[test_case['name']] = config_stats
+        
+        print(f"    Average duration: {config_stats['avg_duration']:.2f}s")
+        print(f"    Average speed: {config_stats['avg_speed']:.0f} ± {config_stats['speed_std']:.0f} steps/s")
+        print(f"    Average concepts: {config_stats['avg_concepts']:.1f}")
+        print(f"    Average curiosity: {config_stats['avg_curiosity']:.3f}")
+        print()
+    
+    # Comparative analysis
+    print("=== Optimization Analysis ===")
+    
+    print("\nPerformance Comparison:")
+    for name, stats in results.items():
+        print(f"  {name:15s}: {stats['avg_speed']:8.0f} ± {stats['speed_std']:6.0f} steps/s, "
+              f"{stats['avg_concepts']:5.1f} ± {((stats['max_concepts'] - stats['min_concepts'])/2):5.1f} concepts")
+    
+    print("\nLearning Effectiveness:")
+    for name, stats in results.items():
+        print(f"  {name:15s}: {stats['avg_concepts']:5.1f} concepts, "
+              f"{stats['avg_curiosity']:5.3f} curiosity, "
+              f"{stats['avg_prediction_error']:6.3f} prediction error")
+    
+    # Determine best configuration
+    best_speed = max(results.keys(), key=lambda k: results[k]['avg_speed'])
+    best_concepts = max(results.keys(), key=lambda k: results[k]['avg_concepts'])
+    
+    print(f"\nBest Configuration:")
+    print(f"  Best speed: {best_speed} ({results[best_speed]['avg_speed']:.0f} steps/s)")
+    print(f"  Best concepts: {best_concepts} ({results[best_concepts]['avg_concepts']:.1f} concepts)")
+    
+    # Save comparison results
+    comparison_results = {
+        "configurations": list(results.keys()),
+        "stats": results,
+        "best_speed": best_speed,
+        "best_concepts": best_concepts
+    }
+    
+    with open('optimization_comparison_results.json', 'w') as f:
+        json.dump(comparison_results, f, indent=2)
+    
+    print(f"\nComparison results saved to 'optimization_comparison_results.json'")
+    
+    return results
+
+if __name__ == "__main__":
+    import json
+    results = optimization_comparison()
+```
+
+## Running the Examples
+
+To run these advanced examples, ensure the NLM Python bindings are properly installed:
+
+```bash
+# Install the library
+pip install -e .  # or pip install .
+
+# Run individual examples
+python advanced_learning.py
+python performance_benchmark.py
+python complex_simulation.py
+python optimization_comparison.py
+
+# Run all examples
+python -c "
+import sys
+sys.path.append('.')
+exec(open('advanced_learning.py').read())
+exec(open('performance_benchmark.py').read())
+exec(open('complex_simulation.py').read())
+exec(open('optimization_comparison.py').read())
+" 2>&1 | tee advanced_examples.log
+```
+
+## Output Files
+
+The examples generate the following output files:
+
+- `advanced_learning_results.json` - Results from advanced learning tests
+- `performance_benchmark_results.json` - Performance benchmark results
+- `complex_simulation_results.json` - Complex multi-agent simulation results
+- `optimization_comparison_results.json` - Optimization strategy comparisons
+- `advanced_examples.log` - Combined execution log from all examples
+
+## Key Features Demonstrated
+
+1. **Multi-Agent Learning**: Different agents with varied characteristics
+2. **Configuration Optimization**: Testing different hyper-parameters
+3. **Performance Benchmarking**: Measuring speed and efficiency
+4. **Learning Analytics**: Tracking curiosity, concepts, and prediction errors
+5. **Statistical Analysis**: Comparative analysis across configurations
+6. **Progress Monitoring**: Real-time tracking of simulation progress
+7. **Result Persistence**: Saving and analyzing results
+
+These examples showcase the advanced capabilities of the NLM Python bindings, providing practical demonstrations of complex neural simulations and learning scenarios.
