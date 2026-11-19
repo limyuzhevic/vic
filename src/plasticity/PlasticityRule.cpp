@@ -1,4 +1,5 @@
 #include "PlasticityRule.hpp"
+#include <cmath>
 
 namespace nlm {
 

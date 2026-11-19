@@ -4,6 +4,7 @@
 #include <random>
 #include <functional>
 #include <stdexcept>
+#include <algorithm>  // Added for std::shuffle
 
 namespace nlm {
 
