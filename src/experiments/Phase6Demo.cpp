@@ -12,9 +12,6 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
-    
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
     

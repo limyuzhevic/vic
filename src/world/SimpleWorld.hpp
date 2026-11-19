@@ -77,6 +77,11 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float g) { resourceEnergyGain_ = g; }
+    
+    // Object management
+    size_t getObjectCount() const { return static_cast<size_t>(objects_.size()); }
     
     // Time
     double getSimulationTime() const { return simTime_; }

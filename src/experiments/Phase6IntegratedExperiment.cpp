@@ -48,15 +48,26 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     world.configure(16, 16, 16, 16);
     world.reset();
     
+    // Set agent start position (move agent away from walls initially)
+    world.setAgentStart(8.0f, 8.0f);
+    
+    // Set world properties that affect agent behavior
+    world.setMaxEnergy(100.0f);
+    world.setEnergyDecayRate(0.01f);
+    world.setResourceEnergyGain(30.0f);  // Increased resource reward
+    
     // Create agent
     AgentBrain agent(brain);
-    agent.initialize(world);
+    agent.initialize(world);  // Initialize with world context
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
+    NLM_LOG_INFO("  World: " + std::to_string(world.getWidth()) + "x" + std::to_string(world.getHeight()) + "m");
+    NLM_LOG_INFO("  Objects: " + std::to_string(world.getObjectCount()) + " (resources/hazards)");
+    NLM_LOG_INFO("  Agent start: (8.0, 8.0) - away from walls");
     
     // Run simulation
     float totalReward = 0.0f;

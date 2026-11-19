@@ -70,6 +70,17 @@ void SimpleWorld::reset() {
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
     }
     
+    // Place additional resource in a known location for predictable testing
+    // This makes the demo more reproducible and ensures the agent can learn to get rewards
+    float resource1X = 5.0f;
+    float resource1Y = 5.0f;
+    objects_.emplace_back(resource1X, resource1Y, WorldObjectType::Resource, 20.0f, 0.5f);
+    
+    // Place another resource
+    float resource2X = 11.0f;
+    float resource2Y = 11.0f;
+    objects_.emplace_back(resource2X, resource2Y, WorldObjectType::Resource, 20.0f, 0.5f);
+    
     generateVision();
 }
 
@@ -101,6 +112,8 @@ void SimpleWorld::update(double timestep) {
     // Energy decay
     agent_.energy -= energyDecayRate_;
     if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+}
+}
     
     // Update age
     agent_.age += timestep;

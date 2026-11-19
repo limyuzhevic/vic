@@ -164,6 +164,12 @@ add_executable(nlm_phase6_demo
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
+# Advanced Phase 6 demo (for advanced users with enhanced features)
+add_executable(nlm_advanced_demo
+    advanced_demo.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
 # a teacher, planner overrides, and a checkpoint round-trip. The old
@@ -206,7 +212,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_advanced_demo nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

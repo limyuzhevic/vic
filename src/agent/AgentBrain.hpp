@@ -13,6 +13,25 @@
 
 namespace nlm {
 
+// World context properties for agent configuration
+struct AgentWorldProperties {
+    float worldWidth = 20.0f;
+    float worldHeight = 20.0f;
+    size_t objectCount = 0;
+    float maxEnergy = 100.0f;
+    float energyDecayRate = 0.01f;
+    float resourceEnergyGain = 30.0f;
+    
+    void configureFromWorld(const SimpleWorld& world) {
+        worldWidth = world.getWidth();
+        worldHeight = world.getHeight();
+        objectCount = world.getObjectCount();
+        maxEnergy = world.getMaxEnergy();
+        energyDecayRate = world.getEnergyDecayRate();
+        resourceEnergyGain = world.getResourceEnergyGain();
+    }
+};
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -144,6 +163,9 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // World properties for agent configuration
+    AgentWorldProperties agentWorldProperties_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

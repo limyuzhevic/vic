@@ -164,10 +164,18 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Configure agent based on world properties
+    // The world defines what objects exist, their positions, values, and the agent's initial state
+    agentWorldProperties_.configureFromWorld(world);
+    
+    // Initialize with world context for better sensory-motor integration
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    NLM_LOG_INFO("  World: " + std::to_string(world.getWidth()) + "x" + std::to_string(world.getHeight()) + "m, " +
+                 std::to_string(world.getObjectCount()) + " objects, " +
+                 std::to_string(world.getMaxEnergy()) + " max energy");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
