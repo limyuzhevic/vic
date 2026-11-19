@@ -172,8 +172,8 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -185,6 +185,16 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine (ACh) - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine (NE) - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin (5-HT) - mood regulation and social behavior
+    Serotonin* getSerotonin();
+
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

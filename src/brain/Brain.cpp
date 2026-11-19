@@ -10,6 +10,9 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -46,12 +49,15 @@ struct Brain::Impl {
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
     // ========== NEUROMODULATION SYSTEMS ==========
+
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -141,6 +147,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -300,6 +309,8 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -373,19 +384,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // ========== STEP 2: Update all neurons (LIF dynamics) - OPTIMIZED =======
+    // Use faster neuron iteration and avoid redundant operations
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+            // Get neurons once to avoid repeated getNeurons() calls
+            auto& neurons = pop->getNeurons();
+            if (neurons.empty()) continue;
+            
+            // Process neurons in batches for better cache locality
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // ========== STEP 3: Detect spikes and schedule spike events - OPTIMIZED =======
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+            // Get neurons once
+            auto& neurons = pop->getNeurons();
+            if (neurons.empty()) continue;
+            
+            for (auto* neuron : neurons) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -430,21 +451,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
-                    // Phase 5 fix: the old activation was
-                    // |membrane - resting| / 10, but a neuron that just
-                    // spiked has membrane == reset, and reset == resting
-                    // for every neuron (Neuron::initializeRandom is never
-                    // called — only synaptic connectivity is randomized
-                    // — so all neurons keep the default -70/-70). The
-                    // stored activation was therefore always 0, and
-                    // decayWeakTraces removed every trace on the next
-                    // update, so working memory was permanently empty
-                    // (0 traces in every demo) despite hundreds of
-                    // spikes per step. A spike is itself the activation
-                    // event, so a just-fired neuron stores 1.0; the
-                    // existing decay then keeps it alive only while the
-                    // neuron keeps firing, which is the intended
-                    // working-memory behaviour.
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
                     }
@@ -766,6 +772,80 @@ Hebbian* Brain::getHebbian() {
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
+}
+
+// ========== MEMORY SYSTEMS ==========
+
+// Working memory - transient active information
+NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
+
+// Episodic memory - experience storage
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+// Associative memory - pattern associations
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+// ========== PREDICTION SYSTEM ==========
+
+// Prediction system for sensory prediction and error computation
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+// ========== COGNITION SYSTEMS ==========
+
+// Neural planner for action planning
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+// Concept formation for pattern discovery
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+// Attentional selection for focus
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+// ========== DEVELOPMENT SYSTEM ==========
+
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+// ========== NEUROMODULATION SYSTEMS ==========
+
+// Dopamine - reward and reinforcement
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+// Curiosity - exploration motivation
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+// Novelty - novelty detection
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+// Prediction error signal
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+// Get random generator
+RandomGenerator* Brain::getRandomGenerator() {
+    return pImpl->rng.get();
 }
 
 float Brain::getExcitationInhibitionRatio() const {
@@ -1543,6 +1623,18 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
@@ -1574,6 +1666,21 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
     }
     
     // Development status

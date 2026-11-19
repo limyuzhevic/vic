@@ -67,6 +67,16 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
+    
+    // Establish bidirectional maintenance connections for better memory persistence
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i-1], strength * 0.3f);
+    }
+    
+    // Create circular connections for longer-term memory maintenance
+    if (memoryNeurons_.size() > 2 && brain_) {
+        createRecurrentConnection(memoryNeurons_.back(), memoryNeurons_.front(), strength * 0.2f);
+    }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
@@ -154,10 +164,10 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
-    decayWeakTraces();
+    // Apply recurrent maintenance connections for stronger persistence
+    updateRecurrentConnections();
     
-    // Run competition to select winners
+    // Run competition to select optimal memory patterns
     runCompetition();
 }
 

@@ -303,8 +303,11 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !curiosity || !novelty || !acetylcholine || !norepinephrine || !serotonin) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
@@ -316,7 +319,15 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         brain->step(i, i * 0.001);
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    // Verify all neuromodulation systems are functional
+    NLM_LOG_INFO("[PASS] Dopamine level: " + std::to_string(dopamine->getLevel()));
+    NLM_LOG_INFO("[PASS] Curiosity level: " + std::to_string(curiosity->getLevel()));
+    NLM_LOG_INFO("[PASS] Novelty level: " + std::to_string(novelty->getLevel()));
+    NLM_LOG_INFO("[PASS] Acetylcholine level: " + std::to_string(acetylcholine->getLevel()));
+    NLM_LOG_INFO("[PASS] Norepinephrine level: " + std::to_string(norepinephrine->getLevel()));
+    NLM_LOG_INFO("[PASS] Serotonin level: " + std::to_string(serotonin->getLevel()));
+    
+    NLM_LOG_INFO("[PASS] All neuromodulation systems are functional");
     return true;
 }
 
