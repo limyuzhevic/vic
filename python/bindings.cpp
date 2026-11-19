@@ -168,7 +168,84 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Enhanced validation methods
+        .def("validate", &Config::validate, py::arg("useCase") = "",
+             "Validate configuration for specific use case")
+        .def("getValidationErrors", &Config::getValidationErrors,
+             "Get validation errors")
+        .def("hasRequiredKeys", &Config::hasRequiredKeys,
+             "Check if configuration has required keys")
+        .def("getValidationReport", &Config::getValidationReport,
+             "Get validation report")
+        .def("validateParameter", [](const Config& self, const std::string& key, double min, double max) {
+            return self.validateParameter(key, min, max);
+        }, py::arg("key"), py::arg("minValue"), py::arg("maxValue"),
+           "Validate parameter is within range [min, max]")
+        .def("validateParameter", [](const Config& self, const std::string& key, int min, int max) {
+            return self.validateParameter(key, min, max);
+        }, py::arg("key"), py::arg("minValue"), py::arg("maxValue"),
+           "Validate parameter is within integer range [min, max]")
+        .def("validateParameter", [](const Config& self, const std::string& key, bool required) {
+            return self.validateParameter(key, required);
+        }, py::arg("key"), py::arg("required"),
+           "Validate required parameter exists");
+        
+        // Advanced configuration helpers
+        .def("validateBrainConfig", [](Config& self) {
+            std::vector<std::string> requiredKeys = {
+                "brain.neuron_count",
+                "brain.synapse_density", 
+                "simulation_timestep"
+            };
+            return self.hasRequiredKeys(requiredKeys) && 
+                   self.validateParameter("brain.neuron_count", 100, 10000) &&
+                   self.validateParameter("brain.synapse_density", 0.01, 0.5) &&
+                   self.validateParameter("simulation_timestep", 0.0, 0.1);
+        }, "Validate typical brain configuration")
+        .def("validateWorldConfig", [](Config& self) {
+            std::vector<std::string> requiredKeys = {
+                "environment_width",
+                "environment_height",
+                "visionWidth",
+                "visionHeight"
+            };
+            return self.hasRequiredKeys(requiredKeys);
+        }, "Validate world configuration")
+        .def("createDefaultBrainConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->set("brain.neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+            config->set("brain.synapse_density", 0.1, nlm::ConfigSource::Default);
+            config->set("brain.connection_probability", 0.05, nlm::ConfigSource::Default);
+            config->set("brain.v_thresh", -50.0f, nlm::ConfigSource::Default);
+            config->set("brain.v_rest", -70.0f, nlm::ConfigSource::Default);
+            config->set("brain.tau_mem", 20.0f, nlm::ConfigSource::Default);
+            config->set("brain.tau_ref", 2.0f, nlm::ConfigSource::Default);
+            config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+            return config;
+        }, "Create a default brain configuration")
+        .def("createDefaultWorldConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->set("environment_name", std::string("GridWorld"), nlm::ConfigSource::Default);
+            config->set("environment_width", 10.0f, nlm::ConfigSource::Default);
+            config->set("environment_height", 10.0f, nlm::ConfigSource::Default);
+            config->set("visionWidth", 8, nlm::ConfigSource::Default);
+            config->set("visionHeight", 8, nlm::ConfigSource::Default);
+            config->set("maxEnergy", 100.0f, nlm::ConfigSource::Default);
+            return config;
+        }, "Create a default world configuration")
+        .def("mergeConfigs", [](const Config& base, const Config& override) {
+            auto merged = std::make_shared<Config>(base);
+            for (const auto& key : override.getKeys()) {
+                auto value = override.get<std::string>(key);
+                if (value) {
+                    merged->set(key, *value, nlm::ConfigSource::Runtime);
+                }
+            }
+            return merged;
+        }, py::arg("base"), py::arg("override"),
+           "Merge two configurations (override takes precedence)");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -408,26 +485,282 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+m.def("createAdvancedBrain", [](std::shared_ptr<Config> config) {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create an advanced brain with default settings");
+        
+        m.def("createSimulationConfig", [](int neuronCount, double timestep, int regions) {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", timestep, nlm::ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(regions), nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+            return config;
+        }, py::arg("neuronCount") = 1000, py::arg("timestep") = 0.001, py::arg("regions") = 2,
+           "Create a simulation-ready configuration");
+        
+        m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+            for (nlm::SimulationStep step = 0; step < steps; ++step) {
+                brain->step(step);
+            }
+            return brain->getTotalSpikeCount();
+        }, py::arg("brain"), py::arg("steps"),
+           "Run a complete simulation and return spike count");
+        
+        m.def("analyzeBrainState", [](const std::shared_ptr<Brain>& brain) {
+            std::map<std::string, py::object> analysis;
+            analysis["neuron_count"] = brain->getTotalNeuronCount();
+            analysis["synapse_count"] = brain->getTotalSynapseCount();
+            analysis["firing_rate"] = brain->getAverageFiringRate();
+            analysis["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+            analysis["total_spikes"] = brain->getTotalSpikeCount();
+            return analysis;
+        }, py::arg("brain"),
+           "Analyze brain state and return key statistics");
+        
+        m.def("benchmarkConfiguration", [](const std::shared_ptr<Config>& config, size_t testSteps) {
+            auto brain = std::make_shared<Brain>(config);
+            if (!brain->initialize()) {
+                throw std::runtime_error("Failed to initialize brain for benchmarking");
+            }
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            for (nlm::SimulationStep step = 0; step < testSteps; ++step) {
+                brain->step(step);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            auto duration = std::chrono::duration<double>(end - start).count();
+            double stepsPerSecond = testSteps / duration;
+            
+            std::map<std::string, double> results;
+            results["steps_per_second"] = stepsPerSecond;
+            results["spikes_per_step"] = brain->getTotalSpikeCount() / static_cast<double>(testSteps);
+            results["neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+            results["synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+            
+            return results;
+        }, py::arg("config"), py::arg("testSteps") = 1000,
+           "Benchmark configuration performance");
+        
+        // Advanced error handling
+        m.def("safeBrainOperation", [](std::shared_ptr<Brain> brain, size_t steps) {
+            try {
+                for (nlm::SimulationStep step = 0; step < steps; ++step) {
+                    brain->step(step);
+                }
+                return brain->getTotalSpikeCount();
+            } catch (const std::exception& e) {
+                throw nlm::RuntimeError(std::string("Brain operation failed: ") + e.what());
+            }
+        }, py::arg("brain"), py::arg("steps"),
+           "Safely run brain simulation with error handling");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+            m.def("benchmarkSimulation", [](std::shared_ptr<Config> config, size_t steps) {
+            auto brain = std::make_shared<Brain>(config);
+            if (!brain->initialize()) {
+                throw std::runtime_error("Failed to initialize brain for benchmarking");
+            }
+            
+            // Warm up
+            for (nlm::SimulationStep step = 0; step < 100; ++step) {
+                brain->step(step);
+            }
+            
+            // Actual benchmark
+            auto start = std::chrono::high_resolution_clock::now();
+            for (nlm::SimulationStep step = 100; step < steps; ++step) {
+                brain->step(step);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            auto duration = std::chrono::duration<double>(end - start).count();
+            double stepsPerSecond = (steps - 100) / duration;
+            double avgSpikesPerStep = brain->getTotalSpikeCount() / static_cast<double>(steps);
+            
+            return std::make_tuple(stepsPerSecond, avgSpikesPerStep, brain->getTotalSpikeCount());
+        }, py::arg("config"), py::arg("steps"),
+           "Benchmark simulation performance and return (steps_per_second, avg_spikes_per_step, total_spikes)");
+        
+        m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+            if (!brain->save(filepath)) {
+                throw std::runtime_error("Failed to export brain state to " + filepath);
+            }
+        }, py::arg("brain"), py::arg("filepath"),
+           "Export brain state (checkpoint) to file");
+        
+        m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+            if (!brain->load(filepath)) {
+                throw std::runtime_error("Failed to import brain state from " + filepath);
+            }
+        }, py::arg("brain"), py::arg("filepath"),
+           "Import brain state (checkpoint) from file");
+        
+        m.def("resetBrain", [](std::shared_ptr<Brain> brain) {
+            brain->reset();
+        }, py::arg("brain"),
+           "Reset brain to initial state");
+        
+        m.def("initializeBrain", [](std::shared_ptr<Brain> brain) {
+            brain->initialize();
+        }, py::arg("brain"),
+           "Initialize brain with current configuration");
+        
+        m.def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, 
+                              std::shared_ptr<SimpleWorld> world, size_t steps) {
+            // This is a simplified episode runner for testing
+            for (nlm::SimulationStep step = 0; step < steps; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+            
+            return brain->getTotalSpikeCount();
+        }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps"),
+           "Run a complete episode with brain, agent, and world");
+        
+        // Advanced configuration utilities
+        m.def("createPresetConfig", [](const std::string& presetName) {
+            auto config = std::make_shared<Config>();
+            
+            if (presetName == "minimal") {
+                config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+                config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+                config->set("simulation_timestep", 0.01, nlm::ConfigSource::Default);
+            } else if (presetName == "standard") {
+                config->set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+                config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+                config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+                config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+            } else if (presetName == "complex") {
+                config->set("neuron_count", static_cast<int64_t>(5000), nlm::ConfigSource::Default);
+                config->set("region_count", static_cast<int64_t>(5), nlm::ConfigSource::Default);
+                config->set("connection_probability", 0.15, nlm::ConfigSource::Default);
+                config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+                config->set("plasticity_learning_rate", 0.01, nlm::ConfigSource::Default);
+            } else {
+                throw std::runtime_error("Unknown preset name: " + presetName);
+            }
+            
+            return config;
+        }, py::arg("presetName"),
+           "Create a preset configuration (minimal, standard, complex)");
+        
+        m.def("listPresets", []() {
+            return std::vector<std::string>{"minimal", "standard", "complex"};
+        }, "List available preset configuration names");
+        
+        // Advanced analysis and statistics
+        m.def("computeNetworkMetrics", [](std::shared_ptr<Brain> brain) {
+            std::map<std::string, double> metrics;
+            
+            // Basic statistics
+            metrics["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+            metrics["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+            metrics["active_neurons"] = static_cast<double>(brain->getActiveNeuronCount());
+            metrics["firing_neuron_percentage"] = 
+                (metrics["total_neurons"] > 0) ? 
+                100.0 * metrics["active_neurons"] / metrics["total_neurons"] : 0.0;
+            
+            // Network properties
+            metrics["average_firing_rate"] = brain->getAverageFiringRate();
+            metrics["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+            metrics["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+            metrics["spikes_per_neuron"] = 
+                (metrics["total_neurons"] > 0) ? 
+                metrics["total_spikes"] / metrics["total_neurons"] : 0.0;
+            
+            // Connectivity
+            metrics["synapses_per_neuron"] = 
+                (metrics["total_neurons"] > 0) ? 
+                metrics["total_synapses"] / metrics["total_neurons"] : 0.0;
+            
+            return metrics;
+        }, py::arg("brain"),
+           "Compute comprehensive network metrics");
+        
+        m.def("analyzeSpikingPattern", [](std::shared_ptr<Brain> brain, size_t windowSize) {
+            // This is a simplified analysis - real implementations would have more sophisticated analysis
+            std::map<std::string, double> analysis;
+            
+            // Get current spike count
+            analysis["current_spike_count"] = static_cast<double>(brain->getTotalSpikeCount());
+            analysis["current_firing_rate"] = brain->getAverageFiringRate();
+            
+            // For a real implementation, we would track spike history and analyze patterns
+            // This is a placeholder for advanced spiking analysis
+            return analysis;
+        }, py::arg("brain"), py::arg("windowSize") = 100,
+           "Analyze current spiking pattern (placeholder for advanced analysis)");
+        
+        // Configuration comparison utilities
+        m.def("diffConfigs", [](const std::shared_ptr<Config>& config1, 
+                               const std::shared_ptr<Config>& config2) {
+            std::vector<std::string> differences;
+            
+            auto keys1 = config1->getKeys();
+            auto keys2 = config2->getKeys();
+            
+            // Check for keys only in config1
+            for (const auto& key : keys1) {
+                if (!config2->has(key)) {
+                    differences.push_back("config1 has key \"" + key + "\" but config2 does not");
+                }
+            }
+            
+            // Check for keys only in config2
+            for (const auto& key : keys2) {
+                if (!config1->has(key)) {
+                    differences.push_back("config2 has key \"" + key + "\" but config1 does not");
+                }
+            }
+            
+            // Check for different values
+            for (const auto& key : keys1) {
+                if (config2->has(key)) {
+                    auto value1 = config1->get<std::string>(key);
+                    auto value2 = config2->get<std::string>(key);
+                    if (value1 && value2 && *value1 != *value2) {
+                        differences.push_back("Difference in \"" + key + "\": \"" + 
+                                            (*value1) + "\" vs \"" + (*value2) + "\"");
+                    }
+                }
+            }
+            
+            return differences;
+        }, py::arg("config1"), py::arg("config2"),
+           "Compare two configurations and return list of differences");
+        
+        m.def("mergeConfigs", [](const std::shared_ptr<Config>& base, 
+                                const std::shared_ptr<Config>& override) {
+            auto merged = std::make_shared<Config>(base);
+            for (const auto& key : override->getKeys()) {
+                auto value = override->get<std::string>(key);
+                if (value) {
+                    merged->set(key, *value, nlm::ConfigSource::Runtime);
+                }
+            }
+            return merged;
+        }, py::arg("base"), py::arg("override"),
+           "Merge two configurations (override takes precedence)");
+        
+        // Validation utilities
+        m.def("validateConfigForUseCase", [](const std::shared_ptr<Config>& config, 
+                                            const std::string& useCase) {
+            bool isValid = config->validate(useCase);
+            auto errors = config->getValidationErrors();
+            return std::make_pair(isValid, errors);
+        }, py::arg("config"), py::arg("useCase"),
+           "Validate configuration for specific use case and return (is_valid, errors)");
+        
+        m.def("validateConfigComplete", [](const std::shared_ptr<Config>& config) {
+            bool isValid = config->validate();
+            auto errors = config->getValidationErrors();
+            return std::make_pair(isValid, errors);
+        }, py::arg("config"),
+           "Validate configuration completeness and return (is_valid, errors)");
 
 } // namespace nlm

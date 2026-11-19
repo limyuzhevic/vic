@@ -86,7 +86,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Use to_string for simple types, handle complex types appropriately
+        std::visit([&file](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else {
+                // For int, int64_t, double, float - just output as number
+                if constexpr (std::is_same_v<T, int> ||
+                             std::is_same_v<T, int64_t> ||
+                             std::is_same_v<T, double> ||
+                             std::is_same_v<T, float>) {
+                    file << entry.key << " = " << value << "\n";
+                }
+            }
+        }, entry.value);
     }
     
     return true;
@@ -234,5 +264,124 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+}
+
+namespace nlm {
+
+// Validation callback type
+using ValidationCallback = std::function<bool(const Config&)>;
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    std::vector<std::string> validationErrors;
+    ValidationCallback validationCallback;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::validate(const std::string& useCase) const {
+    pImpl->validationErrors.clear();
+    
+    // Check for validation callback
+    if (pImpl->validationCallback) {
+        if (!pImpl->validationCallback(*this)) {
+            return false;
+        }
+    }
+    
+    // Basic validation - check for required patterns
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            pImpl->validationErrors.push_back("Empty configuration key found");
+        }
+        
+        // Check for duplicate keys
+        // (Already prevented by std::map-like behavior in set())
+    }
+    
+    return pImpl->validationErrors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+void Config::setValidationCallback(std::function<bool(const Config&)> callback) {
+    pImpl->validationCallback = std::move(callback);
+}
+
+bool Config::hasRequiredKeys(const std::vector<std::string>& requiredKeys) const {
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            pImpl->validationErrors.push_back("Missing required key: " + key);
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string Config::getValidationReport() const {
+    if (pImpl->validationErrors.empty()) {
+        return "Configuration is valid.";
+    }
+    
+    std::ostringstream oss;
+    oss << "Validation errors (" << pImpl->validationErrors.size() << "):\n";
+    for (const auto& error : pImpl->validationErrors) {
+        oss << "  - " << error << "\n";
+    }
+    return oss.str();
+}
+
+bool Config::validateParameter(const std::string& key, double minValue, double maxValue) const {
+    auto val = get<double>(key);
+    if (!val) {
+        pImpl->validationErrors.push_back("Missing parameter for validation: " + key);
+        return false;
+    }
+    
+    if (val.value() < minValue || val.value() > maxValue) {
+        pImpl->validationErrors.push_back("Parameter " + key + " value " + 
+                                        std::to_string(val.value()) + 
+                                        " is outside valid range [" + 
+                                        std::to_string(minValue) + ", " + 
+                                        std::to_string(maxValue) + "]");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateParameter(const std::string& key, int minValue, int maxValue) const {
+    auto val = get<int>(key);
+    if (!val) {
+        pImpl->validationErrors.push_back("Missing parameter for validation: " + key);
+        return false;
+    }
+    
+    if (val.value() < minValue || val.value() > maxValue) {
+        pImpl->validationErrors.push_back("Parameter " + key + " value " + 
+                                        std::to_string(val.value()) + 
+                                        " is outside valid range [" + 
+                                        std::to_string(minValue) + ", " + 
+                                        std::to_string(maxValue) + "]");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateParameter(const std::string& key, bool required) const {
+    if (required && !has(key)) {
+        pImpl->validationErrors.push_back("Missing required parameter: " + key);
+        return false;
+    }
+    return true;
+}
 
 } // namespace nlm

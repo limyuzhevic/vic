@@ -1,16 +1,28 @@
 #pragma once
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-#include <algorithm>
+#include <functional>
 
-namespace nlm {
-
-// Forward declarations
-class Config;
+// Configuration validation and error handling
+ 
+    // Validate configuration for specific use case
+    bool validate(const std::string& useCase = "") const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Set custom validation callback
+    void setValidationCallback(std::function<bool(const Config&)> callback);
+    
+    // Check if configuration has required keys
+    bool hasRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Get validation report
+    std::string getValidationReport() const;
+    
+    // Validate specific parameter ranges
+    bool validateParameter(const std::string& key, double minValue, double maxValue) const;
+    bool validateParameter(const std::string& key, int minValue, int maxValue) const;
+    bool validateParameter(const std::string& key, bool required = true) const;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -92,10 +104,27 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation and error handling
     
-private:
+    // Validate configuration for specific use case
+    bool validate(const std::string& useCase = "") const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Set custom validation callback
+    void setValidationCallback(std::function<bool(const Config&)> callback);
+    
+    // Check if configuration has required keys
+    bool hasRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Get validation report
+    std::string getValidationReport() const;
+    
+    // Validate specific parameter ranges
+    bool validateParameter(const std::string& key, double minValue, double maxValue) const;
+    bool validateParameter(const std::string& key, int minValue, int maxValue) const;
+    bool validateParameter(const std::string& key, bool required = true) const;
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
