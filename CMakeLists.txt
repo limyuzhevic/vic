@@ -173,6 +173,15 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
+# Unified demo system - provides consistent interface for all phases
+add_executable(nlm_unified
+    src/unified_demo.cpp
+)
+target_link_libraries(nlm_unified PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 2 demo is already accessible via 'nlm' command (src/main.cpp)
+# The unified system provides enhanced help, configuration, and phase selection
+
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp

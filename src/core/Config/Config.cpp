@@ -18,6 +18,182 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Configuration validation functions and constants
+namespace {
+    
+    // Common configuration key patterns
+    const std::unordered_set<std::string> NUMERICAL_KEYS = {
+        "neuron_count", "region_count", "connection_probability",
+        "plasticity_learning_rate", "stdp_ltp_weight", "stdp_ltd_weight",
+        "stdp_time_constant", "synaptogenesis_rate", "pruning_rate",
+        "dopamine_baseline", "reward_discount_factor", "simulation_timestep",
+        "max_simulation_steps", "environment_width", "environment_height",
+        "log_level", "random_seed"
+    };
+    
+    const std::unordered_set<std::string> STRING_KEYS = {
+        "environment_name", "log_filename", "visualization_type"
+    };
+    
+    const std::unordered_set<std::string> BOOLEAN_KEYS = {
+        "log_to_file", "visualization_enabled", "enable_reward_modulation",
+        "enable_curiosity", "enable_development", "enable_checkpointing",
+        "enable_replay"
+    };
+    
+    // Valid ranges for configuration values
+    const std::unordered_map<std::string, std::pair<double, double>> VALID_RANGES = {
+        {"neuron_count", {1, 10000}},
+        {"region_count", {1, 100}},
+        {"connection_probability", {0.0, 1.0}},
+        {"plasticity_learning_rate", {0.0, 1.0}},
+        {"stdp_ltp_weight", {0.0, 1.0}},
+        {"stdp_ltd_weight", {0.0, 1.0}},
+        {"stdp_time_constant", {0.0, 100.0}},
+        {"synaptogenesis_rate", {0.0, 1.0}},
+        {"pruning_rate", {0.0, 1.0}},
+        {"dopamine_baseline", {0.0, 1.0}},
+        {"reward_discount_factor", {0.0, 1.0}},
+        {"simulation_timestep", {0.0, 1.0}},
+        {"max_simulation_steps", {0, 1000000}},
+        {"environment_width", {1, 1000}},
+        {"environment_height", {1, 1000}},
+    };
+    
+    // String value validation
+    bool validateString(const std::string& key, const std::string& value) {
+        if (key == "environment_name") {
+            const std::unordered_set<std::string> validEnvironments = {"GridWorld", "EmptyWorld", "MazeWorld"};
+            return validEnvironments.find(value) != validEnvironments.end();
+        }
+        
+        if (key == "log_level") {
+            const std::unordered_set<std 외
+
+    bool validateConfigEntry(const ConfigEntry& entry) {
+        std::string key = entry.key;
+        std::string lowerKey = toLower(key);
+        
+        // Determine expected type based on key prefix
+        if (lowerKey.find("enable_") == 0) {
+            // boolean flag
+            if (!std::holds_alternative<bool>(entry.value)) {
+                return false;
+            }
+            return true;
+        }
+        
+        if (NUMERICAL_KEYS.find(lowerKey) != NUMERICAL_KEYS.end()) {
+            // numeric value
+            if (!std::holds_alternative<int>(entry.value) &&
+                !std::holds_alternative<int64_t>(entry.value) &&
+                !std::holds_alternative<double>(entry.value)) {
+                return false;
+            }
+            
+            // Check range if valid range is defined
+            auto rangeIt = VALID_RANGES.find(lowerKey);
+            if (rangeIt != VALID_RANGES.end()) {
+                double value = 0.0;
+                std::visit([&](auto&& v) { value = static_cast<double>(v); }, entry.value);
+                double min = rangeIt->second.first;
+                double max = rangeIt->second.second;
+                if (value < min || value > max) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        if (STRING_KEYS.find(lowerKey) != STRING_KEYS.end()) {
+            // string value
+            return std::holds_alternative<std::string>(entry.value);
+        }
+        
+        // Default: accept any value
+        return true;
+    }
+    
+    std::string formatErrorMessage(const std::string& key, const std::string& value, const std::string& expectedType) {
+        return "Invalid configuration value for key '" + key + "': '" + value + "' (expected type: " + expectedType + ")";
+    }
+    
+    // Configuration source precedence validation
+    bool validateSourcePrecedence(const ConfigEntry& newEntry, const ConfigEntry& existingEntry) {
+        // CommandLine overrides File, which overrides Default
+        if (newEntry.source == ConfigSource::CommandLine && existingEntry.source == ConfigSource::File) {
+            return true;
+        }
+        if (newEntry.source == ConfigSource::CommandLine && existingEntry.source == ConfigSource::Default) {
+            return true;
+        }
+        if (newEntry.source == ConfigSource::File && existingEntry.source == ConfigSource::Default) {
+            return true;
+        }
+        if (newEntry.source == ConfigSource::Runtime && existingEntry.source == ConfigSource::Default) {
+            return true;
+        }
+        return true; // Other combinations are fine
+    }
+    
+} // namespace
+
+bool Config::validateConfig(const std::string& key, const ConfigValue& value) {
+    ConfigEntry entry(key, value, ConfigSource::Runtime);
+    return validateConfigEntry(entry);
+}
+
+std::vector<std::string> Config::validateAll() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!validateConfigEntry(entry)) {
+            // Determine expected type
+            std::string expectedType = "unknown";
+            std::string lowerKey = toLower(entry.key);
+            
+            if (NUMERICAL_KEYS.find(lowerKey) != NUMERICAL_KEYS.end()) {
+                expectedType = "numeric (int, int64_t, or double)";
+            } else if (STRING_KEYS.find(lowerKey) != STRING_KEYS.end()) {
+                expectedType = "string";
+            } else if (BOOLEAN_KEYS.find(lowerKey) != BOOLEAN_KEYS.end()) {
+                expectedType = "boolean";
+            }
+            
+            errors.push_back(formatErrorMessage(entry.key, to_string(entry.value), expectedType));
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the configuration entry before setting
+    ConfigEntry newEntry(key, value, source);
+    if (!validateConfigEntry(newEntry)) {
+        // Validation failed
+        return false;
+    }
+    
+    // Check source precedence
+    auto existingIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (existingIt != pImpl->entries.end()) {
+        if (!validateSourcePrecedence(newEntry, *existingIt)) {
+            // Source precedence violation
+            return false;
+        }
+        existingIt->value = value;
+        existingIt->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+    
+    return true;
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
@@ -28,7 +204,12 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
+    std::vector<std::string> validationErrors;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,8 +229,53 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            ConfigValue configValue;
+            bool parsingSuccess = true;
+            
+            // Try to convert to appropriate type
+            if (isNumericString(value)) {
+                // Try to parse as int first, then int64_t, then double
+                try {
+                    configValue = std::stoi(value);
+                } catch (...) {
+                    try {
+                        configValue = std::stoll(value);
+                    } catch (...) {
+                        try {
+                            configValue = std::stod(value);
+                        } catch (...) {
+                            parsingSuccess = false;
+                        }
+                    }
+                }
+            } else if (isBooleanString(value)) {
+                configValue = (value == "true" || value == "1" || value == "yes");
+            } else {
+                // Treat as string
+                configValue = value;
+            }
+            
+            if (!parsingSuccess) {
+                validationErrors.push_back("Line " + std::to_string(lineNumber) + 
+                                          ": Cannot parse value '" + value + "' as numeric or boolean");
+                continue;
+            }
+            
+            // Validate the configuration entry
+            ConfigEntry entry(key, configValue, ConfigSource::File);
+            if (!validateConfigEntry(entry)) {
+                validationErrors.push_back("Line " + std::to_string(lineNumber)ihilation + 
+                                          ": Invalid configuration for key '" + key + "'");
+                continue;
+            }
+            
+            set(key, configValue, ConfigSource::File);
         }
+    }
+    
+    // If there were validation errors, log them and return false
+    if (!validationErrors.empty()) {
+        return false;
     }
     
     return true;
@@ -216,6 +442,49 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
+
+// Helper functions for configuration validation
+namespace {
+    
+    bool isNumericString(const std::string& str) {
+        // Check if string can be parsed as numeric
+        if (str.empty()) return false;
+        
+        size_t start = 0;
+        if (str[0] == '-' || str[0] == '+') {
+            start = 1;
+        }
+        
+        // Check for digits
+        bool hasDigit = false;
+        for (size_t i = start; i < str.size(); ++i) {
+            if (std::isdigit(str[i])) {
+                hasDigit = true;
+            } else if (str[i] != '.' && str[i] != 'e' && str[i] != 'E') {
+                // Not a valid numeric character
+                return false;
+            }
+        }
+        
+        return hasDigit;
+    }
+    
+    bool isBooleanString(const std::string& str) {
+        std::string lower = str;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        return (lower == "true" || lower == "false" || lower == "1" || lower == "0" || 
+                lower == "yes" || lower == "no" || lower == "on" || lower == "off");
+    }
+    
+    std::string to_string(const ConfigValue& value) {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            oss << arg;
+        }, value);
+        return oss.str();
+    }
+    
+} // namespace
 
 // Explicit template instantiations
 // (uint64_t and size_t are the same type on this platform, so only one is listed)
