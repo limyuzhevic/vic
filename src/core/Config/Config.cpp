@@ -230,8 +230,15 @@ template std::optional<std::string> Config::get<std::string>(const std::string&)
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
+// Print configuration to stdout
+void Config::printConfig() const {
+    std::cout << summary() << std::endl;
+}
+
+// Print configuration to log
+void Config::logConfig() const {
+    NLM_LOG_INFO(summary());
+}
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 

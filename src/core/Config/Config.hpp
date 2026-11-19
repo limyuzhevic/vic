@@ -95,6 +95,12 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Print configuration to stdout
+    void printConfig() const;
+    
+    // Print configuration to log
+    void logConfig() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
