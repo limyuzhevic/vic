@@ -35,6 +35,15 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Update prediction system with current state and timestep
+    void update(TimestepDuration dt, SimulationStep step);
+    
+    // Get current prediction strength (0.0 = weak, 1.0 = strong)
+    float getPredictionStrength() const;
+    
+    // Integrate concepts from concept formation system
+    void integrateConcepts(const std::vector<std::string>& concepts);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

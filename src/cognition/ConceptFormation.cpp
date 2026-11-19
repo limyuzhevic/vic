@@ -558,4 +558,14 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
+// Get current concepts (those that are currently active/being used)
+const std::vector<size_t>& ConceptFormation::getCurrentConcepts() const {
+    return currentConceptIds_;
+}
+
+// Set current concepts for planning/decision making
+void ConceptFormation::setCurrentConcepts(const std::vector<size_t>& conceptIds) {
+    currentConceptIds_ = conceptIds;
+}
+
 } // namespace nlm

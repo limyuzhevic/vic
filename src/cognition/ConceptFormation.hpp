@@ -108,11 +108,13 @@ public:
     // Measure concept stability (0-1)
     float getConceptStability(size_t conceptId) const;
 
-    // Get number of concepts discovered
-    size_t getConceptCount() const { return concepts_.size(); }
-
-    // Merge two concepts (when discovered they are actually the same)
-    void mergeConcepts(size_t conceptA, size_t conceptB);
+// Get current concepts (those that are currently active/being used)
+    const std::vector<size_t>& getCurrentConcepts() const { return currentConceptIds_; }
+    
+    // Set current concepts for planning/decision making
+    void setCurrentConcepts(const std::vector<size_t>& conceptIds) {
+        currentConceptIds_ = conceptIds;
+    }
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
@@ -158,6 +160,9 @@ private:
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
     
+    // Current concepts being used for planning/decision making
+    std::vector<size_t> currentConceptIds_;
+    
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
@@ -165,6 +170,15 @@ private:
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience
+// NOT a map with coordinates - encodes spatial relationships in neural patterns
+//
+// Key mechanisms:
+// - Place neurons form through spatial exploration
+// - Spatial relationships encoded in synaptic connectivity
+// - Path integration through dead reckoning
+// - Landmark associations
+
+class SpatialRepresentation {
 // NOT a map with coordinates - encodes spatial relationships in neural patterns
 //
 // Key mechanisms:
