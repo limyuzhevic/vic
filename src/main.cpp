@@ -326,10 +326,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+// Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Try to load from JSON file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -339,14 +339,33 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 8) == "--jsonconfig") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+            // Try JSON loading first
+            if (config->loadFromJSONFile(configFile)) {
+                NLM_LOG_INFO("Loaded JSON configuration from: " + configFile);
+            } else if (config->loadFromFile(configFile)) {
+                NLM_LOG_INFO("Loaded configuration from: " + configFile);
+            } else {
+                NLM_LOG_INFO("Failed to load configuration, using defaults.");
+            }
+            continue; // Skip the regular loadFromFile call
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load from config file (supports both .cfg and .json formats)
+    if (configFile.substr(configFile.size() - 5) == ".json") {
+        if (!config->loadFromJSONFile(configFile)) {
+            NLM_LOG_INFO("Failed to load JSON configuration, falling back to defaults.");
+        }
+    } else if (!config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Failed to load configuration file, using defaults.");
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
     }
     
     // Override with command line args

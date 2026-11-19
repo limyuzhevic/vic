@@ -401,9 +401,42 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    // Implement actual header writing - write to stream now
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) {
+        error_ = "Failed to write checkpoint header";
+        return false;
+    }
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    // Implement actual section header writing
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) {
+        error_ = "Failed to write section header";
+        return false;
+    }
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    // Pad to alignment boundary for disk I/O optimization
+    size_t current = static_cast<size_t>(stream_.tellp());
+    size_t padSize = (alignment - (current % alignment)) % alignment;
+    
+    if (padSize > 0) {
+        std::vector<uint8_t> padding(padSize, 0);
+        stream_.write(reinterpret_cast<const char*>(padding.data()), padSize);
+        if (!stream_) {
+            error_ = "Failed to pad to alignment";
+            return false;
+        }
+    }
+    
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

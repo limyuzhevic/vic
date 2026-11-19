@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -56,8 +57,8 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from JSON file
+    bool loadFromJSONFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -68,10 +69,10 @@ public:
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
