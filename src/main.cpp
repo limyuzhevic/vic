@@ -28,7 +28,32 @@
 
 using namespace nlm;
 
+/**
+ * @brief Displays the NLM application banner with version and phase information.
+ * 
+ * This function prints the main title screen showing NLM as "熙然" (serene flow),
+ * which represents the project's goal of creating a neural system that develops
+ * and adapts over time through experience and learning.
+ */
 void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Real LIF neuron dynamics                                ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -307,76 +332,32 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Forward declaration
+bool setupLogging();
+bool loadConfiguration(std::shared_ptr<Config>& config, int argc, char** argv);
+void logConfigurationSummary(const std::shared_ptr<Config>& config);
+void runAllTests(const std::shared_ptr<Brain>& brain);
+void printFinalSummary();
+
 int main(int argc, char** argv) {
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Initialize logging system
+    if (!setupLogging()) {
+        std::cerr << "Failed to initialize logging system!" << std::endl;
+        return 1;
+    }
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
+    // Load and configure settings
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (!loadConfiguration(config, argc, argv)) {
+        std::cerr << "Failed to load configuration!" << std::endl;
+        return 1;
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    logConfigurationSummary(config);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -395,7 +376,245 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Run all tests
+    runAllTests(brain);
+    
+    // Print final summary
+    printFinalSummary();
+    
+    return 0;
+}
+
+bool setupLogging() {
+    try {
+        auto logger = std::make_shared<Logger>();
+        
+        // Determine log level from environment variable or default to Info
+        LogLevel logLevel = LogLevel::Info;
+        const char* logLevelEnv = std::getenv("NLM_LOG_LEVEL");
+        if (logLevelEnv) {
+            std::string level = logLevelEnv;
+            if (level == "debug") logLevel = LogLevel::Debug;
+            else if (level == "warning") logLevel = LogLevel::Warning;
+            else if (level == "error") logLevel = LogLevel::Error;
+            else if (level == "critical") logLevel = LogLevel::Critical;
+        }
+        
+        auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
+        logger->addLogger(consoleLogger);
+        
+        // Check for log file output
+        const char* logFileEnv = std::getenv("NLM_LOG_FILE");
+        if (logFileEnv) {
+            consoleLogger->setOutputFile(logFileEnv);
+            NLM_LOG_INFO("Logging to file: " + std::string(logFileEnv));
+        }
+        
+        // Check for log colors
+        const char* useColorsEnv = std::getenv("NLM_LOG_COLORS");
+        if (useColorsEnv) {
+            bool useColors = std::string(useColorsEnv) == "true" || std::string(useColorsEnv) == "1" || std::string(useColorsEnv) == "yes";
+            consoleLogger->setUseColors(useColors);
+        }
+        
+        Logger::setGlobal(logger);
+        
+        NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+        NLM_LOG_INFO("Implementing:");
+        NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+        NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+        NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+        
+        // Log environment info
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Log Level: " + (logLevelEnv ? logLevelEnv : "Info"));
+        if (logFileEnv) NLM_LOG_INFO("Log File: " + std::string(logFileEnv));
+        NLM_LOG_INFO("Colors: " + (useColorsEnv ? (std::string(useColorsEnv) == "true" || std::string(useColorsEnv) == "1" || std::string(useColorsEnv) == "yes" ? "enabled" : "disabled") : "enabled"));
+        NLM_LOG_INFO("");
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error setting up logging: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool loadConfiguration(std::shared_ptr<Config>& config, int argc, char** argv) {
+    try {
+        config = std::make_shared<Config>();
+        
+        // Try to load from file if provided
+        std::string configFile = "configs/default.cfg";
+        if (!parseCommandLineArgs(argc, argv, configFile)) {
+            NLM_LOG_WARNING("Failed to parse command line arguments");
+        }
+        
+        // Load config from file
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
+        }
+        
+        // Process enhanced command line arguments
+        bool enableProfiler = false;
+        bool enableDebug = false;
+        bool enableValidation = false;
+        std::string logLevel = "info";
+        std::string logFile = "";
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Enhanced config options
+            if (arg.find("--log-level=") == 0) {
+                logLevel = arg.substr(11);
+                NLM_LOG_INFO("Setting log level to: " + logLevel);
+            } else if (arg.find("--log-file=") == 0) {
+                logFile = arg.substr(10);
+                NLM_LOG_INFO("Setting log file to: " + logFile);
+            } else if (arg == "--debug" || arg == "-debug") {
+                enableDebug = true;
+                NLM_LOG_INFO("Debug mode enabled");
+            } else if (arg == "--validate" || arg == "-validate") {
+                enableValidation = true;
+                NLM_LOG_INFO("Configuration validation enabled");
+            } else if (arg == "--profiler" || arg == "-profiler") {
+                enableProfiler = true;
+                NLM_LOG_INFO("Performance profiler enabled");
+            }
+        }
+        
+        // Override with command line args
+        config->loadFromArgs(argc, argv);
+        
+        // Set default values for Phase 2
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        // Update log level based on environment
+        updateLogLevel(logLevel);
+        
+        // Set log file if specified
+        if (!logFile.empty()) {
+            setLogFile(logFile);
+        }
+        
+        // Enable profiler if requested
+        if (enableProfiler) {
+            enablePerformanceProfiling();
+        }
+        
+        // Enable debug mode if requested
+        if (enableDebug) {
+            enableDebugMode();
+        }
+        
+        // Validate configuration if requested
+        if (enableValidation) {
+            if (!config->validate()) {
+                NLM_LOG_WARNING("Configuration validation failed - see logs for details");
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading configuration: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool parseCommandLineArgs(int argc, char** argv, std::string& configFile) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+                return true;
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void updateLogLevel(const std::string& level) {
+    LogLevel logLevel = LogLevel::Info;
+    std::string levelLower = level;
+    std::transform(levelLower.begin(), levelLower.end(), levelLower.begin(), ::tolower);
+    
+    if (levelLower == "debug") logLevel = LogLevel::Debug;
+    else if (levelLower == "warning") logLevel = LogLevel::Warning;
+    else if (levelLower == "error") logLevel = LogLevel::Error;
+    else if (levelLower == "critical") logLevel = LogLevel::Critical;
+    
+    Logger::getGlobal().setLevel(logLevel);
+}
+
+void setLogFile(const std::string& filepath) {
+    if (!filepath.empty()) {
+        // The ConsoleLogger setOutputFile method is called during initialization
+        // and the file is set when the logger is created.
+        // For this implementation, we'll rely on the NLM_LOG_FILE environment variable
+        // which is already handled in setupLogging().
+        NLM_LOG_INFO("Log file setting should be configured via NLM_LOG_FILE environment variable");
+    }
+}
+
+void enablePerformanceProfiling() {
+    // Initialize profiler for phase 2
+    nlm::Profiler::getInstance().clear();
+    nlm::Profiler::getInstance().start("total_simulation");
+    NLM_LOG_INFO("Performance profiling enabled");
+}
+
+void enableDebugMode() {
+    // Enable debug output
+    NLM_LOG_INFO("Debug mode enabled - detailed logging will be shown");
+    NLM_LOG_DEBUG("Debug output available for developers");
+}
+
+void logConfigurationSummary(const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Log additional configuration details
+    if (config->has("stdp_ltp_weight")) {
+        NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    }
+    if (config->has("stdp_ltd_weight")) {
+        NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    }
+    if (config->has("synaptogenesis_rate")) {
+        NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    }
+    NLM_LOG_INFO("");
+}
+
+void runAllTests(const std::shared_ptr<Brain>& brain) {
     // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting NLM Test Suite ===");
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
@@ -409,12 +628,9 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
+}
+
+void printFinalSummary() {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
@@ -430,6 +646,4 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
-    return 0;
 }

@@ -28,6 +28,10 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<nlm::ConfigError>(m, "ConfigError");
+    py::register_exception<nlm::ConfigFileError>(m, "ConfigFileError");
+    py::register_exception<nlm::ConfigParseError>(m, "ConfigParseError");
+    py::register_exception<nlm::ConfigValidationError>(m, "ConfigValidationError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -144,27 +148,56 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile),
+             py::arg("filepath"),
+             "Load configuration from a file (JSON, YAML, or INI format)")
+        .def("loadFromString", &Config::loadFromString,
+             py::arg("content"), py::arg("format") = "auto",
+             "Load configuration from a string (JSON, YAML, or INI format)")
+        .def("saveToFile", py::overload_cast<const std::string&>(&Config::saveToFile),
+             py::arg("filepath"),
+             "Save configuration to a file (JSON format)")
+        .def("has", py::overload_cast<const std::string&>(&Config::has, std::shared_ptr<Config>::return_type),
+             py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
+        .def("get", py::overload_cast<const std::string&>(&Config::get, std::shared_ptr<Config>::return_type),
+             py::arg("key"),
+             "Get a configuration value (returns None if key doesn't exist)")
+        .def("getOr", py::overload_cast<const std::string&, const int64_t&>(&Config::getOr, std::shared_ptr<Config>::return_type),
+             py::arg("key"), py::arg("default_value"),
+             "Get a configuration value or return default if key doesn't exist")
+        .def("set", py::overload_cast<const std::string&, const ConfigValue&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (string)")
+        .def("set", py::overload_cast<const std::string&, int64_t, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (int64)")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (double)")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (bool)")
+        .def("remove", &Config::remove,
+             py::arg("key"),
+             "Remove a configuration key")
+        .def("getKeys", py::overload_cast<>(&Config::getKeys),
              "Get all configuration keys")
-        .def("clear", &Config::clear,
+        .def("getEntryCount", py::overload_cast<>(&Config::getEntryCount),
+             "Get the number of configuration entries")
+        .def("getSource", py::overload_cast<const std::string&>(&Config::getSource),
+             py::arg("key"),
+             "Get the source of a configuration key")
+        .def("validate", py::overload_cast<>(&Config::validate),
+             "Validate the configuration (return True if valid)")
+        .def("getValidationErrors", py::overload_cast<>(&Config::getValidationErrors),
+             "Get validation error messages")
+        .def("clear", py::overload_cast<>(&Config::clear),
              "Clear all configuration entries")
-        .def("summary", &Config::summary,
+        .def("summary", py::overload_cast<>(&Config::summary),
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";

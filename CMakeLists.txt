@@ -57,6 +57,7 @@ add_library(nlm_core STATIC
     # Memory
     src/memory/Memory.cpp
     src/performance/CheckpointSystem.cpp
+    src/performance/Profiler.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition

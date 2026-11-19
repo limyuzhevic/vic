@@ -8,6 +8,7 @@
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
+#include "performance/Profiler.hpp"
 
 #include <iostream>
 #include <chrono>
@@ -29,6 +30,8 @@ struct BenchmarkResult {
 };
 
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
+    auto scope = ProfilerScope("Benchmark: " + std::to_string(neuronCount) + " neurons");
+    
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
