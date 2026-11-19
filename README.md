@@ -96,16 +96,20 @@ Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+./nlm                 # Phase 2: Basic neural computation with STDP and Hebbian learning
+./nlm_phase3_demo     # Phase 3: world interaction, reward prediction, and basic cognition
+./nlm_phase4_demo     # Phase 4: full cognition systems with concepts, self-model, and social learning
+./nlm_phase5_demo     # Phase 5: brain-personality, sandbox learning, and checkpoint persistence
+./nlm_phase6_demo     # Phase 6: final integration - comprehensive connectivity test of all brain systems
+./nlm_phase6_text_demo # Phase 6 text/thought demo - text as sensory, concept formation, and social learning
+./nlm_benchmark       # Performance benchmark measuring simulation speed at different scales
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+**Phase 6 Integration Demo:** `nlm_phase6_demo` runs a comprehensive integration test verifying that all Phase 6 brain systems (memory, neuromodulation, prediction, cognition, development, checkpointing, and replay) are properly connected and working together.
+
+**Phase 5 Brain-Personality Demo:** `nlm_phase5_demo` demonstrates a brain developing a personality through three measurable components: pattern probe (selective coding), sandbox run (closed-loop learning), and checkpoint round-trip (state persistence).
+
+**Phase 6 Text Demo:** `nlm_phase6_text_demo` extends the integration demo with text processing, concept formation, and social learning demonstrations.
 
 ## Project Structure
 
@@ -154,6 +158,7 @@ NLM/
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
+- `nlm` executable (Phase 2 demo)
 
 ### Phase 3 (Complete)
 - World interaction loop
@@ -161,6 +166,7 @@ NLM/
 - Reward prediction error
 - Developmental stages
 - Novelty and curiosity
+- `nlm_phase3_demo` executable
 
 ### Phase 4 (Complete)
 - Neural prediction system
@@ -172,6 +178,7 @@ NLM/
 - Self-model
 - Social learning
 - Continual learning
+- `nlm_phase4_demo` executable
 
 ### Phase 5 (Complete)
 - Performance optimizations
@@ -179,6 +186,7 @@ NLM/
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
+- `nlm_phase5_demo` executable (brain-personality and sandbox demo)
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
@@ -188,7 +196,8 @@ NLM/
 - Development affects plasticity rates
 - Checkpoint save/load working
 - Replay and consolidation functional
-- Phase 6 integration experiment created
+- `nlm_phase6_demo` executable (integration test)
+- `nlm_phase6_text_demo` executable (text teaching and concept demo)
 
 ## Scientific Limitations
 

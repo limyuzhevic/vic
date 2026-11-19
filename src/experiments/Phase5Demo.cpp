@@ -135,10 +135,21 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 
 int main() {
     using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
+    
+    // Print banner with help information
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
     std::cout << "===========================================\n\n";
+    std::cout << "This demo demonstrates three measurable components of Phase 5:\n";
+    std::cout << "1. Pattern probe - fresh brain responses to different synthetic percepts\n";
+    std::cout << "2. Sandbox run - closed-loop learning in SimpleWorld\n";
+    std::cout << "3. Checkpoint round-trip - state persistence across brain reloads\n\n";
+    
+    std::cout << "Usage: nlm_phase5_demo\n";
+    std::cout << "  Runs the complete Phase 5 demonstration without command-line arguments.\n";
+    std::cout << "  Note: Brain seed is fixed at 42 for reproducibility.\n\n";
+    
+    Logger::getGlobal().setLevel(LogLevel::Error);
 
     // --- 1. Pattern probe ---
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";

@@ -39,13 +39,18 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "\nUsage: nlm [--config file.cfg] [other config options]\n";
+    std::cout << "  --config file.cfg    Load configuration from file (default: configs/default.cfg)\n";
+    std::cout << "\nExample:\n";
+    std::cout << "  nlm --config myconfig.cfg --neuron_count 1000 --random_seed 123\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

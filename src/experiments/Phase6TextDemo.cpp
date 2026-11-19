@@ -132,10 +132,23 @@ float cosine(const std::vector<float>& a, const std::vector<float>& b) {
 
 int main() {
     using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
+    
+    // Print banner with help information
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
     std::cout << "===========================================\n\n";
+    std::cout << "This Phase 6 demo demonstrates text-based learning capabilities:\n";
+    std::cout << "1. Text as a sense - teaches text associations through STDP\n";
+    std::cout << "2. Planner in the loop - reports planner overrides and agreement\n";
+    std::cout << "3. Concepts, self-model, social learning - cognitive systems\n";
+    std::cout << "4. Pacing - timed sandbox with real action execution\n\n";
+    
+    std::cout << "Usage: nlm_phase6_text_demo\n";
+    std::cout << "  Runs the text teaching and thought demo.\n";
+    std::cout << "  Note: Demonstrates learning text associations, concept formation, " << std::endl;
+    std::cout << "  social learning, and planner integration.\n\n";
+    
+    Logger::getGlobal().setLevel(LogLevel::Error);
 
     std::vector<float> emptyVision(16, 1.0f);
     std::vector<float> noTouch(8, 0.0f);
