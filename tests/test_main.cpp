@@ -37,6 +37,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_phase6_integration {
+    int main();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -119,6 +123,20 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << std::endl << "Running Phase 6 Integration tests..." << std::endl;
+    try {
+        int phase6Result = test_phase6_integration::main();
+        if (phase6Result == 0) {
+            std::cout << "  PASSED" << std::endl;
+        } else {
+            std::cout << "  FAILED" << std::endl;
+            allPassed = false;
+        }
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
@@ -128,3 +146,4 @@ int main() {
         return 1;
     }
 }
+

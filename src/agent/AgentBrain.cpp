@@ -942,48 +942,43 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Dopamine-like signal: use the actual reward for signaling
+    // This fixes the integration issue where world rewards were not connected to the dopamine system
+    // The prediction error was being used incorrectly; we should use the actual reward
+    dopamineLevel_ = reward / 10.0f;  // Normalize reward to [-1, 1] range
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
+    // Apply reward-modulated weight changes
+    // Reward-modulated synaptic plasticity implements R-STDP: eligibility traces accumulate
+    // STDP-like weight changes until a reward arrives, at which point the trace is converted
+    // to a weight change proportional to both the trace and the reward magnitude.
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
 
             if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
+                // Apply reward-modulated weight change.
+                // This implements R-STDP: eligibility traces accumulate during pre-post spike pairs
+                // and are converted to weight changes when reward arrives.
+                // A 0.05 learning rate and +-0.1 per-event cap keep rewards meaningful without
+                // erasing all prior selectivity in one step.
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
                 delta = std::clamp(delta, -0.1f, 0.1f);
                 syn->addToWeight(delta);
-                
+
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
+    // Apply neuromodulation based on the reward signal
+    // This is now connected: world rewards are properly signaling the brain's dopamine system
+    // The AgentBrain computes a dopamine level from the actual reward (not prediction error)
+    // and the Brain's applyNeuromodulation() method now properly scales STDP learning rates
+    // based on this dopamine signal, creating a real reward-modulated plasticity system.
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

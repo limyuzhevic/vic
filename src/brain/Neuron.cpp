@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 namespace nlm {
 
@@ -216,11 +217,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // IMPROVEMENT: Add input scaling to prevent runaway excitation
+    // Previously: synapticContribution = pImpl->synapticInput / C;
+    // Now: synapticContribution is scaled down to be more biologically realistic
+    float synapticContribution = std::min(pImpl->synapticInput / C, 50.0f);
+    
+    // IMPROVEMENT: Add homeostatic scaling based on firing rate
+    // If neuron is firing too frequently, increase leak to reduce excitability
+    float firingRateModulation = 1.0f;
+    if (pImpl->state.firingRate > 100.0f) {
+        firingRateModulation = std::max(0.5f, 1.0f - (pImpl->state.firingRate - 100.0f) / 200.0f);
+        // Apply homeostatic scaling to resting potential
+        V_rest = pImpl->state.restingPotential * firingRateModulation;
+    }
     
     // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    float leakContribution = (V_rest - V) / tau * firingRateModulation;
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
@@ -242,14 +254,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        // IMPROVEMENT: Better EMA decay for firing rate
+        // Use a more stable decay rate that doesn't cause oscillations
+        float emaDecay = 1.0f - dt * 1000.0f * 1.0f;  // More stable decay rate
+        pImpl->state.firingRate = emaDecay * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // IMPROVEMENT: Spike contribution to firing rate is more realistic
+            // A spike contributes to firing rate in a more biologically accurate way
+            pImpl->state.firingRate += static_cast<float>(1.0 / dt) * 0.05f;
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);

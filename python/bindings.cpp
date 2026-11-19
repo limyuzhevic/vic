@@ -410,19 +410,49 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    }, "Create a default configuration with sensible defaults for new simulations".c_str(),
+         py::doc="Create a default configuration with sensible defaults for new simulations. Returns a Config object that can be modified before being passed to createBrain().");
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::runtime_error("Config must be provided. Use createDefaultConfig() for simple cases.");
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
+    }, "Create a new brain with configuration".c_str(),
+         py::arg("config"), "Configuration for the brain".c_str(),
+         py::doc="Create a new brain with configuration. The config should be created using createDefaultConfig() or loaded from a file. The brain will initialize itself with random weights and connectivity patterns.");
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
+    }, "Create a simple 2D world for agent interaction".c_str(),
+         py::doc="Create a simple 2D world for agent interaction. The world provides sensory input, handles agent movement, and contains objects that can be collected or avoided.")
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::runtime_error("Brain must be provided. Cannot create agent without brain.");
+        }
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, "Create an agent brain interface that connects NLM brain to world".c_str(),
+         py::arg("brain"), "The underlying NLM brain".c_str(),
+         py::doc="Create an agent brain interface that connects NLM brain to world interaction. The agent processes sensory input, selects actions, and learns from experiences through reward modulation.");
+    
+    // Export helper functions
+    m.def("run_simple_simulation", [](std::shared_ptr<Config> config, size_t steps) {
+        auto brain = createBrain(config);
+        brain->initialize();
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getTotalSpikeCount() << " spikes" << std::endl;
+            }
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, "Run a simple simulation with the given configuration for specified number of steps. Returns total spike count.".c_str(),
+         py::arg("config"), "Configuration for the simulation".c_str(),
+         py::arg("steps"), "Number of simulation steps to run".c_str(),
+         py::doc="Run a simple simulation with the given configuration for specified number of steps. This is a convenience function for basic testing and demonstration. Returns total spike count and prints progress every 100 steps.");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
