@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
