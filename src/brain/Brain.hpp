@@ -95,6 +95,7 @@ public:
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    float getAverageFiringRate() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();

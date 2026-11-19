@@ -51,8 +51,8 @@ public:
     ~Config();
     
     // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
+    Config(const Config&) noexcept;
+    Config& operator=(const Config&) noexcept;
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     

@@ -19,8 +19,8 @@ public:
     ~Synapse();
     
     // Disable copying, enable moving
-    Synapse(const Synapse&) = delete;
-    Synapse& operator=(const Synapse&) = delete;
+    Synapse(const Synapse&) noexcept;
+    Synapse& operator=(const Synapse&) noexcept;
     Synapse(Synapse&&) noexcept;
     Synapse& operator=(Synapse&&) noexcept;
     

@@ -59,8 +59,8 @@ public:
     ~Neuron();
     
     // Disable copying, enable moving
-    Neuron(const Neuron&) = delete;
-    Neuron& operator=(const Neuron&) = delete;
+    Neuron(const Neuron&) noexcept;
+    Neuron& operator=(const Neuron&) noexcept;
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
@@ -106,6 +106,9 @@ public:
     // Spike detection
     bool checkThreshold() const;
     float getLastSpikeTime() const;
+    
+    // Average firing rate (rate-based computation)
+    float getAverageFiringRate() const;
     
     // LIF step function - returns true if neuron fired
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);

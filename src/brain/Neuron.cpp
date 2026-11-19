@@ -37,15 +37,33 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(const Neuron& other) : pImpl(new Impl(*other.pImpl)) {
+    pImpl->id = other.pImpl->id;
+    pImpl->type = other.pImpl->type;
+    pImpl->regionId = other.pImpl->regionId;
+    pImpl->populationId = other.pImpl->populationId;
+    pImpl->totalCurrent = other.pImpl->totalCurrent;
+    pImpl->synapticInput = other.pImpl->synapticInput;
+    pImpl->spikeHistory = other.pImpl->spikeHistory;
+    pImpl->incomingSynapses = other.pImpl->incomingSynapses;
+    pImpl->outgoingSynapses = other.pImpl->outgoingSynapses;
+    pImpl->plasticityFlags = other.pImpl->plasticityFlags;
 }
 
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
+Neuron& Neuron::operator=(const Neuron& other) {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = new Impl(*other.pImpl);
+        pImpl->id = other.pImpl->id;
+        pImpl->type = other.pImpl->type;
+        pImpl->regionId = other.pImpl->regionId;
+        pImpl->populationId = other.pImpl->populationId;
+        pImpl->totalCurrent = other.pImpl->totalCurrent;
+        pImpl->synapticInput = other.pImpl->synapticInput;
+        pImpl->spikeHistory = other.pImpl->spikeHistory;
+        pImpl->incomingSynapses = other.pImpl->incomingSynapses;
+        pImpl->outgoingSynapses = other.pImpl->outgoingSynapses;
+        pImpl->plasticityFlags = other.pImpl->plasticityFlags;
     }
     return *this;
 }
@@ -267,7 +285,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
@@ -314,6 +332,26 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+NeuronId Neuron::getId() const { return pImpl->id; }
+NeuronType Neuron::getType() const { return pImpl->type; }
+const NeuronState& Neuron::getState() const { return pImpl->state; }
+MembranePotential Neuron::getMembranePotential() const { return pImpl->state.membranePotential; }
+MembranePotential Neuron::getThreshold() const { return pImpl->state.threshold; }
+bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::Active; }
+bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
+FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
+MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
+const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
+RegionId Neuron::getRegionId() const { return pImpl->regionId; }
+PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
+
+float Neuron::getAverageFiringRate() const {
+    return pImpl->state.firingRate;
 }
 
 NeuronId Neuron::getId() const { return pImpl->id; }

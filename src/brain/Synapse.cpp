@@ -64,15 +64,35 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Synapse::Synapse(const Synapse& other) : pImpl(new Impl(*other.pImpl)) {
+    pImpl->id = other.pImpl->id;
+    pImpl->sourceNeuron = other.pImpl->sourceNeuron;
+    pImpl->destinationNeuron = other.pImpl->destinationNeuron;
+    pImpl->weight = other.pImpl->weight;
+    pImpl->delay = other.pImpl->delay;
+    pImpl->type = other.pImpl->type;
+    pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+    pImpl->preSpikeHistory = other.pImpl->preSpikeHistory;
+    pImpl->postSpikeHistory = other.pImpl->postSpikeHistory;
+    pImpl->eligibilityTrace = other.pImpl->eligibilityTrace;
+    pImpl->efficacy = other.pImpl->efficacy;
 }
 
-Synapse& Synapse::operator=(Synapse&& other) noexcept {
+Synapse& Synapse::operator=(const Synapse& other) {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = new Impl(*other.pImpl);
+        pImpl->id = other.pImpl->id;
+        pImpl->sourceNeuron = other.pImpl->sourceNeuron;
+        pImpl->destinationNeuron = other.pImpl->destinationNeuron;
+        pImpl->weight = other.pImpl->weight;
+        pImpl->delay = other.pImpl->delay;
+        pImpl->type = other.pImpl->type;
+        pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+        pImpl->preSpikeHistory = other.pImpl->preSpikeHistory;
+        pImpl->postSpikeHistory = other.pImpl->postSpikeHistory;
+        pImpl->eligibilityTrace = other.pImpl->eligibilityTrace;
+        pImpl->efficacy = other.pImpl->efficacy;
     }
     return *this;
 }

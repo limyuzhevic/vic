@@ -783,10 +783,23 @@ float Brain::getExcitationInhibitionRatio() const {
         }
     }
     
-    if (totalInhibitory > 0.0f) {
-        return totalExcitatory / totalInhibitory;
+    float Brain::getAverageFiringRate() const {
+    float totalRate = 0.0f;
+    size_t neuronCount = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                totalRate += neuron->getAverageFiringRate();
+                neuronCount++;
+            }
+        }
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    
+    if (neuronCount > 0) {
+        return totalRate / static_cast<float>(neuronCount);
+    }
+    return 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {

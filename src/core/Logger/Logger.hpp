@@ -71,8 +71,8 @@ public:
     ~Logger();
     
     // Disable copying
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
+    Logger(const Logger&) noexcept;
+    Logger& operator=(const Logger&) noexcept;
     
     // Add logger sink
     void addLogger(std::shared_ptr<ILogger> logger);
