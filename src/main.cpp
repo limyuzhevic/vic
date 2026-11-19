@@ -211,11 +211,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
+    // Enable plasticity on synapses with better error handling
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
+        auto& synapses = region->getSynapses();
+        NLM_LOG_INFO("  Enabling plasticity on " + std::to_string(synapses.size()) + " synapses");
+        
+        for (auto& syn : synapses) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+        NLM_LOG_INFO("  Plasticity enabled on all synapses");
+    } else {
+        NLM_LOG_WARNING("  No region found for plasticity experiment");
     }
     
     // Apply repeated input pattern to stimulate learning

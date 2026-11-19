@@ -1,9 +1,9 @@
-#include "Logger.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -12,6 +12,8 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string filepath;
+    bool fileErrorLogged = false;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -20,7 +22,11 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -51,6 +57,9 @@ void ConsoleLogger::log(const LogEntry& entry) {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+    } else if (pImpl->filepath.empty() && !pImpl->fileErrorLogged) {
+        std::cerr << "Warning: ConsoleLogger file not open (file path not set)" << std::endl;
+        pImpl->fileErrorLogged = true;
     }
 }
 
@@ -71,12 +80,37 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close current file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    pImpl->filepath = filepath;
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        std::cerr << "Error: Cannot open log file: " << filepath << std::endl;
+    } else {
+        // Write header if file is empty
+        pImpl->fileOut.seekp(0, std::ios::end);
+        if (pImpl->fileOut.tellp() == 0) {
+            pImpl->fileOut << "=== NLM Log File ===" << std::endl;
+            pImpl->fileOut << "Log format: [LEVEL] YYYY-MM-DD HH:MM:SS Message" << std::endl;
+            pImpl->fileOut << "=== End Header ===" << std::endl << std::endl;
+        }
+        pImpl->fileErrorLogged = false;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        pImpl->filepath.clear();
+        pImpl->fileErrorLogged = false;
     }
 }
 
@@ -113,6 +147,11 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        std::cerr << "Warning: Attempted to add null logger" << std::endl;
+        return;
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
 }
@@ -131,6 +170,10 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
+    if (message.empty()) {
+        return;  // Skip empty messages
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -142,7 +185,11 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.timestamp = std::chrono::system_clock::now();
     
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        try {
+            logger->log(entry);
+        } catch (const std::exception& e) {
+            std::cerr << "Error logging to logger: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -186,9 +233,11 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    if (logger) {
-        globalLoggerPtr() = logger;
+    if (!logger) {
+        std::cerr << "Warning: Attempted to set global logger to null" << std::endl;
+        return;
     }
+    globalLoggerPtr() = logger;
 }
 
 // LogStream implementation

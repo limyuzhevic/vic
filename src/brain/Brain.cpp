@@ -104,6 +104,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , spikeHandlersRegistered(false)
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -163,6 +165,10 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize development stage
+        developmentalStage = DevelopmentalStage::Initial;
+        nextRegionId = RegionId(1);
     }
     
     DevelopmentalStage developmentalStage;

@@ -1,8 +1,9 @@
-#include "Config.hpp"
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            set(key, ConfigValue(it.value().get<std::string>()), ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        // Fall back to simple key=value format
+    }
     
+    // Simple key=value parser (placeholder)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,11 +103,13 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Try to write JSON format first
+    nlohmann::json j;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        j[entry.key] = std::get<std::string>(entry.value);
     }
     
+    file << j.dump(2);
     return true;
 }
 
@@ -197,8 +218,7 @@ std::optional<T> Config::get(const std::string& key) const {
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
+    
     return std::visit([](auto&& v) -> std::optional<T> {
         using V = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<V, T>) {
@@ -218,7 +238,6 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 // Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
