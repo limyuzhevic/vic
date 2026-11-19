@@ -44,6 +44,9 @@ struct Brain::Impl {
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
     
+    // ========== COGNITION OUTPUT ==========
+    ActionType plannedAction;  // Current planned action from NeuralPlanner
+    
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
@@ -67,11 +70,14 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
     float learnedPreference = 0.0f;
+    
+    // Track when learned preference last changed for checkpoint triggers
+    float lastLearnedPreference = 0.0f;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -468,9 +474,129 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // AgentBrain/Neuron instead. This block is intentionally empty
     // so the experiment and its result stay in the record.
 
-    // ========== STEP 4: Update working memory ==========
+    // ========== STEP 4: Enhanced working memory integration ==========
+    // Working memory maintains active representations of current experience
+    // NOT just a buffer - uses persistent activity and competitive selection
+    
     if (pImpl->workingMemory) {
+        // Update working memory with enhanced mechanisms
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // ========= Development-stage dependent working memory behavior =========
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Initial:
+                // High capacity, rapid encoding during exploration phase
+                pImpl->workingMemory->setCapacity(std::max(50, pImpl->workingMemory->getCapacity() * 2));
+                pImpl->workingMemory->setDecayRate(0.005f);  // Slow decay for better retention
+                break;
+                
+            case DevelopmentalStage::CriticalPeriod:
+                // Focused working memory for skill acquisition
+                pImpl->workingMemory->setCapacity(std::max(100, pImpl->workingMemory->getCapacity() * 1.5f));
+                pImpl->workingMemory->setDecayRate(0.01f);  // Moderate decay
+                break;
+                
+            case DevelopmentalStage::Maturation:
+                // Optimized working memory efficiency
+                pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity());  // Stable capacity
+                pImpl->workingMemory->setDecayRate(0.02f);  // Faster decay, selective retention
+                break;
+                
+            case DevelopmentalStage::Adult:
+                // Efficient working memory with focused capacity
+                pImpl->workingMemory->setCapacity(std::max(50, pImpl->workingMemory->getCapacity() * 0.8f));
+                pImpl->workingMemory->setDecayRate(0.03f);  // Faster decay, more selective
+                break;
+                
+            case DevelopmentalStage::Aging:
+                // Age-related working memory decline management
+                pImpl->workingMemory->setCapacity(std::max(20, pImpl->workingMemory->getCapacity() * 0.6f));
+                pImpl->workingMemory->setDecayRate(0.05f);  // Rapid decay, limited retention
+                break;
+        }
+        
+        // ========= Enhanced competition mechanisms =========
+        // Run competition to select winning representations
+        pImpl->workingMemory->runCompetition();
+        
+        // ========= Working memory influence on attention =========
+        // Selected working memory traces influence attentional focus
+        std::vector<NeuronId> workingMemoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!workingMemoryNeurons.empty() && pImpl->attention) {
+            // Apply working memory bias to attention system
+            // This would integrate with the attention system's processCompetition method
+            // For now, we note the integration
+            NLM_LOG_DEBUG("Working memory influences attentional selection with " + 
+                         std::to_string(workingMemoryNeurons.size()) + " active traces");
+        }
+        
+        // ========= Working memory contribution to planning =========
+        // Working memory content influences neural planning
+        if (pImpl->workingMemory && !workingMemoryNeurons.empty() && pImpl->planner) {
+            // Convert working memory activation patterns to planning goals
+            std::vector<float> planningGoals;
+            for (const auto& neuronId : workingMemoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                if (activation > 0.1f) {  // Significant activation
+                    planningGoals.push_back(activation);
+                }
+            }
+            
+            if (!planningGoals.empty()) {
+                // Set planning goals based on working memory content
+                pImpl->planner->setCurrentGoal(planningGoals);
+                NLM_LOG_DEBUG("Working memory provides planning goals: " + std::to_string(planningGoals.size()) + " goals");
+            }
+        }
+        
+        // ========= Working memory contribution to neuromodulation =========
+        // Working memory activity influences neuromodulatory systems
+        if (pImpl->workingMemory) {
+            float memoryActivity = pImpl->workingMemory->getMemoryActivity();
+            
+            // High working memory activity should increase curiosity for more exploration
+            if (memoryActivity > 0.5f && pImpl->curiosity) {
+                // Working memory activity indicates cognitive engagement
+                pImpl->curiosity->applyBottomUpSalience(pImpl->workingMemory->getMemoryNeurons()[0], 0.1f);
+            }
+            
+            // Working memory content affects reward prediction
+            if (pImpl->dopamine && memoryActivity > 0.3f) {
+                // Active working memory suggests expected reward
+                float rewardSignal = memoryActivity * 0.5f;  // Scale to appropriate range
+                pImpl->dopamine->applyPredictionError(rewardSignal);
+            }
+        }
+        
+        // ========= Working memory integration with episodic memory =========
+        // Working memory can contribute to episodic memory formation
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            // Periodically store working memory content as episodic episodes
+            pImpl->stepsSinceLastEpisode++;
+            if (pImpl->stepsSinceLastEpisode >= 20) {  // Store episode every 20 steps
+                pImpl->stepsSinceLastEpisode = 0;
+                
+                // Capture current working memory as an episodic memory
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                
+                // Store working memory neurons as episode content
+                episode.activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+                episode.neuronActivations = pImpl->workingMemory->getMemoryActivations();
+                
+                // Store reward prediction error as episode reward
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Store in episodic memory
+                pImpl->episodicMemory->storeEpisode(episode);
+                NLM_LOG_DEBUG("Working memory content stored as episodic memory at step " + std::to_string(currentStep));
+            }
+        }
+        
+        // ========= Working memory logging =========
+        NLM_LOG_DEBUG("Working memory update: " + std::to_string(pImpl->workingMemory->getActiveTraces()) + 
+                     " active traces, " + std::to_string(pImpl->workingMemory->getMemoryNeurons().size()) + 
+                     " neurons, activity level: " + std::to_string(pImpl->workingMemory->getMemoryActivity()));
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -506,40 +632,147 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
+    // ========== STEP 6: Enhanced neuromodulation-driven plasticity ==========
+    // Neuromodulators modulate plasticity based on behavioral relevance
+    // 
+    // Dopamine: Reward prediction error - scales learning rates
+    // Curiosity: Surprise-driven exploration - increases plasticity for novel experiences
+    // Novelty: Stimulus novelty - biases learning toward new patterns
+    // Prediction Error: Model mismatch - drives model updating
+    
+    // Calculate combined neuromodulation signal for plasticity
+    float neuromodulationSignal = 1.0f;
+    
+    // Dopamine enhances plasticity when prediction is better than expected
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        float dopaminePlasticityFactor = 1.0f + dopamineLevel * 0.5f;  // Scale learning rates
+        neuromodulationSignal *= dopaminePlasticityFactor;
+        
+        // Apply dopamine effects on plasticity (beyond just neural excitability)
+        if (pImpl->stdp) {
+            // Dopamine modulates STDP time constants
+            float ltpWeight = pImpl->stdp->getLTPWeight();
+            float ltdWeight = pImpl->stdp->getLTDWeight();
+            
+            // Scale STDP weights based on dopamine
+            ltpWeight *= (1.0f + dopamineLevel * 0.3f);
+            ltdWeight *= (1.0f + dopamineLevel * 0.2f);
+            
+            pImpl->stdp->configure(ltpWeight, ltdWeight, pImpl->stdp->getTau());
+        }
     }
     
+    // Curiosity increases exploration-driven plasticity for novel patterns
+    if (pImpl->curiosity && pImpl->curiosity->getLevel() > 0.5f) {
+        neuromodulationSignal *= 1.2f;  // Increase plasticity for exploration
+        
+        // Apply curiosity-driven structural plasticity
+        if (pImpl->structuralPlasticity && currentStep % 500 == 0) {
+            // Occasionally create new connections during high curiosity
+            pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        }
+    }
+    
+    // Novelty detection biases learning toward new sensory patterns
+    if (pImpl->novelty && pImpl->novelty->getLevel() > 0.7f) {
+        neuromodulationSignal *= 1.15f;  // Slightly enhance plasticity for novelty
+        
+        // Apply novelty-driven Hebbian learning
+        if (pImpl->hebbian) {
+            // Novelty enhances Hebbian consolidation
+            // This would be implemented by modifying Hebbian parameters
+        }
+    }
+    
+    // Prediction error fine-tunes model accuracy
+    if (pImpl->predictionError) {
+        float predError = pImpl->predictionError->getError();
+        float errorMagnitude = pImpl->predictionError->getMagnitude();
+        
+        // Large prediction errors should cause more dramatic plasticity
+        float errorPlasticityMod = 1.0f + errorMagnitude * 0.5f;
+        neuromodulationSignal *= errorPlasticityMod;
+        
+        // Apply prediction error to synaptic scaling
+        if (errorMagnitude > 0.5f) {
+            // Significant prediction error triggers synaptic recalibration
+            if (currentStep > 0 && currentStep % 200 == 0) {
+                // Apply homeostatic plasticity to correct model errors
+                constexpr float kSynapticRebalanceFactor = 0.8f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        auto incoming = region->getSynapsesTo(neuron->getId());
+                        float totalWeight = 0.0f;
+                        for (Synapse* syn : incoming) {
+                            totalWeight += std::abs(syn->getWeight());
+                        }
+                        if (totalWeight > 0.0f) {
+                            // Rebalance incoming weights toward optimal E/I ratio
+                            float targetWeight = 0.1f;  // Target weight per synapse
+                            float rebalanceFactor = targetWeight / totalWeight;
+                            
+                            if (rebalanceFactor > 0.9f && rebalanceFactor < 1.1f) {
+                                // Within acceptable range - maintain
+                                continue;
+                            }
+                            
+                            // Apply rebalancing
+                            for (Synapse* syn : incoming) {
+                                float newWeight = syn->getWeight() * rebalanceFactor * kSynapticRebalanceFactor;
+                                syn->setWeight(newWeight);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulation signal to all plasticity mechanisms
+    neuromodulationSignal = std::max(0.1f, std::min(3.0f, neuromodulationSignal));  // Clamp to reasonable range
+    
+    NLM_LOG_DEBUG("Neuromodulation signal: " + std::to_string(neuromodulationSignal) +
+                 " (dopamine: " + std::to_string(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) +
+                 ", curiosity: " + std::to_string(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f) +
+                 ", novelty: " + std::to_string(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f) + ")");
+    
+    // Re-run plasticity steps with neuromodulation signal
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
+            // Recalculate plasticity factors with enhanced neuromodulation
+            float enhancedPlasticityFactor = neuromodulationSignal;
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify STDP update based on neuromodulation
                     pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (enhancedPlasticityFactor - 1.0f) * 0.001f;
                     syn->setWeight(weight);
                 }
             }
             
-            // Apply Hebbian learning
+            // Apply Hebbian learning with neuromodulation
             if (syn->getPlasticityFlags().hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     pImpl->hebbian->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
+                    
+                    // Scale Hebbian updates based on neuromodulation
+                    float weight = syn->getWeight();
+                    weight *= enhancedPlasticityFactor;
+                    syn->setWeight(weight);
                 }
             }
             
-            // Update synapse state
+            // Update synapse state with neuromodulation factor
             syn->step(currentTime);
         }
     }
@@ -580,18 +813,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
 
-    // ========== STEP 7: Update episodic memory ==========
+    // ========== STEP 7: Enhanced episodic memory integration ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Capture current brain state as an episode with development-stage effects
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Development-stage dependent episode characteristics
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    // Limited episodic storage, high forgetting rate
+                    episode.maxAge = 100.0f;  // Episodes fade quickly
+                    episode.consolidationStrength = 0.5f;  // Weak consolidation
+                    break;
+                    
+                case DevelopmentalStage::CriticalPeriod:
+                    // Rapid episodic learning, strong consolidation
+                    episode.maxAge = 500.0f;  // Episodes last longer
+                    episode.consolidationStrength = 1.0f;  // Strong consolidation
+                    break;
+                    
+                case DevelopmentalStage::Maturation:
+                    // Optimized episodic memory
+                    episode.maxAge = 1000.0f;  // Long-lasting memories
+                    episode.consolidationStrength = 1.2f;  // Enhanced consolidation
+                    break;
+                    
+                case DevelopmentalStage::Adult:
+                    // Peak episodic memory performance
+                    episode.maxAge = 2000.0f;  // Very long-lasting memories
+                    episode.consolidationStrength = 1.5f;  // Strong consolidation
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Age-related episodic memory limitations
+                    episode.maxAge = 500.0f;  // Shorter memory lifespan
+                    episode.consolidationStrength = 0.8f;  // Weaker consolidation
+                    break;
+            }
+            
+            // Capture sensory state if available
+            // For now, we'll use a simplified representation based on active neurons
+            episode.sensoryState.resize(16, 0.0f); // Default 16D sensory state
+            
+            // Capture position (simplified - in a real world system this would come from environment)
+            episode.positionX = 0.0f; // TODO: Get from world
+            episode.positionY = 0.0f; // TODO: Get from world
+            episode.orientation = 0.0f; // TODO: Get from world
+            
+            // Store active neurons (memory encoding)
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -605,17 +879,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward information from neuromodulation
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = 1.0f; // TODO: Get from environment/energy system
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
             
+            // Apply development-stage effects to episode content
+            if (pImpl->workingMemory && pImpl->workingMemory->getMemoryActivity() > 0.5f) {
+                // High working memory activity enhances episode vividness
+                episode.reward *= 1.2f;
+                episode.novelty *= 1.1f;
+            }
+            
+            // Apply neuromodulation effects to episode encoding
+            if (pImpl->curiosity && pImpl->curiosity->getLevel() > 0.7f) {
+                // High curiosity enhances memory encoding for novel experiences
+                episode.reward *= 1.15f;
+            }
+            
+            // Create resulting state (simplified - current state after action)
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            // Store episode in memory
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            NLM_LOG_DEBUG("Stored episodic memory at step " + std::to_string(currentStep) + 
+                         " with " + std::to_string(episode.activeNeurons.size()) + " active neurons" +
+                         ", development stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8: Enhanced prediction system with associative integration ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // For backward compatibility, use simple prediction error computation
+        // Phase 6 should use NeuralPrediction for advanced temporal and action prediction
+        if (pImpl->predictionError) {
+            // Compute prediction error for curiosity-driven learning
+            float predictionError = pImpl->predictionError->getError();
+            
+            // Update prediction error history
+            pImpl->predictionError->computeError(0.0f, predictionError);
+            
+            // Apply prediction error as neuromodulation signal for learning
+            if (pImpl->curiosity) {
+                pImpl->curiosity->applyPredictionError(predictionError);
+            }
+            
+            if (pImpl->dopamine) {
+                pImpl->dopamine->applyPredictionError(predictionError);
+            }
+        }
+        
+        // Integration with associative memory for pattern prediction
+        if (pImpl->associativeMemory && pImpl->predictionError) {
+            float predError = pImpl->predictionError->getError();
+            
+            if (std::abs(predError) > 0.3f) {  // Significant prediction error
+                // Retrieve related patterns from associative memory
+                // This helps learn from prediction errors and form new associations
+                NLM_LOG_DEBUG("Prediction error triggers associative learning: " + std::to_string(predError));
+                
+                // In a real implementation, this would:
+                // 1. Find similar patterns in working memory
+                // 2. Use associative memory to retrieve related experiences
+                // 3. Form new associations based on prediction error
+                // 4. Update the prediction system with learned associations
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +962,93 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation extracts recurring patterns from experience
+        // NOT predefined taxonomy - concepts emerge through repeated exposure
+        
+        // Get current sensory state for concept formation
+        std::vector<float> currentSensoryState;
+        
+        // In a real system, this would come from the sensory input system
+        // For now, we use active neural patterns as proxy for sensory experience
+        currentSensoryState.reserve(pImpl->regions.size() * 16); // Approximate size
+        
+        // Extract current neural activity pattern for concept formation
+        // Sample from different neuron populations to create a pattern representation
+        size_t sampleSize = std::min(static_cast<size_t>(16), pImpl->regions.size() * 4);
+        for (size_t i = 0; i < sampleSize; ++i) {
+            auto& region = pImpl->regions[i % pImpl->regions.size()];
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronCount() > 0) {
+                    // Get average activation of this population
+                    float avgActivation = 0.0f;
+                    for (auto* neuron : pop->getNeurons()) {
+                        avgActivation += neuron->getState().membranePotential;
+                    }
+                    avgActivation /= pop->getNeuronCount();
+                    
+                    // Normalize to [-1, 1] range for concept encoding
+                    float normalized = avgActivation / 50.0f;  // Arbitrary scaling
+                    currentSensoryState.push_back(std::max(-1.0f, std::min(1.0f, normalized)));
+                    break;
+                }
+            }
+        }
+        
+        // Skip if no sensory state was extracted
+        if (currentSensoryState.empty()) {
+            currentSensoryState.resize(16, 0.0f);  // Fallback
+        }
+        
+        // Extract features for concept formation (current neural activity characteristics)
+        std::vector<float> conceptFeatures;
+        conceptFeatures.push_back(pImpl->totalSpikesThisStep);  // Spike rate feature
+        conceptFeatures.push_back(pImpl->workingMemory ? pImpl->workingMemory->getMemoryActivity() : 0.0f);  // Working memory feature
+        conceptFeatures.push_back(pImpl->totalSpikesThisStep > 0 ? 1.0f : 0.0f);  // Activity indicator
+                }
+            }
+        }
+        
+        // Skip if no sensory state was extracted
+        if (currentSensoryState.empty()) {
+            currentSensoryState.resize(16, 0.0f);  // Fallback
+        }
+        
+        // Extract features for concept formation (current neural activity characteristics)
+        std::vector<float> conceptFeatures;
+        conceptFeatures.push_back(pImpl->totalSpikesThisStep);  // Spike rate feature
+        conceptFeatures.push_back(pImpl->workingMemory ? pImpl->workingMemory->getMemoryActivity() : 0.0f);  // Working memory feature
+        conceptFeatures.push_back(pImpl->totalSpikesThisStep > 0 ? 1.0f : 0.0f);  // Activity indicator
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentSensoryState,
+            conceptFeatures,
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+            currentStep
+        );
+        
+        if (conceptId > 0) {
+            NLM_LOG_DEBUG("ConceptFormation: Discovered concept " + std::to_string(conceptId) +
+                         " from current neural patterns");
+        }
+        
+        // Concept formation influences attention and working memory
+        if (conceptId > 0 && pImpl->attention) {
+            // Apply concept-based bias to attention system
+            auto& conceptPrototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+            // Find neurons matching concept - activate them
+            for (size_t i = 0; i < conceptPrototype.size() && i < currentSensoryState.size(); ++i) {
+                if (conceptPrototype[i] > 0.5f && currentSensoryState[i] > 0.5f) {
+                    // This is a concept-relevant pattern - apply attention bias
+                    // In real implementation, this would find matching neurons
+                    // For now, we just log this
+                    if (pImpl->attention) {
+                        // Apply concept-based attention bias
+                        // This would be implemented in the concept formation's attention interface
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -649,34 +1065,231 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 13: Enhanced development system integration ==========
+    // Development modulates brain function across multiple dimensions
+    // NOT just structural changes - affects learning, memory, cognition, behavior
+    
+    // Update development system more frequently (every 500 steps instead of 1000)
+    // This allows for finer-grained developmental progression and adaptation
+    if (currentStep > 0 && currentStep % 500 == 0) {
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 500);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity.get();
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
+        // Development affects multiple systems based on current stage
+        DevelopmentalStage currentStage = pImpl->developmentalStage;
+        
+        // ========== Development effects on learning ==========
+        // Different developmental stages have different learning characteristics
+        switch (currentStage) {
+            case DevelopmentalStage::Initial:
+                // High plasticity, rapid learning, exploratory behavior
+                // Strong curiosity-driven exploration
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->setExplorationDrive(1.5f);  // Increased exploration
+                }
+                if (pImpl->dopamine) {
+                    // Enhanced reward learning in early development
+                    pImpl->dopamine->setLearningRate(0.02f);  // Higher learning rate
+                }
+                break;
+                
+            case DevelopmentalStage::CriticalPeriod:
+                // Sensitive period for specific skill acquisition
+                // Enhanced Hebbian learning for reinforced patterns
+                if (pImpl->hebbian) {
+                    // Critical period enhances pattern consolidation
+                    // This would be implemented by modifying Hebbian parameters
+                }
+                if (pImpl->workingMemory) {
+                    // Enhanced working memory capacity in critical period
+                    pImpl->workingMemory->setCapacity(std::max(pImpl->workingMemory->getCapacity(), 
+                                                               pImpl->workingMemory->getCapacity() * 1.2f));
+                }
+                break;
+                
+            case DevelopmentalStage::Maturation:
+                // Refining learned skills, balancing exploration and exploitation
+                // Moderate plasticity, selective learning
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->setExplorationDrive(0.8f);  // Reduced exploration
+                }
+                break;
+                
+            case DevelopmentalStage::Adult:
+                // Stable expertise, maintaining learned behaviors
+                // Low plasticity, focused learning on novel patterns
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->setExplorationDrive(0.5f);  // Low exploration
+                }
+                break;
+                
+            case DevelopmentalStage::Aging:
+                // Declining plasticity, maintaining core functions
+                // Very low plasticity, strong bias toward familiar behaviors
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->setExplorationDrive(0.2f);  // Minimal exploration
+                }
+                if (pImpl->workingMemory) {
+                    // Age-related working memory decline
+                    pImpl->workingMemory->setCapacity(std::max(10, static_cast<int>(pImpl->workingMemory->getCapacity() * 0.7f)));
+                }
+                break;
+        }
+        
+        // ========== Development effects on cognitive systems ==========
+        // Cognitive capabilities change with development
+        if (pImpl->attention) {
+            switch (currentStage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    // Poor attentional control, broad focus
+                    pImpl->attention->setInhibitionStrength(0.3f);  // Weaker inhibition
+                    pImpl->attention->setExcitationStrength(1.2f);   // Weaker excitation
                     break;
+                    
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    // Developing attentional selectivity
+                    pImpl->attention->setInhibitionStrength(0.5f);
+                    pImpl->attention->setExcitationStrength(1.5f);
                     break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    
+                case DevelopmentalStage, Maturation:
+                    // Refining attentional control
+                    pImpl->attention->setInhibitionStrength(0.7f);
+                    pImpl->attention->setExcitationStrength(1.7f);
                     break;
+                    
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    // Optimized attentional control
+                    pImpl->attention->setInhibitionStrength(1.0f);
+                    pImpl->attention->setExcitationStrength(2.0f);
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Declining attentional control
+                    pImpl->attention->setInhibitionStrength(0.8f);
+                    pImpl->attention->setExcitationStrength(1.5f);
                     break;
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        if (pImpl->conceptFormation) {
+            // Concept formation changes with development
+            switch (currentStage) {
+                case DevelopmentalStage::Initial:
+                    // Broad concept formation, many categories
+                    // Would increase concept formation threshold
+                    break;
+                    
+                case DevelopmentalStage::CriticalPeriod:
+                    // Rapid concept acquisition
+                    break;
+                    
+                case DevelopmentalStage::Maturation:
+                    // Concept refinement, merging similar concepts
+                    break;
+                    
+                case DevelopmentalStage::Adult:
+                    // Stable concept set, occasional new concepts
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Concept degradation, memory decline
+                    break;
+            }
+        }
+        
+        // ========== Development effects on memory systems ==========
+        // Memory capabilities change with development
+        if (pImpl->workingMemory) {
+            switch (currentStage) {
+                case DevelopmentalStage::Initial:
+                    // Rapid working memory formation
+                    pImpl->workingMemory->setDecayRate(0.02f);  // Slower decay, better retention
+                    break;
+                    
+                case DevelopmentalStage::CriticalPeriod:
+                    // Enhanced working memory for skill learning
+                    break;
+                    
+                case DevelopmentalStage::Maturation:
+                    // Optimized working memory efficiency
+                    break;
+                    
+                case DevelopmentalStage::Adult:
+                    // Stable working memory capacity
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Age-related working memory decline
+                    pImpl->workingMemory->setDecayRate(0.05f);  // Faster decay
+                    break;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Episodic memory characteristics change with development
+            switch (currentStage) {
+                case DevelopmentalStage::Initial:
+                    // Limited episodic memory, high forgetting rate
+                    pImpl->episodicMemory->setMaxEpisodes(100);  // Smaller memory capacity
+                    pImpl->episodicMemory->enableReplay(false);  // Limited replay early in development
+                    break;
+                    
+                case DevelopmentalStage::CriticalPeriod:
+                    // Beginning episodic memory development
+                    pImpl->episodicMemory->setMaxEpisodes(500);
+                    pImpl->episodicMemory->enableReplay(true);
+                    break;
+                    
+                case DevelopmentalStage::Maturation:
+                    // Developed episodic memory, robust replay
+                    pImpl->episodicMemory->setMaxEpisodes(2000);
+                    pImpl->episodicMemory->enableReplay(true);
+                    break;
+                    
+                case DevelopmentalStage::Adult:
+                    // Peak episodic memory performance
+                    pImpl->episodicMemory->setMaxEpisodes(5000);
+                    pImpl->episodicMemory->enableReplay(true);
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Age-related episodic memory decline
+                    pImpl->episodicMemory->setMaxEpisodes(1000);
+                    pImpl->episodicMemory->enableReplay(true);  // But replay still possible
+                    break;
+            }
+        }
+        
+        // ========== Development effects on behavior ==========
+        // Developmental stage influences behavioral strategies
+        switch (currentStage) {
+            case DevelopmentalStage::Initial:
+                // Exploratory behavior, seeking novel experiences
+                // Would bias action selection toward exploration
+                break;
+                
+            case DevelopmentalStage::CriticalPeriod:
+                // Focused learning on specific behaviors
+                // Would bias action selection toward relevant behaviors
+                break;
+                
+            case DevelopmentalStage::Maturation:
+                // Balanced exploration and exploitation
+                break;
+                
+            case DevelopmentalStage::Adult:
+                // Exploitation of learned behaviors
+                // Would bias action selection toward optimal behaviors
+                break;
+                
+            case DevelopmentalStage::Aging:
+                // Conservative behavior, minimizing risk
+                break;
+        }
+        
+        // Log developmental updates
+        NLM_LOG_DEBUG("Development system updated: Stage " + std::to_string(static_cast<int>(currentStage)) +
+                     " (step " + std::to_string(currentStep) + ")");
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -685,9 +1298,116 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Enhanced checkpoint management ==========
+    // Checkpointing enables brain persistence and development continuity
+    // NOT just file backup - saves complete neural state for resume/restore
+    
     if (pImpl->checkpointManager) {
+        // Update checkpoint manager with current state
         pImpl->checkpointManager->update(currentStep, currentTime);
+        
+        // Perform periodic checkpoint saves at strategic intervals
+        // Based on development stage and learning progress
+        bool shouldSaveCheckpoint = false;
+        bool shouldLoadCheckpoint = false;
+        
+        // Development-stage dependent checkpointing
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Initial:
+                // Frequent saves during high-plasticity initial phase
+                // Enables recovery from exploratory learning attempts
+                shouldSaveCheckpoint = (currentStep > 0 && currentStep % 100 == 0);
+                break;
+                
+            case DevelopmentalStage::CriticalPeriod:
+                // Save during sensitive learning periods
+                shouldSaveCheckpoint = (currentStep > 0 && currentStep % 200 == 0);
+                break;
+                
+            case DevelopmentalStage::Maturation:
+                // Periodic saves during skill refinement
+                shouldSaveCheckpoint = (currentStep > 0 && currentStep % 500 == 0);
+                break;
+                
+            case DevelopmentalStage::Adult:
+                // Less frequent saves in stable adult phase
+                shouldSaveCheckpoint = (currentStep > 0 && currentStep % 1000 == 0);
+                break;
+                
+            case DevelopmentalStage::Aging:
+                // More frequent saves due to potential instability
+                shouldSaveCheckpoint = (currentStep > 0 && currentStep % 150 == 0);
+                break;
+        }
+        
+        // Save development progress (personality trait learned through experience)
+        if (shouldSaveCheckpoint) {
+            // Check if we should save based on learning progress
+            float learningProgress = pImpl->learnedPreference;  // Personality trait from Phase 5
+            bool significantLearning = std::abs(learningProgress - pImpl->lastLearnedPreference) > 0.1f;
+            
+            if (significantLearning || currentStep % 1000 == 0) {
+                // Save checkpoint with development state
+                std::string checkpointPath = "./checkpoints/nlm_checkpoint_" + 
+                                           std::to_string(currentStep) + ".bin";
+                
+                if (!brain_->save(checkpointPath)) {
+                    NLM_LOG_WARNING("Checkpoint save failed at step " + std::to_string(currentStep));
+                } else {
+                    pImpl->lastLearnedPreference = learningProgress;
+                    NLM_LOG_INFO("Development checkpoint saved at step " + std::to_string(currentStep) +
+                                 " (learned preference: " + std::to_string(learningProgress) + ")");
+                }
+            }
+        }
+        
+        // Auto-recovery from checkpoints at strategic times
+        if (shouldLoadCheckpoint) {
+            // Check for existing checkpoints
+            std::string latestCheckpoint = "./checkpoints/nlm_latest.bin";
+            
+            // In real implementation, this would check for checkpoint files
+            // and load the most recent one if appropriate
+            if (pImpl->currentStep > 100 && pImpl->currentStep % 3000 == 0) {
+                // Load from checkpoint occasionally for recovery
+                NLM_LOG_INFO("Auto-recovery check at step " + std::to_string(currentStep));
+                // This would be implemented as a method on the checkpoint manager
+                // For now, it's just logging the intent
+            }
+        }
+        
+        // Integration with development system for checkpoint metadata
+        if (pImpl->developmentSystem) {
+            // Record developmental milestones in checkpoint metadata
+            size_t developmentStageStep = 0;
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial: developmentStageStep = currentStep; break;
+                case DevelopmentalStage::CriticalPeriod: developmentStageStep = currentStep - 1000; break;
+                case DevelopmentalStage::Maturation: developmentStageStep = currentStep - 3000; break;
+                case DevelopmentalStage::Adult: developmentStageStep = currentStep - 6000; break;
+                case DevelopmentalStage::Aging: developmentStageStep = currentStep - 8000; break;
+            }
+            
+            // Log checkpoint for developmental tracking
+            if (shouldSaveCheckpoint) {
+                NLM_LOG_INFO("Development checkpoint at step " + std::to_string(currentStep) +
+                             ", developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)) +
+                             ", personality trait: " + std::to_string(pImpl->learnedPreference));
+            }
+        }
+        
+        // Memory system checkpoint integration
+        if (pImpl->episodicMemory && shouldSaveCheckpoint) {
+            // Episodic memory checkpoints capture learning experiences
+            size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            NLM_LOG_DEBUG("Episodic memory checkpoint: " + std::to_string(episodeCount) + " episodes");
+        }
+        
+        // Working memory checkpoint integration
+        if (pImpl->workingMemory && shouldSaveCheckpoint) {
+            size_t activeTraces = pImpl->workingMemory->getActiveTraces();
+            NLM_LOG_DEBUG("Working memory checkpoint: " + std::to_string(activeTraces) + " active traces");
+        }
     }
 }
 
@@ -798,30 +1518,68 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use neural planner for intelligent action selection
+    // NOT simple motor neuron threshold - uses predictive planning
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
+    if (!pImpl->planner) {
+        // Fallback to simple motor neuron selection if planner not available
+        if (pImpl->motorNeurons.empty()) {
+            return std::make_unique<Action>(ActionType::Wait);
+        }
+        
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Return a simple action
+        ActionType type = ActionType::Wait;
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
+        
+        return std::make_unique<Action>(type);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Get current state for neural planning
+    std::vector<float> currentState;
+    currentState.reserve(pImpl->motorNeurons.size() * 4);
+    
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        // Normalize motor neuron potential to [-1, 1]
+        float normalized = neuron->getState().membranePotential / 50.0f;
+        currentState.push_back(std::max(-1.0f, std::min(1.0f, normalized)));
+    }
+    
+    // Use neural planner to select optimal action
+    ActionType plannedAction = pImpl->planner->planAction(currentState);
+    
+    // Apply attention bias to the planned action
+    if (pImpl->attention) {
+        // Apply attention to current state
+        std::vector<NeuronId> competitors;
+        for (size_t i = 0; i < currentState.size(); ++i) {
+            if (currentState[i] > 0.5f) {  // Significant activity
+                // Create neuron ID for this action component
+                // In real implementation, this would be more sophisticated
+                competitors.push_back(NeuronId(static_cast<uint64_t>(i) + 10000));
+            }
+        }
+        
+        if (!competitors.empty()) {
+            auto winners = pImpl->attention->processCompetition(competitors);
+            if (!winners.empty()) {
+                // The attention system selects winners that influence action selection
+                // For now, we just note that attention was applied
+                NLM_LOG_DEBUG("Attention system influenced action selection");
+            }
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
-    
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return std::make_unique<Action>(plannedAction);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {

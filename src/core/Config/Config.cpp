@@ -18,17 +18,31 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_ERROR("Configuration file does not exist: " + filepath);
+        return false;
+    }
+    
+    if (!std::filesystem::is_regular_file(filepath)) {
+        NLM_LOG_ERROR("Configuration path is not a file: " + filepath);
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file for reading: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +55,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,12 +68,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Set configuration value
             set(key, value, ConfigSource::File);
+        } else {
+            // Log warning for malformed line
+            NLM_LOG_WARNING("Malformed configuration line at " + filepath + ": line " + 
+                           std::to_string(lineNumber) + ": missing '='");
         }
     }
     
+    NLM_LOG_DEBUG("Configuration loaded successfully from " + filepath + ": " + 
+                 std::to_string(pImpl->entries.size()) + " entries");
+    
     return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
