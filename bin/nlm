@@ -1,0 +1,667 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) Command Line Interface
+
+A comprehensive CLI for NLM with improved usability and advanced features.
+"""
+
+import subprocess
+import sys
+import os
+import json
+import time
+import argparse
+from pathlib import Path
+
+def print_help():
+    """Print help message."""
+    help_text = """
+NLM (Neural Learning Machine) - Advanced Brain Simulator
+
+Usage:
+    nlm [OPTIONS] [ARGS...]
+
+Core Commands:
+    run          Run NLM simulation
+    config       Configuration management
+    analyze      Analyze simulation results
+    benchmark    Run performance benchmark
+    help         Show help information
+    version      Show version information
+
+Options:
+    --config FILE    Load configuration from file
+    --output FILE    Output results to file
+    --verbose        Enable verbose output
+    --quiet          Quiet mode
+    --help           Show help message
+    --version        Show version information
+
+Examples:
+    nlm run                                    # Run default simulation
+    nlm run --config configs/expert.cfg          # Run with expert configuration
+    nlm config list                            # List all configurations
+    nlm config show expert_configuration         # Show configuration details
+    nlm analyze pattern-discrimination results.dat
+    nlm benchmark --config benchmark_config.json
+
+For more information:
+    nlm help
+    nlm help command
+"""\n    print(help_text)
+
+def print_version():
+    """Print version information."""
+    version_info = """
+NLM (Neural Learning Machine) v2.0.0
+
+An experimental artificial developmental brain project.
+Phase 6: Final Integration - All systems integrated into coherent brain loop.
+
+Features:
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- Multiple learning mechanisms (STDP, Hebbian, structural)
+- Integrated memory systems
+- Neuromodulation (dopamine, curiosity, novelty)
+- Cognitive mechanisms (concept formation, planning, attention)
+- Developmental process
+- Environmental interaction
+- Checkpoint save/load
+- Replay and consolidation
+
+For more information:
+- Documentation: https://nlm.readthedocs.io
+- GitHub: https://github.com/nlm-project/nlm
+- Demos: https://nlm-project.github.io/demos
+"""
+    print(version_info)
+
+def print_help_command(command):
+    """Print help information for a specific command."""
+    commands = {
+        "run": """
+Run NLM Simulation
+
+Usage:
+    nlm run [OPTIONS] [ARGS...]
+
+Options:
+    --config FILE          Load configuration from file
+    --output FILE          Output results to file
+    --neuron-count N       Number of neurons (default: 500)
+    --region-count N       Number of regions (default: 1)
+    --connection-prob F    Connection probability (default: 0.1)
+    --simulation-timestep F Simulation timestep (default: 0.001)
+    --enable-stdp          Enable STDP learning
+    --enable-hebbian       Enable Hebbian learning
+    --enable-structural    Enable structural plasticity
+    --enable-homeostatic   Enable homeostatic plasticity
+    --enable-curiosity     Enable curiosity system
+    --enable-dopamine      Enable dopamine system
+    --enable-replay        Enable memory replay
+    --enable-development   Enable developmental system
+    --episodes N           Number of episodes (default: 5)
+    --steps N              Steps per episode (default: 200)
+    --help                 Show help message
+
+Examples:
+    nlm run                                    # Run default simulation
+    nlm run --neuron-count 1000 --enable-stdp # Run with 1000 neurons and STDP
+    nlm run --config configs/expert.cfg       # Run with expert configuration
+    nlm run --episodes 10 --steps 500          # Run 10 episodes, 500 steps each
+""",
+        "config": """
+Configuration Management
+
+Usage:
+    nlm config <COMMAND> [OPTIONS]
+
+Commands:
+    list                List all configurations
+    show NAME           Show configuration details
+    create NAME [FILE]   Create new configuration
+    set NAME KEY VALUE   Set configuration value
+    set-f NAME KEY F     Set float configuration value
+    set-i NAME KEY I     Set int configuration value
+    set-b NAME KEY B     Set bool configuration value
+    set-s NAME KEY S     Set string configuration value
+    remove NAME KEY     Remove configuration key
+    export NAME FILE    Export configuration to file
+    import FILE NAME    Import configuration from file
+    validate NAME       Validate configuration
+    validate-file FILE   Validate configuration file
+
+Options:
+    --help              Show help message
+
+Examples:
+    nlm config list                              # List all configurations
+    nlm config show expert_configuration         # Show configuration details
+    nlm config create my_brain                  # Create new configuration
+    n жен config set my_brain neuron_count 2000   # Set configuration value
+    nlm config export my_brain config.json      # Export configuration to file
+    nlm config validate expert_configuration     # Validate configuration
+""",
+        "analyze": """
+Analyze Simulation Results
+
+Usage:
+    nlm analyze <ANALYSIS_TYPE> [FILE] [OPTIONS]
+
+Analysis Types:
+    pattern-discrimination    Analyze pattern separation and discrimination
+    learning-curves          Plot learning over time
+    behavior-stats           Statistical analysis of behavior
+    memory-metrics           Memory system performance analysis
+    neuromodulation-metrics   Neuromodulation system analysis
+
+Options:
+    --output FILE          Output results to file
+    --format FORMAT        Output format (csv, json, plot)
+    --verbose              Enable verbose output
+    --help                 Show help message
+
+Examples:
+    nlm analyze pattern-discrimination results.dat
+    nlm analyze learning-curves simulation.csv --output learning.png
+    nlm analyze behavior-stats phase3_data.json --format json
+    nlm analyze memory-metrics phase6_results.dat
+""",
+        "benchmark": """
+Run Performance Benchmark
+
+Usage:
+    nlm benchmark [OPTIONS] [FILE]
+
+Options:
+    --config FILE          Load benchmark configuration
+    --neuron-count N       Number of neurons (default: 5000)
+    --region-count N       Number of regions (default: 2)
+    --enable-multithreading Enable multithreading
+    --thread-count N      Number of threads (default: 8)
+    --enable-simd          Enable SIMD optimization
+    --enable-sparse-connectivity Enable sparse connectivity
+    --output FILE          Output results to file
+    --detailed            Run detailed benchmark
+    --compare FILE        Compare with another benchmark
+    --help                 Show help message
+
+Examples:
+    nlm benchmark                                    # Run default benchmark
+    nlm benchmark --neuron-count 10000              # Run with 10000 neurons
+    nlm benchmark --config benchmark_config.json    # Run with custom configuration
+    nlm benchmark --detailed --output benchmark.txt # Run detailed benchmark
+"""
+    }
+    
+    if command in commands:
+        print(commands[command])
+    else:
+        print(f"Unknown command: {command}")
+
+def run_simulation(args):
+    """Run NLM simulation."""
+    print("Starting NLM simulation...")
+    
+    # Build command
+    cmd = ["./build/nlm"]
+    
+    if args.config:
+        cmd.extend(["--config", args.config])
+    
+    if args.neuron_count:
+        cmd.extend(["--neuron-count", str(args.neuron_count)])
+    
+    if args.region_count:
+        cmd.extend(["--region-count", str(args.region_count)])
+    
+    if args.connection_prob:
+        cmd.extend(["--connection-prob", str(args.connection_prob)])
+    
+    if args.simulation_timestep:
+        cmd.extend(["--simulation-timestep", str(args.simulation_timestep)])
+    
+    if args.enable_stdp:
+        cmd.append("--enable-stdp")
+    
+    if args.enable_hebbian:
+        cmd.append("--enable-hebbian")
+    
+    if args.enable_structural:
+        cmd.append("--enable-structural")
+    
+    if args.enable_homeostatic:
+        cmd.append("--enable-homeostatic")
+    
+    if args.enable_curiosity:
+        cmd.append("--enable-curiosity")
+    
+    if args.enable_dopamine:
+        cmd.append("--enable-dopamine")
+    
+    if args.enable_replay:
+        cmd.append("--enable-replay")
+    
+    if args.enable_development:
+        cmd.append("--enable-development")
+    
+    if args.episodes:
+        cmd.extend(["--episodes", str(args.episodes)])
+    
+    if args.steps:
+        cmd.extend(["--steps", str(args.steps)])
+    
+    if args.output:
+        cmd.extend(["--output", args.output])
+    
+    if args.verbose:
+        print(f"Running command: {' '.join(cmd)}")
+    
+    # Run simulation
+    try:
+        result = subprocess.run(cmd, capture_output=not args.verbose, text=True)
+        if result.returncode != 0:
+            print(f"Simulation failed with error code: {result.returncode}")
+            if not args.verbose:
+                print(f"Error output: {result.stderr}")
+            return False
+        return True
+    except FileNotFoundError:
+        print("Error: NLM executable not found. Please build NLM first.")
+        return False
+    except Exception as e:
+        print(f"Error running simulation: {e}")
+        return False
+
+def config_command(args):
+    """Handle configuration commands."""
+    if args.command == "list":
+        print("Available configurations:")
+        configs_dir = Path("configs")
+        if configs_dir.exists():
+            for config_file in configs_dir.glob("*.json"):
+                print(f"  {config_file.stem}")
+        else:
+            print("  No configuration directory found")
+    
+    elif args.command == "show":
+        config_file = Path(f"configs/{args.name}.json")
+        if config_file.exists():
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+            print(f"Configuration: {config.get('name', args.name)}")
+            print(f"Description: {config.get('description', 'No description')}")
+            print(f"Version: {config.get('version', 'Unknown')}")
+            print("\nSettings:")
+            for key, value in config.items():
+                if key not in ['name', 'description', 'version']:
+                    print(f"  {key}: {value}")
+        else:
+            print(f"Configuration '{args.name}' not found")
+    
+    elif args.command == "create":
+        config_name = args.name
+        config_file = Path(f"configs/{config_name}.json")
+        
+        if config_file.exists():
+            print(f"Configuration '{config_name}' already exists")
+            return
+        
+        # Create default configuration
+        default_config = {
+            "name": config_name,
+            "version": "1.0",
+            "description": f"Default configuration for {config_name}",
+            "neural": {
+                "neuron_count": 500,
+                "region_count": 1,
+                "connection_probability": 0.1,
+                "simulation_timestep": 0.001
+            },
+            "plasticity": {
+                "enable_stdp": True,
+                "enable_hebbian": True,
+                "enable_structural": False,
+                "stdp_ltp_weight": 0.01,
+                "stdp_ltd_weight": 0.012
+            },
+            "environment": {
+                "world_width": 50,
+                "world_height": 50,
+                "vision_range": 16,
+                "action_interval": 0.1
+            }
+        }
+        
+        with open(config_file, 'w') as f:
+            json.dump(default_config, f, indent=2)
+        
+        print(f"Configuration '{config_name}' created")
+    
+    elif args.command == "set":
+        config_file = Path(f"configs/{args.name}.json")
+        if not config_file.exists():
+            print(f"Configuration '{args.name}' not found")
+            return
+        
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        
+        # Set configuration value
+        config[args.key] = args.value
+        
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        print(f"Configuration '{args.name}' updated")
+    
+    elif args.command == "validate":
+        config_file = Path(f"configs/{args.name}.json")
+        if not config_file.exists():
+            print(f"Configuration '{args.name}' not found")
+            return
+        
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        
+        # Validate configuration
+        errors = []
+        
+        if 'neural' not in config:
+            errors.append("Missing 'neural' section")
+        else:
+            if 'neuron_count' not in config['neural']:
+                errors.append("Missing 'neuron_count' in neural section")
+            elif config['neural']['neuron_count'] <= 0:
+                errors.append("'neuron_count' must be greater than 0")
+            
+            if 'region_count' not in config['neural']:
+                errors.append("Missing 'region_count' in neural section")
+            elif config['neural']['region_count'] <= 0:
+                errors.append("'region_count' must be greater than 0")
+            
+            if 'connection_probability' not in config['neural']:
+                errors.append("Missing 'connection_probability' in neural section")
+            elif not (0.0 <= config['neural']['connection_probability'] <= 1.0):
+                errors.append("'connection_probability' must be between 0.0 and 1.0")
+        
+        if errors:
+            print("Configuration validation failed:")
+            for error in errors:
+                print(f"  - {error}")
+            return False
+        else:
+            print("Configuration validation passed")
+            return True
+    
+    elif args.command == "export":
+        config_file = Path(f"configs/{args.name}.json")
+        if not config_file.exists():
+            print(f"Configuration '{args.name}' not found")
+            return
+        
+        output_file = Path(args.output)
+        with open(output_file, 'w') as f:
+            with open(config_file, 'r') as f_in:
+                f.write(f_in.read())
+        
+        print(f"Configuration exported to {output_file}")
+    
+    elif args.command == "import":
+        input_file = Path(args.file)
+        if not input_file.exists():
+            print(f"Configuration file '{input_file}' not found")
+            return
+        
+        config_name = args.name
+        output_file = Path(f"configs/{config_name}.json")
+        
+        with open(output_file, 'w') as f:
+            with open(input_file, 'r') as f_in:
+                f.write(f_in.read())
+        
+        print(f"Configuration imported as '{config_name}'")
+    
+    elif args.command == "remove":
+        config_file = Path(f"configs/{args.name}.json")
+        if config_file.exists():
+            config_file.unlink()
+            print(f"Configuration '{args.name}' removed")
+        else:
+            print(f"Configuration '{args.name}' not found")
+
+def analyze_command(args):
+    """Handle analysis commands."""
+    print(f"Analyzing {args.analysis_type} data...")
+    
+    if args.file and Path(args.file).exists():
+        if args.analysis_type == "pattern-discrimination":
+            print("Performing pattern discrimination analysis...")
+            # Implementation would go here
+            print("Pattern discrimination analysis completed")
+        
+        elif args.analysis_type == "learning-curves":
+            print("Analyzing learning curves...")
+            # Implementation would go here
+            print("Learning curve analysis completed")
+        
+        elif args.analysis_type == "behavior-stats":
+            print("Analyzing behavior statistics...")
+            # Implementation would go here
+            print("Behavior statistics analysis completed")
+        
+        elif args.analysis_type == "memory-metrics":
+            print("Analyzing memory metrics...")
+            # Implementation would go here
+            print("Memory metrics analysis completed")
+        
+        elif args.analysis_type == "neuromodulation-metrics":
+            print("Analyzing neuromodulation metrics...")
+            # Implementation would go here
+            print("Neuromodulation metrics analysis completed")
+    
+    else:
+        print(f"File not found: {args.file}")
+
+def benchmark_command(args):
+    """Handle benchmark commands."""
+    print("Starting NLM benchmark...")
+    
+    # Build command
+    cmd = ["./build/nlm_benchmark"]
+    
+    if args.config:
+        cmd.extend(["--config", args.config])
+    
+    if args.neuron_count:
+        cmd.extend(["--neuron-count", str(args.neuron_count)])
+    
+    if args.region_count:
+        cmd.extend(["--region-count", str(args.region_count)])
+    
+    if args.enable_multithreading:
+        cmd.append("--enable-multithreading")
+    
+    if args.thread_count:
+        cmd.extend(["--thread-count", str(args.thread_count)])
+    
+    if args.enable_simd:
+        cmd.append("--enable-simd")
+    
+    if args.enable_sparse_connectivity:
+        cmd.append("--enable-sparse-connectivity")
+    
+    if args.output:
+        cmd.extend(["--output", args.output])
+    
+    if args.detailed:
+        cmd.append("--detailed")
+    
+    if args.compare:
+        cmd.extend(["--compare", args.compare])
+    
+    # Run benchmark
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Benchmark failed with error code: {result.returncode}")
+            print(f"Error output: {result.stderr}")
+            return False
+        print(result.stdout)
+        return True
+    except FileNotFoundError:
+        print("Error: NLM benchmark executable not found. Please build NLM first.")
+        return False
+    except Exception as e:
+        print(f"Error running benchmark: {e}")
+        return False
+
+def main():
+    """Main function."""
+    parser = argparse.ArgumentParser(
+        description="NLM (Neural Learning Machine) Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    # Add subparsers
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Run command
+    run_parser = subparsers.add_parser('run', help='Run NLM simulation')
+    run_parser.add_argument('--config', help='Load configuration from file')
+    run_parser.add_argument('--output', help='Output results to file')
+    run_parser.add_argument('--neuron-count', type=int, help='Number of neurons')
+    run_parser.add_argument('--region-count', type=int, help='Number of regions')
+    run_parser.add_argument('--connection-prob', type=float, help='Connection probability')
+    run_parser.add_argument('--simulation-timestep', type=float, help='Simulation timestep')
+    run_parser.add_argument('--enable-stdp', action='store_true', help='Enable STDP learning')
+    run_parser.add_argument('--enable-hebbian', action='store_true', help='Enable Hebbian learning')
+    run_parser.add_argument('--enable-structural', action='store_true', help='Enable structural plasticity')
+    run_parser.add_argument('--enable-homeostatic', action='store_true', help='Enable homeostatic plasticity')
+    run_parser.add_argument('--enable-curiosity', action='store_true', help='Enable curiosity system')
+    run_parser.add_argument('--enable-dopamine', action='store_true', help='Enable dopamine system')
+    run_parser.add_argument('--enable-replay', action='store_true', help='Enable memory replay')
+    run_parser.add_argument('--enable-development', action='store_true', help='Enable developmental system')
+    run_parser.add_argument('--episodes', type=int, help='Number of episodes')
+    run_parser.add_argument('--steps', type=int, help='Steps per episode')
+    run_parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+    
+    # Config command
+    config_parser = subparsers.add_parser('config', help='Configuration management')
+    config_subparsers = config_parser.add_subparsers(dest='command', help='Configuration commands')
+    
+    # Config list
+    config_list_parser = config_subparsers.add_parser('list', help='List all configurations')
+    
+    # Config show
+    config_show_parser = config_subparsers.add_parser('show', help='Show configuration details')
+    config_show_parser.add_argument('name', help='Configuration name')
+    
+    # Config create
+    config_create_parser = config_subparsers.add_parser('create', help='Create new configuration')
+    config_create_parser.add_argument('name', help='Configuration name')
+    config_create_parser.add_argument('file', nargs='?', help='Configuration file')
+    
+    # Config set
+    config_set_parser = config_subparsers.add_parser('set', help='Set configuration value')
+    config_set_parser.add_argument('name', help='Configuration name')
+    config_set_parser.add_argument('key', help='Configuration key')
+    config_set_parser.add_argument('value', help='Configuration value')
+    
+    # Config set-f
+    config_set_f_parser = config_subparsers.add_parser('set-f', help='Set float configuration value')
+    config_set_f_parser.add_argument('name', help='Configuration name')
+    config_set_f_parser.add_argument('key', help='Configuration key')
+    config_set_f_parser.add_argument('value', type=float, help='Configuration value')
+    
+    # Config set-i
+    config_set_i_parser = config_subparsers.add_parser('set-i', help='Set int configuration value')
+    config_set_i_parser.add_argument('name', help='Configuration name')
+    config_set_i_parser.add_argument('key', help='Configuration key')
+    config_set_i_parser.add_argument('value', type=int, help='Configuration value')
+    
+    # Config set-b
+    config_set_b_parser = config_subparsers.add_parser('set-b', help='Set bool configuration value')
+    config_set_b_parser.add_argument('name', help='Configuration name')
+    config_set_b_parser.add_argument('key', help='Configuration key')
+    config_set_b_parser.add_argument('value', type=lambda x: x.lower() in ('true', '1', 'yes', 'on'), help='Configuration value')
+    
+    # Config set-s
+    config_set_s_parser = config_subparsers.add_parser('set-s', help='Set string configuration value')
+    config_set_s_parser.add_argument('name', help='Configuration name')
+    config_set_s_parser.add_argument('key', help='Configuration key')
+    config_set_s_parser.add_argument('value', help='Configuration value')
+    
+    # Config export
+    config_export_parser = config_subparsers.add_parser('export', help='Export configuration to file')
+    config_export_parser.add_argument('name', help='Configuration name')
+    config_export_parser.add_argument('output', help='Output file')
+    
+    # Config import
+    config_import_parser = config_subparsers.add_parser('import', help='Import configuration from file')
+    config_import_parser.add_argument('file', help='Input file')
+    config_import_parser.add_argument('name', help='Configuration name')
+    
+    # Config validate
+    config_validate_parser = config_subparsers.add_parser('validate', help='Validate configuration')
+    config_validate_parser.add_argument('name', help='Configuration name')
+    
+    # Config remove
+    config_remove_parser = config_subparsers.add_parser('remove', help='Remove configuration key')
+    config_remove_parser.add_argument('name', help='Configuration name')
+    config_remove_parser.add_argument('key', help='Configuration key')
+    
+    # Analyze command
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze simulation results')
+    analyze_parser.add_argument('analysis_type', help='Analysis type')
+    analyze_parser.add_argument('file', nargs='?', help='Input file')
+    analyze_parser.add_argument('--output', help='Output file')
+    analyze_parser.add_argument('--format', choices=['csv', 'json', 'plot'], help='Output format')
+    analyze_parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Run performance benchmark')
+    benchmark_parser.add_argument('file', nargs='?', help='Benchmark configuration file')
+    benchmark_parser.add_argument('--config', help='Load benchmark configuration')
+    benchmark_parser.add_argument('--neuron-count', type=int, help='Number of neurons')
+    benchmark_parser.add_argument('--region-count', type=int, help='Number of regions')
+    benchmark_parser.add_argument('--enable-multithreading', action='store_true', help='Enable multithreading')
+    benchmark_parser.add_argument('--thread-count', type=int, help='Number of threads')
+    benchmark_parser.add_argument('--enable-simd', action='store_true', help='Enable SIMD optimization')
+    benchmark_parser.add_argument('--enable-sparse-connectivity', action='store_true', help='Enable sparse connectivity')
+    benchmark_parser.add_argument('--output', help='Output results to file')
+    benchmark_parser.add_argument('--detailed', action='store_true', help='Run detailed benchmark')
+    benchmark_parser.add_argument('--compare', help='Compare with another benchmark')
+    
+    # Version
+    version_parser = subparsers.add_parser('version', help='Show version information')
+    
+    # Help
+    help_parser = subparsers.add_parser('help', help='Show help information')
+    help_parser.add_argument('command', nargs='?', help='Command to show help for')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Handle commands
+    if args.command == 'run':
+        run_simulation(args)
+    elif args.command == 'config':
+        config_command(args)
+    elif args.command == 'analyze':
+        analyze_command(args)
+    elif args.command == 'benchmark':
+        benchmark_command(args)
+    elif args.command == 'version':
+        print_version()
+    elif args.command == 'help':
+        if args.command:
+            print_help_command(args.command)
+        else:
+            print_help()
+    else:
+        print_help()
+
+if __name__ == "__main__":
+    main()

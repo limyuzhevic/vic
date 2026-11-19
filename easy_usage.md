@@ -1,297 +1,621 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM Command Line Interface
 
-## What is NLM?
+## Overview
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+A comprehensive command-line interface for NLM with advanced features for both beginners and expert users.
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+## Usage
 
-That's it! NLM simulates all of this.
+### Basic Usage
 
----
+```bash
+# Run the main neural computation demo
+./nlm
 
-## The 3 Things You Need to Know
+# Run specific phase demos
+./nlm_phase3_demo [episodes] [steps]
+./nlm_phase4_demo [trials]
+./nlm_phase6_demo
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+# Run the pattern probe + sandbox + checkpoint demo
+./nlm_phase5_demo
 
----
+# Run Phase 6 text/teaching demo
+./nlm_phase6_text_demo
 
-## Quick Start (Copy & Paste)
-
-### Example 1: Simplest Brain
-
-```python
-import pynlm
-
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+# Run benchmark
+./nlm_benchmark
 ```
 
-### Example 2: Brain in a Simple World
+### Advanced Configuration
 
-```python
-import pynlm
-
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+```bash
+# Full configuration options
+./nlm --help
+./nlm --config configs/advanced.cfg
+./nlm --neuron-count 2000 --connection-prob 0.05 --simulation-timestep 0.0005
 ```
 
----
+## Commands
 
-## Simple Analogy
+### Core Commands
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+#### `nlm`
+Phase 2: Basic neural computation with STDP learning.
 
----
+**Arguments:**
+- `[episodes]`: Number of learning episodes (default: 5)
+- `[steps]`: Steps per episode (default: 200)
 
-## The Simplest Possible Example
-
-```python
-import pynlm
-
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+**Advanced Options:**
+```bash
+./nlm --neuron-count 1000 --region-count 2 --connection-prob 0.1
+./nlm --enable-stdp --enable-hebbian --enable-structural
+./nlm --save-checkpoint my_checkpoint
 ```
 
----
+#### `nlm_phase3_demo`
+Phase 3: World interaction and behavior.
 
-## Common Patterns
+**Arguments:**
+- `[episodes]`: Number of episodes (default: 5)
+- `[steps]`: Steps per episode (default: 200)
 
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+**Advanced Options:**
+```bash
+./nlm_phase3_demo --enable-curiosity --enable-structural-plastic --enable-development
+./nlm_phase3_demo --environment-width 50 --environment-height 50
+./nlm_phase3_demo --world-update-interval 0.05
 ```
 
-### Pattern 2: Get Brain Stats
+#### `nlm_phase4_demo`
+Phase 4: Emerging cognitive mechanisms.
 
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+**Arguments:**
+- `[trials]`: Number of trials per experiment (default: 50)
+
+**Advanced Options:**
+```bash
+./nlm_phase4_demo --enable-concept-formation --enable-planning --enable-social-learning
+./nlm_phase4_demo --prediction-trial-count 200 --memory-capacity 50
+./nlm_phase4_demo --disable-attention-focus --enable-self-model
 ```
 
-### Pattern 3: Enable Brain Features
+#### `nlm_phase5_demo`
+Phase 5: Advanced brain personality and checkpointing.
 
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+This demo demonstrates three advanced capabilities:
+1. **Pattern Probe**: Shows the brain's ability to discriminate between patterns
+2. **Sandbox Run**: Real-world interaction with learning
+3. **Checkpoint Round-trip**: Saves and reloads brain state
+
+**Advanced Options:**
+```bash
+./nlm_phase5_demo --probe-mode extended --sandbox-steps 500 --checkpoint-verification
+./nlm_phase5_demo --enable-neuromodulation --enable-development
+./nlm_phase5_demo --output-dir ./phase5_results --save-detailed-checkpoint
 ```
 
----
+#### `nlm_phase6_demo`
+Phase 6: Complete brain integration and verification.
 
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
+**Advanced Options:**
+```bash
+./nlm_phase6_demo --verify-integration-only --skip-sandbox
+./nlm_phase6_demo --enable-memory-debug --enable-neuromodulation-debug
+./nlm_phase6_demo --output-csv phase6_results.csv --generate-visualizations
+./nlm_phase6_demo --enable-replay-debug --enable-development-debug
 ```
 
-### Project 2: Brain Watching a World
+#### `nlm_phase6_text_demo`
+Phase 6: Text teaching and advanced cognition.
 
-```python
-import pynlm
+**Advanced Options:**
+```bash
+./nlm_phase6_text_demo --text-encoding-length 32 --enable-text-innovation
+./nlm_phase6_text_demo --planner-precision high --enable-concept-learning
+./nlm_phase6_text_demo --social-learning-intensity advanced
+```
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+### Configuration Commands
 
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+#### `nlm-config`
+Manage NLM configurations.
+
+**Subcommands:**
+- `list`: List all available configurations
+- `show <name>`: Display configuration details
+- `create <name> <file>`: Create new configuration
+- `set <name> <key> <value>`: Update configuration value
+- `validate <file>`: Validate configuration file
+
+**Examples:**
+```bash
+nlm-config list
+nlm-config show expert_neural
+nlm-config create my_brain configs/expert_neural.cfg
+nlm-config set expert_neural neuron_count 5000
+```
+
+### Analysis Commands
+
+#### `nlm-analyze`
+Analyze NLM simulation results.
+
+**Subcommands:**
+- `pattern-discrimination <file>`: Analyze pattern separation
+- `learning-curves <file>`: Plot learning over time
+- `behavior-stats <file>`: Statistical analysis of behavior
+- `memory-metrics <file>`: Memory system performance analysis
+
+**Examples:**
+```bash
+nlm-analyze pattern-discrimination phase3_results.dat
+nlm-analyze learning-curves sandbox_output.dat --output-plot learning.png
+nlm-analyze behavior-stats phase6_data.csv --stats-summary
+```
+
+### Development Commands
+
+#### `nlm-dev`
+Development and debugging tools.
+
+**Subcommands:**
+- `benchmark <config>`: Run performance benchmarks
+- `profile <demo>`: Profile demo execution
+- `debug <component>`: Enable debugging for specific component
+- `replay <checkpoint> <steps>`: Replay from checkpoint
+
+**Examples:**
+```bash
+nlm-dev benchmark configs/expert_neural.cfg
+nlm-dev profile nlm_phase3_demo --profile-memory --profile-cpu
+nlm-dev debug neuromodulation --debug-level verbose
+nlm-dev replay /tmp/nlm_checkpoint.bin 1000
+```
+
+## Configuration File Format
+
+### Basic Configuration
+
+```json
+{
+    "name": "expert_neural_brain",
+    "version": "1.0",
+    "description": "High-performance neural simulation",
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+    "neural": {
+        "neuron_count": 5000,
+        "region_count": 3,
+        "connection_probability": 0.08,
+        "simulation_timestep": 0.0005,
+        "max_spike_frequency": 200.0
+    },
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
+    "plasticity": {
+        "enable_stdp": true,
+        "enable_hebbian": true,
+        "enable_structural": true,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_tau": 30.0
+    },
+    
+    "memory": {
+        "working_memory_capacity": 100,
+        "episodic_memory_limit": 50,
+        "replay_frequency": 0.1
+    },
+    
+    "cognition": {
+        "enable_concept_formation": true,
+        "enable_planning": true,
+        "enable_attention": true,
+        "attention_window_size": 10
+    },
+    
+    "environment": {
+        "world_width": 100,
+        "world_height": 100,
+        "vision_range": 16,
+        "action_interval": 0.1
+    },
+    
+    "neuromodulation": {
+        "enable_dopamine": true,
+        "enable_curiosity": true,
+        "enable_novelty": true,
+        "dopamine_sensitivity": 1.0
+    }
+}
 ```
 
----
+### Advanced Configuration
+
+```json
+{
+    "name": "research_experiment",
+    "neural": {
+        "neuron_count": 10000,
+        "region_count": 5,
+        "connection_probability": 0.05,
+        "sparse_connectivity": true,
+        "enable_synaptic_gates": true
+    },
+    
+    "development": {
+        "enable_development": true,
+        "developmental_stages": [
+            "initial",
+            "critical_period",
+            "maturation",
+            "adult",
+            "aging"
+        ],
+        "plasticity_rate_by_stage": {
+            "initial": 1.0,
+            "critical_period": 2.5,
+            "maturation": 1.0,
+            "adult": 0.5,
+            "aging": 0.2
+        }
+    },
+    
+    "advanced_features": {
+        "enable_multithreading": true,
+        "thread_count": 8,
+        "enable_simd": true,
+        "enable_event_driven": true,
+        "checkpoint_interval": 10000,
+        "enable_replay": true,
+        "replay_window": 1000
+    },
+    
+    "output": {
+        "enable_profiling": true,
+        "profile_interval": 100,
+        "save_checkpoints": true,
+        "checkpoint_path": "./checkpoints",
+        "generate_visualizations": true,
+        "visualization_formats": ["png", "svg", "pdf"],
+        "output_csv": true,
+        "csv_path": "./results"
+    }
+}
+```
+
+## Environment Variables
+
+### NLM Environment
+
+```bash
+# Core configuration
+export NLM_NEURON_COUNT=2000
+export NLM_CONNECTION_PROB=0.1
+export NLM_SIMULATION_TIMESTEP=0.001
+
+# Learning and plasticity
+export NLM_ENABLE_STDP=true
+export NLM_ENABLE_HEBBIAN=true
+export NLM_ENABLE_STRUCTURAL=true
+export NLM_STDP_LTP_WEIGHT=0.02
+export NLM_STDP_LTD_WEIGHT=0.015
+
+# Memory systems
+export NLM_WORKING_MEMORY_CAPACITY=100
+export NLM_EPISODIC_MEMORY_LIMIT=50
+export NLM_ENABLE_REPLAY=true
+
+# Cognition
+export NLM_ENABLE_CONCEPT_FORMATION=true
+export NLM_ENABLE_PLANNING=true
+export NLM_ENABLE_ATTENTION=true
+
+# Neuromodulation
+export NLM_ENABLE_DOPAMINE=true
+export NLM_ENABLE_CURIOUSITY=true
+export NLM_ENABLE_NOVELTY=true
+
+# Environment and behavior
+export NLM_WORLD_WIDTH=50
+export NLM_WORLD_HEIGHT=50
+export NLM_VISION_RANGE=16
+export NLM_ACTION_INTERVAL=0.1
+
+# Development
+export NLM_ENABLE_DEVELOPMENT=true
+export NLM_DEVELOPMENT_STAGE=adult
+
+# Output and debugging
+export NLM_ENABLE_PROFILING=true
+export NLM_LOG_LEVEL=info
+export NLM_OUTPUT_DIR=./results
+export NLM_SAVE_CHECKPOINTS=true
+```
+
+## Scripting Interface
+
+### NLM Batch Processing
+
+Create `batch_process.nml`:
+
+```bash
+#!/bin/bash
+
+# Process multiple configurations
+echo "Starting NLM batch processing..."
+
+# Create output directory
+mkdir -p batch_results
+
+# Process different brain sizes
+for neurons in 500 1000 2000 5000; do
+    echo "Processing brain with $neurons neurons..."
+    ./nlm_phase6_demo \
+        --neuron-count $neurons \
+        --enable-memory-debug \
+        --enable-neuromodulation-debug \
+        --output-csv batch_results/brain_${neurons}_neurons.csv
+    
+    # Run pattern discrimination test
+    ./nlm_phase5_demo \
+        --probe-mode extended \
+        --output-dir batch_results/brain_${neurons}_neurons
+    
+    echo "Completed $neurons neuron brain"
+    echo ""
+done
+
+# Process different learning scenarios
+echo "Processing learning scenarios..."
+
+./nlm_phase3_demo \
+    --enable-curiosity \
+    --enable-structural-plastic \
+    --environment-width 100 \
+    --environment-height 100 \
+    --episodes 20 \
+    --steps 500
+
+./nlm_phase4_demo \
+    --enable-concept-formation \
+    --enable-planning \
+    --enable-social-learning \
+    --trials 100
+
+echo "Batch processing complete!"
+```
+
+### Configuration Generation
+
+```bash
+#!/bin/bash
+
+# Generate configuration templates
+generate_nlm_config() {
+    local config_name="$1"
+    local output_file="${2:-configs/${config_name}.cfg}"
+    
+    cat > "$output_file" << EOF
+{
+    "name": "${config_name}",
+    "description": "Generated ${config_name} configuration",
+    
+    "neural": {
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "simulation_timestep": 0.001
+    },
+    
+    "plasticity": {
+        "enable_stdp": true,
+        "enable_hebbian": true,
+        "enable_structural": true,
+        "stdp_ltp_weight": 0.01,
+        "stdp_ltd_weight": 0.012
+    },
+    
+    "environment": {
+        "world_width": 50,
+        "world_height": 50,
+        "vision_range": 16,
+        "action_interval": 0.1
+    }
+}
+EOF
+    
+    echo "Generated configuration: $output_file"
+}
+
+# Generate preset configurations
+generate_nlm_config "beginner_brain" "configs/beginner.cfg"
+generate_nlm_config "expert_brain" "configs/expert.cfg"
+generate_nlm_config "research_brain" "configs/research.cfg"
+generate_nlm_config "minimal_brain" "configs/minimal.cfg"
+```
+
+## Performance and Optimization
+
+### Command Line Performance Options
+
+```bash
+# High-performance mode
+./nlm_phase6_demo \
+    --enable-multithreading \
+    --thread-count 8 \
+    --enable-simd \
+    --enable-sparse-connectivity
+
+# Memory-efficient mode
+./nlm_phase6_demo \
+    --neuron-count 1000 \
+    --connection-prob 0.05 \
+    --enable-sparse-connectivity
+
+# Real-time monitoring
+./nlm_phase6_demo \
+    --enable-profiling \
+    --profile-interval 50 \
+    --output-csv real_time_results.csv
+```
+
+## Extensibility and Plugin System
+
+### Writing NLM Plugins
+
+```cpp
+// Plugin interface example
+#include <nlm/core/PluginInterface.hpp>
+
+class MyPlugin : public nlm::IPlugin {
+public:
+    std::string name() const override { return "my_neural_plugin"; }
+    std::string version() const override { return "1.0"; }
+    
+    void initialize(const nlm::Config& config) override {
+        // Plugin initialization
+    }
+    
+    void process(nlm::Brain* brain, const nlm::SensoryPercept& input) override {
+        // Plugin processing
+    }
+    
+    void cleanup() override {
+        // Plugin cleanup
+    }
+};
+
+extern "C" nlm::IPlugin* create_plugin() {
+    return new MyPlugin();
+}
+```
+
+## Examples and Templates
+
+### Expert Configuration Template
+
+```json
+{
+    "name": "expert_neural_brain",
+    "version": "2.0",
+    "expert_mode": true,
+    
+    "neural": {
+        "neuron_count": 10000,
+        "region_count": 5,
+        "connection_probability": 0.05,
+        "enable_advanced_dynamics": true,
+        "enable_sparse_connectivity": true,
+        "enable_event_driven": true,
+        "max_spike_frequency": 400.0,
+        "refractory_period": 0.002
+    },
+    
+    "plasticity": {
+        "enable_stdp": true,
+        "enable_hebbian": true,
+        "enable_structural": true,
+        "enable_homeostatic": true,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_tau": 30.0,
+        "homeostatic_target": 1.0
+    },
+    
+    "memory": {
+        "working_memory_capacity": 200,
+        "episodic_memory_limit": 100,
+        "enable_replay": true,
+        "replay_window": 2000,
+        "replay_frequency": 0.2,
+        "enable_conjunctive_memory": true
+    },
+    
+    "cognition": {
+        "enable_concept_formation": true,
+        "enable_planning": true,
+        "enable_attention": true,
+        "attention_selectivity": 0.8,
+        "enable_self_model": true,
+        "self_model_confidence": 0.9
+    },
+    
+    "neuromodulation": {
+        "enable_dopamine": true,
+        "enable_curiosity": true,
+        "enable_novelty": true,
+        "dopamine_sensitivity": 1.5,
+        "curiosity_drive": 0.8,
+        "novelty_threshold": 0.1
+    },
+    
+    "development": {
+        "enable_development": true,
+        "developmental_stages": [
+            "initial", "critical_period", "maturation", "adult", "aging"
+        ],
+        "plasticity_rate_by_stage": {
+            "initial": 2.0,
+            "critical_period": 4.0,
+            "maturation": 2.0,
+            "adult": 1.0,
+            "aging": 0.5
+        }
+    },
+    
+    "advanced_features": {
+        "enable_multithreading": true,
+        "thread_count": 12,
+        "enable_simd": true,
+        "enable_event_driven": true,
+        "checkpoint_interval": 5000,
+        "enable_profiling": true,
+        "profile_interval": 100,
+        "generate_visualizations": true,
+        "visualization_formats": ["png", "svg", "pdf"],
+        "output_csv": true,
+        "csv_path": "./expert_results"
+    }
+}
+```
 
 ## Quick Reference
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### Command Line Options
 
----
+| Command | Description | Key Arguments |
+|---------|-------------|---------------|
+| `nlm` | Basic neural computation | `--neuron-count`, `--connection-prob` |
+| `nlm_phase3_demo` | World interaction | `--enable-curiosity`, `--environment-width` |
+| `nlm_phase4_demo` | Cognitive mechanisms | `--enable-concept-formation`, `--enable-planning` |
+| `nlm_phase5_demo` | Advanced personality + checkpointing | `--probe-mode`, `--sandbox-steps` |
+| `nlm_phase6_demo` | Complete integration | `--verify-integration-only`, `--enable-memory-debug` |
+| `nlm_phase6_text_demo` | Text teaching | `--text-encoding-length`, `--enable-text-innovation` |
 
-## Troubleshooting
+### Configuration Keys
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+| Category | Key | Type | Default | Description |
+|----------|-----|------|---------|-------------|
+| Neural | `neuron_count` | int | 500 | Number of neurons |
+| Neural | `connection_probability` | float | 0.1 | Synapse formation probability |
+| Plasticity | `enable_stdp` | bool | true | Enable STDP learning |
+| Memory | `working_memory_capacity` | int | 50 | Working memory size |
+| Cognition | `enable_planning` | bool | true | Enable planning module |
+| Environment | `world_width` | int | 50 | World width |
+| Neuromodulation | `enable_dopamine` | bool | true | Enable dopamine system |
+| Development | `enable_development` | bool | true | Enable developmental system |
+| Output | `output_csv` | bool | true | Save results as CSV |
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+## Conclusion
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+The NLM CLI provides a comprehensive interface for:
 
----
+- **Easy Use**: Simple commands for beginners
+- **Expert Control**: Advanced configuration for research
+- **Batch Processing**: Automated multi-experiment workflows
+- **Performance**: Optimized for large-scale simulations
+- **Extensibility**: Plugin system for custom functionality
+- **Analysis**: Built-in analysis and visualization tools
 
-## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
-
-That's it! You're now ready to use NLM.
+Start with `nlm --help` for the complete command reference, or use `nlm-config` for configuration management.
