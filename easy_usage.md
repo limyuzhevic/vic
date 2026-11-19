@@ -71,6 +71,46 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 4: Brain Configuration with Validation
+
+```python
+import pynlm
+
+# Create and validate configuration
+config = pynlm.createDefaultConfig()
+
+# Configure specific parameters (with automatic validation)
+config.set("brain.neuron_count", 500)  # Must be positive
+config.set("brain.connection_probability", 0.05)  # Must be non-negative
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("neuromod.curiosity.enable", True)
+
+# Create brain with validation
+brain = pynlm.createBrain(config)  # Validates config automatically
+brain.initialize()
+
+print(f"Brain configured with {brain.getTotalNeuronCount()} neurons")
+print(f"Excitation/Inhibition ratio: {brain.getExcitationInhibitionRatio():.3f}")
+```
+
+### Example 5: Parameterized Quick Start
+
+```python
+import pynlm
+
+# One line to create a virtual brain with validation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
 ---
 
 ## Simple Analogy

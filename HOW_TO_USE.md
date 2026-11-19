@@ -114,7 +114,7 @@ pip install dist/*.whl
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(pynlm.version())
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
@@ -193,18 +193,18 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Enhanced Agent Example
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_enhanced_simulation():
+    """Run a complete agent simulation with validation and error checking."""
     
-    # 1. Create configuration
+    # 1. Create configuration with validation
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
+    # 2. Create brain with automatic validation
     brain = pynlm.createBrain(config)
     brain.initialize()
     
@@ -220,14 +220,15 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable subsystems with validation
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
-    for step in range(num_steps):
+    # 7. Run simulation loop with error checking
+    print("Starting enhanced simulation...")
+    for step in range(1000):
         # Update world
         world.update(timestep=0.1)
         
@@ -260,9 +261,33 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    
+    print("Enhanced simulation complete!")
+    print(f"Final brain stats:")
+    print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+    print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    print(f"  Development stage: {brain.getDevelopmentalStage()}")
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the enhanced simulation
+run_enhanced_simulation()
+```
+
+### Factory Functions (New)
+
+```python
+# Factory functions for easy creation
+config = pynlm.createDefaultConfig()      # Create config with defaults
+brain = pynlm.createBrain(config)        # Create brain with validation
+world = pynlm.createSimpleWorld()        # Create world
+agent = pynlm.createAgentBrain(brain)    # Create agent interface
+
+# Convenience validation functions
+pynlm.validate_positive(value, "name")
+pynlm.validate_non_negative(value, "name")
+
+# Version information
+pynlm.version()  # Returns "pynlm 0.1.0 (Phase 6)"
 ```
 
 ### Key Classes and Methods
@@ -318,6 +343,10 @@ config.set("learning.rate", 0.001)
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")
+
+# Get with validation and defaults
+neuron_count = config.getOr("brain.neuron_count", 1000)
+connection_prob = config.getOr("brain.connection_probability", 0.1)
 ```
 
 #### AgentBrain Class
@@ -353,6 +382,9 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+agent.getMotorGroupActivities()  # New: diagnostic info
+agent.getThoughtTrace()           # New: Phase 5 thought trace
+agent.getLearnedPreference()      # New: learned personality trait
 ```
 
 #### SimpleWorld Class
@@ -377,10 +409,11 @@ world.applyMotorCommand(motor_cmd, current_time)
 percept = world.getSensoryPercept()
 body = world.getAgentBody()
 
-# World objects
+# Enhanced world objects
 world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
 world.removeObject(x, y)
 world.isValidPosition(x, y)
+world.getObjectAt(x, y)  # Returns None or object
 
 # Properties
 world.getWidth()
