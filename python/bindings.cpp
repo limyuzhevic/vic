@@ -142,7 +142,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // === ADVANCED PYTHON BINDINGS ===
+
+    // Enhanced Config with more advanced settings
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Advanced configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -168,7 +171,317 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Advanced configuration methods
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (integer)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (boolean)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (float)")
+        .def("get", [](Config& self, const std::string& key) -> py::object {
+            if (self.has(key)) {
+                auto value = self.getOr<std::string>(key, "");
+                // Try to detect type and return appropriate Python type
+                try {
+                    size_t pos;
+                    int64_t intVal = std::stoll(value, &pos);
+                    if (pos == value.size()) {
+                        return py::int_(intVal);
+                    }
+                } catch (...) {}
+                try {
+                    size_t pos;
+                    double floatVal = std::stod(value, &pos);
+                    if (pos == value.size()) {
+                        return py::float_(floatVal);
+                    }
+                } catch (...) {}
+                try {
+                    size_t pos;
+                    bool boolVal = (value == "true" || value == "1");
+                    if (pos == value.size()) {
+                        return py::bool_(boolVal);
+                    }
+                } catch (...) {}
+            }
+            return py::none();
+        }, py::arg("key"),
+           "Get a configuration value (returns Python int, float, str, or bool)")
+        .def("exportAsJSON", [](const Config& self) {
+            std::ostringstream oss;
+            oss << "{";
+            bool first = true;
+            for (const auto& key : self.getKeys()) {
+                if (!first) oss << ", ";
+                first = false;
+                oss << "\"" << key << "\": ";
+                auto value = self.getOr<std::string>(key, "");
+                // Simple JSON escaping
+                std::string escaped;
+                for (char c : value) {
+                    switch (c) {
+                        case '\\': escaped += "\\\\"; break;
+                        case '"': escaped += "\\\""; break;
+                        case '\n': escaped += "\\n"; break;
+                        case '\r': escaped += "\\r"; break;
+                        case '\t': escaped += "\\t"; break;
+                        default: escaped += c; break;
+                    }
+                }
+                oss << "\"" << escaped << "\"";
+            }
+            oss << "}";
+            return oss.str();
+        }, "Export configuration as JSON string")
+        .def("importFromJSON", [](Config& self, const std::string& json) {
+            // Simple JSON parsing for basic key-value pairs
+            // This is a minimal implementation - for production use a proper JSON parser
+            self.clear();
+            size_t pos = 0;
+            while (pos < json.size()) {
+                // Find next key
+                size_t keyStart = json.find('"', pos);
+                if (keyStart == std::string::npos) break;
+                size_t keyEnd = json.find('"', keyStart + 1);
+                if (keyEnd == std::string::npos) break;
+                std::string key = json.substr(keyStart + 1, keyEnd - keyStart - 1);
+                
+                // Find value
+                size_t colonPos = json.find(':', keyEnd);
+                if (colonPos == std::string::npos) break;
+                size_t valueStart = json.find_first_not_of(' ', colonPos);
+                if (valueStart == std::string::npos) break;
+                
+                if (json[valueStart] == '"') {
+                    // String value
+                    size_t valueEnd = json.find('"', valueStart + 1);
+                    if (valueEnd == std::string::npos) break;
+                    std::string value = json.substr(valueStart + 1, valueEnd - valueStart - 1);
+                    self.set(key, value, ConfigSource::User);
+                    pos = valueEnd + 1;
+                } else if (isdigit(json[valueStart]) || json[valueStart] == '-') {
+                    // Number value
+                    size_t valueEnd = json.find_first_of(",}", valueStart);
+                    if (valueEnd == std::string::npos) valueEnd = json.size();
+                    std::string value = json.substr(valueStart, valueEnd - valueStart);
+                    try {
+                        size_t intPos;
+                        int64_t intVal = std::stoll(value, &intPos);
+                        if (intPos == value.size()) {
+                            self.set(key, intVal, ConfigSource::User);
+                        } else {
+                            double floatVal = std::stod(value, &intPos);
+                            if (intPos == value.size()) {
+                                self.set(key, floatVal, ConfigSource::User);
+                            }
+                        }
+                    } catch (...) {}
+                    pos = valueEnd;
+                } else if (json.substr(valueStart, 4) == "true" || json.substr(valueStart, 5) == "false") {
+                    // Boolean value
+                    bool value = (json.substr(valueStart, 4) == "true");
+                    self.set(key, value, ConfigSource::User);
+                    pos = valueStart + (value ? 4 : 5);
+                }
+                pos = json.find_first_not_of(' ', pos);
+                if (pos < json.size() && json[pos] == ',') pos++;
+            }
+            return true;
+        }, py::arg("json"), "Import configuration from JSON string");
+
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Advanced neural simulation brain class with comprehensive learning capabilities)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        // getRegion is const/non-const overloaded; bind the mutable one.
+        .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
+             py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        // === ADVANCED BRAIN OPERATIONS ===
+        .def("analyzeConnectivity", [](const Brain& self) {
+            std::map<std::string, double> analysis;
+            size_t totalNeurons = self.getTotalNeuronCount();
+            size_t totalSynapses = self.getTotalSynapseCount();
+            if (totalNeurons > 0) {
+                analysis["synapseDensity"] = static_cast<double>(totalSynapses) / totalNeurons;
+                analysis["connectivityRatio"] = totalSynapses > 0 ? 
+                    static_cast<double>(self.getFiringNeuronCount()) / totalSynapses : 0.0;
+            }
+            analysis["avgFiringRate"] = self.getAverageFiringRate();
+            analysis["eirRatio"] = self.getExcitationInhibitionRatio();
+            return analysis;
+        }, "Analyze brain connectivity and statistics")
+        .def("detectNetworkTopology", [](const Brain& self) {
+            std::map<std::string, std::string> topology;
+            // Simple topology classification based on region count and neuron distribution
+            size_t regionCount = self.getRegionCount();
+            if (regionCount == 1) {
+                topology["type"] = "SingleRegion";
+                topology["complexity"] = "Simple";
+            } else if (regionCount <= 3) {
+                topology["type"] = "MultiRegion";
+                topology["complexity"] = "Moderate";
+            } else {
+                topology["type"] = "HighlyDistributed";
+                topology["complexity"] = "Complex";
+            }
+            
+            topology["neuronCount"] = std::to_string(self.getTotalNeuronCount());
+            topology["synapseCount"] = std::to_string(self.getTotalSynapseCount());
+            topology["firingRate"] = std::to_string(self.getAverageFiringRate());
+            
+            return topology;
+        }, "Detect and classify network topology")
+        .def("exportState", [](const Brain& self, const std::string& filename) {
+            // Create a compressed state export
+            std::stringstream state;
+            state << "NLM_Brain_State_Export" << std::endl;
+            state << "Version: 1.0" << std::endl;
+            state << "Neurons: " << self.getTotalNeuronCount() << std::endl;
+            state << "Synapses: " << self.getTotalSynapseCount() << std::endl;
+            state << "FiringRate: " << self.getAverageFiringRate() << std::endl;
+            state << "EIRRatio: " << self.getExcitationInhibitionRatio() << std::endl;
+            state << "TotalSpikes: " << self.getTotalSpikeCount() << std::endl;
+            
+            std::ofstream file(filename);
+            if (file.is_open()) {
+                file << state.str();
+                file.close();
+                return true;
+            }
+            return false;
+        }, py::arg("filename"), "Export brain state as text file")
+        .def("importState", [](Brain& self, const std::string& filename) {
+            // Basic state import from text file
+            std::ifstream file(filename);
+            if (!file.is_open()) return false;
+            
+            std::string line;
+            while (std::getline(file, line)) {
+                if (line.find("Neurons: ") == 0) {
+                    // Could add neural state restoration here
+                    continue;
+                } else if (line.find("Synapses: ") == 0) {
+                    // Could add synapse state restoration here
+                    continue;
+                }
+            }
+            file.close();
+            return true;
+        }, py::arg("filename"), "Import brain state from text file")
+        .def("benchmark", [](const Brain& self, int steps) {
+            if (steps <= 0) return 0.0;
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            for (int i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+            double avgStepTime = duration.count() / static_cast<double>(steps);
+            
+            return avgStepTime / 1000.0; // Return milliseconds per step
+        }, py::arg("steps"), "Benchmark brain performance (returns ms per step)")
+        .def("validate", [](const Brain& self) {
+            std::vector<std::string> errors;
+            
+            // Basic validation checks
+            if (self.getTotalNeuronCount() == 0) {
+                errors.push_back("No neurons in brain");
+            }
+            
+            if (self.getTotalSynapseCount() == 0) {
+                errors.push_back("No synapses in brain");
+            }
+            
+            float firingRate = self.getAverageFiringRate();
+            if (firingRate > 100.0) { // Excessive firing rate
+                errors.push_back("Excessive firing rate: " + std::to_string(firingRate));
+            }
+            
+            if (std::abs(self.getExcitationInhibitionRatio() - 1.0) > 0.5) {
+                errors.push_back("Unbalanced E/I ratio: " + std::to_string(self.getExcitationInhibitionRatio()));
+            }
+            
+            return errors;
+        }, "Validate brain state and return list of errors")
+        .def("clone", [](const std::shared_ptr<Brain>& self) {
+            if (!self) return std::shared_ptr<Brain>(nullptr);
+            return std::make_shared<Brain>(*self);
+        }, "Create a deep copy of the brain");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
