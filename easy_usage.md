@@ -2,7 +2,7 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -11,6 +11,22 @@ Think of it like this:
 - **Memory** = The brain remembering patterns
 
 That's it! NLM simulates all of this.
+
+## Enhanced Version Available
+
+This is the **enhanced version (v2.0.0)** with:
+
+- **Comprehensive Error Handling** - Specific exception types for different error conditions
+- **Batch Operations** - Configuration batches and validation
+- **Statistics Dictionary** - Easy access to brain statistics
+- **Type Safety** - Better Python-C++ type conversions
+- **Progress Monitoring** - Progress tracking and logging
+- **Memory Management** - Memory-aware simulation
+- **CLI Interface** - Command line access to all functionality
+- **Validation** - Configuration and simulation validation
+- **Performance Monitoring** - CPU and memory usage tracking
+
+For the enhanced API with all these features, see `easy_usage_enhanced.md`.
 
 ---
 
@@ -24,7 +40,7 @@ That's it! NLM simulates all of this.
 
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain (Original API)
 
 ```python
 import pynlm
@@ -42,7 +58,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Original API)
 
 ```python
 import pynlm

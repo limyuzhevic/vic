@@ -4,15 +4,15 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "2.0.0-enhanced"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with comprehensive error handling, convenience methods, and improved Python integration. This is the enhanced edition (v2.0.0) featuring better error handling, batch operations, enhanced statistics, validation functions, and Python-C++ type safety."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "enhanced", "bindings", "error-handling"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,6 +25,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems",
 ]
 
 dependencies = []
@@ -33,6 +35,8 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pytest-cov>=2.12.0",
+    "pytest-asyncio>=0.21.0",
 ]
 
 [project.urls]
@@ -51,6 +55,7 @@ cmake.args = [
     # Phase 5: without this the root build produces no pynlm module
     # at all (the option is OFF by default for plain C++ builds).
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
+    "-DNLM_ENHANCED_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
@@ -59,3 +64,5 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

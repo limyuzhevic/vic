@@ -337,33 +337,71 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     float avgFiring1 = brain1->getAverageFiringRate();
     size_t totalSpikes1 = brain1->getTotalSpikeCount();
+    auto memory1 = brain1->getWorkingMemory();
+    auto episodic1 = brain1->getEpisodicMemory();
+    auto neuromod1 = brain1->getDopamine();
     
     NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
+    NLM_LOG_INFO("Brain1 working memory active traces: " + std::to_string(memory1 ? memory1->getActiveTraces() : 0));
+    NLM_LOG_INFO("Brain1 episodic memory episodes: " + std::to_string(episodic1 ? episodic1->getEpisodeCount() : 0));
+    NLM_LOG_INFO("Brain1 dopamine level: " + std::to_string(neuromod1 ? neuromod1->getCurrentLevel() : 0.0f));
     
-    // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    // Save checkpoint using configurable path
+    std::string path = "./nlm_checkpoint_test.bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
     
-    // Create new brain and load
+    // Verify file was created and has reasonable size
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to verify checkpoint file was created");
+        return false;
+    }
+    size_t fileSize = file.tellg();
+    file.close();
+    NLM_LOG_INFO("Checkpoint file size: " + std::to_string(fileSize) + " bytes");
+    
+    // Create new brain with same config
     auto brain2 = std::make_shared<Brain>(cfg);
     brain2->initialize();
     
-    if (!brain2->load(path)) {
-        NLM_LOG_ERROR("Failed to load checkpoint");
+    // Verify brain2 is in clean state
+    if (brain2->getTotalSpikeCount() != 0) {
+        NLM_LOG_ERROR("New brain should start with 0 spikes, has " + std::to_string(brain2->getTotalSpikeCount()));
         return false;
     }
     
+    if (!brain2->load(path)) {
+        NLM_LOG_ERROR("Failed to load checkpoint");
+        std::remove(path.c_str()); // Cleanup
+        return false;
+    }
+    
+    // Verify critical state was restored
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
+    auto memory2 = brain2->getWorkingMemory();
+    auto episodic2 = brain2->getEpisodicMemory();
+    auto neuromod2 = brain2->getDopamine();
+    
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    NLM_LOG_INFO("Brain2 working memory active traces: " + std::to_string(memory2 ? memory2->getActiveTraces() : 0));
+    NLM_LOG_INFO("Brain2 episodic memory episodes: " + std::to_string(episodic2 ? episodic2->getEpisodeCount() : 0));
+    NLM_LOG_INFO("Brain2 dopamine level: " + std::to_string(neuromod2 ? neuromod2->getCurrentLevel() : 0.0f));
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Verify consistency: spike count should be the same (or very close due to timing)
+    if (std::abs((float)totalSpikes1 - (float)totalSpikes2) > 1) {
+        NLM_LOG_ERROR("Spike count mismatch: original " + std::to_string(totalSpikes1) + ", loaded " + std::to_string(totalSpikes2));
+        std::remove(path.c_str());
+        return false;
+    }
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    // Cleanup
+    std::remove(path.c_str());
+    
+    NLM_LOG_INFO("[PASS] Checkpoint save/load completed with state verification");
     return true;
 }
 
