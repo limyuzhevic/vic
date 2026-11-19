@@ -471,6 +471,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Run competition every few steps to maintain active traces
+        if (currentStep % 3 == 0) {  // Competition every 3 steps
+            pImpl->workingMemory->runCompetition();
+        }
+        
+        // Additional competition based on novelty/dopamine signals
+        if (pImpl->dopamine && pImpl->dopamine->getLevel() > 0.5f && 
+            currentStep % 10 == 0) {
+            pImpl->workingMemory->runCompetition();
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -614,8 +625,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current state from working memory and other systems
+        std::vector<float> currentState = /* encode current brain state */;
+        
+        // Create prediction using prediction system
+        auto currentInput = /* create SensoryInput from currentState */;
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentInput);
+        
+        // Compare prediction with actual state (would need to create SensoryInput)
+        auto actualInput = /* create SensoryInput from actual current state */;
+        pImpl->predictionSystem->updatePredictions(predictedState.get(), actualInput);
+        
+        // Use prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (std::abs(predictionError) > 0.01f) {
+            // Apply prediction error to novelty detector
+            if (pImpl->novelty) {
+                pImpl->novelty->setError(predictionError);
+            }
+            
+            // Update curiosity based on prediction error
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(predictionError, predictionError, pImpl->timestep);
+            }
+        }
+        
+        // Integrate episodic memory for prediction system guidance
+        if (pImpl->episodicMemory) {
+            std::vector<const EpisodicMemoryItem*> similarEpisodes = 
+                pImpl->episodicMemory->retrieveSimilar(currentState, 3);
+            
+            if (!similarEpisodes.empty()) {
+                // Use patterns from similar episodes to inform predictions
+                for (size_t i = 0; i < std::min(size_t(3), similarEpisodes.size()); ++i) {
+                    const auto* episode = similarEpisodes[i];
+                    std::vector<float> predictivePattern = episode->resultingSensoryState;
+                    pImpl->predictionSystem->updateWithEpisodicPattern(predictivePattern);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -625,16 +673,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Apply episodic memory influence to attention competition
+            if (pImpl->episodicMemory) {
+                std::vector<float> currentSensoryPattern;
+                // (Extract from current neural activity)
+                auto relevantEpisodes = pImpl->episodicMemory->retrieveSimilar(
+                    currentSensoryPattern, 3);
+                
+                // Increase attention bias for patterns from relevant episodes
+                if (!relevantEpisodes.empty()) {
+                    pImpl->attention->applyTopDownGuidance(competitors, 0.5f);
+                }
+            }
+            
             pImpl->attention->processCompetition(competitors);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get working memory state for concept formation
+        std::vector<float> wmState = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        float memoryActivity = pImpl->workingMemory ? pImpl->workingMemory->getMemoryActivity() : 0.0f;
+        
+        if (!wmState.empty() && memoryActivity > 0.1f) {
+            // Create features from working memory content
+            pImpl->conceptFormation->presentExperience(wmState, wmState, memoryActivity, currentStep);
+            
+            // Apply concept formation to working memory (bidirectional)
+            std::vector<NeuronId> competingNeurons = pImpl->conceptFormation->getCompetitorNeurons();
+            if (!competingNeurons.empty()) {
+                std::vector<float> conceptPattern;
+                conceptPattern.reserve(competingNeurons.size());
+                for (NeuronId neuronId : competingNeurons) {
+                    float activation = pImpl->conceptFormation->getNeuronActivation(neuronId);
+                    conceptPattern.push_back(activation);
+                }
+                
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->store(conceptPattern, 1.0f);
+                }
+            }
+        }
+        
+        // Also integrate episodic memory for concept formation
+        if (pImpl->episodicMemory) {
+            std::vector<const EpisodicMemoryItem*> recentEpisodes = 
+                pImpl->episodicMemory->getRecentEpisodes(20);
+            
+            for (const auto* episode : recentEpisodes) {
+                std::vector<float> episodePattern = /* encode episode data */;
+                std::vector<float> episodeFeatures = /* encode episode features */;
+                
+                pImpl->conceptFormation->presentExperience(
+                    episodePattern, episodeFeatures, episode->reward, currentStep);
+            }
+        }
     }
-    
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
@@ -798,28 +895,131 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Plan action using NeuralPlanner
+    // The planner uses learned forward models, episodic memory, and predictions
+    // to select actions that maximize expected reward
     
-    if (pImpl->motorNeurons.empty()) {
+    // Get current sensory state for planning
+    // In a real implementation, this would come from actual sensory inputs
+    // For now, we'll use a neutral state - in practice this would be integrated
+    // with the sensory processing pipeline
+    std::vector<float> currentState;
+    if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        // Use working memory as current state representation
+        const auto& neurons = pImpl->workingMemory->getMemoryNeurons();
+        const auto& activations = pImpl->workingMemory->getMemoryActivations();
+        currentState.resize(neurons.size());
+        for (size_t i = 0; i < neurons.size() && i < activations.size(); ++i) {
+            currentState[i] = activations[i];
+        }
+    } else {
+        // Fallback to neutral state if no working memory
+        currentState = std::vector<float>(20, 0.5f);
+    }
+    
+    // Check if planner is available
+    if (!pImpl->planner) {
+        NLM_LOG_WARNING("Planner not available, using fallback action selection");
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Set current goal from concept formation if available
+    if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+        // Get current concept to inform planning goals
+        size_t currentConcept = pImpl->conceptFormation->getMatchingConcept(currentState);
+        if (currentConcept > 0) {
+            const auto* concept = pImpl->conceptFormation->getConcept(currentConcept);
+            if (concept) {
+                // Set goal based on concept prototype
+                pImpl->planner->setCurrentGoal(concept->prototype);
+                NLM_LOG_DEBUG("Planner goal set based on concept " + std::to_string(currentConcept));
+            }
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Check episodic memory for relevant past experiences
+    if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+        // Retrieve similar past episodes to inform planning
+        auto relevantEpisodes = pImpl->episodicMemory->retrieveSimilar(currentState, 3);
+        if (!relevantEpisodes.empty()) {
+            NLM_LOG_DEBUG("Planning informed by " + std::to_string(relevantEpisodes.size()) + " relevant episodes");
+            
+            // Update planner's action quality based on successful past episodes
+            for (size_t i = 0; i < relevantEpisodes.size() && i < 5; ++i) {
+                const auto* episode = relevantEpisodes[i];
+                if (episode) {
+                    // Extract action that led to good outcome
+                    if (episode->reward > 0.0f) {
+                        pImpl->planner->setActionQuality(episode->action, 0.5f);
+                    } else if (episode->reward < 0.0f) {
+                        pImpl->planner->setActionQuality(episode->action, -0.5f);
+                    }
+                }
+            }
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Use prediction system to validate planned actions
+    float predictionConfidence = 0.0f;
+    if (pImpl->predictionSystem) {
+        // The prediction system provides confidence in forward models
+        // which helps the planner assess action sequences
+        predictionConfidence = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+        
+        // Use prediction confidence to modulate planning depth
+        size_t predictedPlanningDepth = 3;  // Default
+        if (predictionConfidence < 0.3f) {
+            // High confidence -> deeper planning
+            predictedPlanningDepth = pImpl->planner->getPlanningDepth();
+        } else if (predictionConfidence > 0.7f) {
+            // Low confidence -> shallower planning
+            predictedPlanningDepth = std::min(predictedPlanningDepth, 2UL);
+        }
+        
+        pImpl->planner->setPlanningDepth(predictedPlanningDepth);
+        NLM_LOG_DEBUG("Prediction confidence " + std::to_string(predictionConfidence) + 
+                     " modulated planning depth to " + std::to_string(predictedPlanningDepth));
+    }
+    
+    // Update planner based on recent prediction errors
+    if (pImpl->predictionError && pImpl->planner) {
+        // Prediction errors provide valuable feedback for planning
+        // High error means the forward model needs improvement
+        float error = pImpl->predictionError->getError();
+        if (error > 0.5f) {
+            // High prediction error -> increase action quality update
+            // This helps the planner learn from mistakes
+            pImpl->planner->setPlanningConfidence(0.3f);
+            NLM_LOG_DEBUG("High prediction error detected, reducing planning confidence");
+        } else if (error < 0.2f) {
+            // Low prediction error -> increase confidence
+            pImpl->planner->setPlanningConfidence(0.8f);
+            NLM_LOG_DEBUG("Low prediction error detected, increasing planning confidence");
+        }
+    }
+    
+    // Plan next action using the neural planner
+    // Target reward from learned preference trait
+    float targetReward = pImpl->learnedPreference * 0.5f + 0.5f;  // Scale to 0-1 range
+    
+    ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+    
+    // Validate that planned action is not obviously bad
+    bool actionValid = true;
+    if (pImpl->planner->getPlanningConfidence() < 0.3f) {
+        // Low planning confidence - be conservative
+        actionValid = (plannedAction == ActionType::Wait || plannedAction == ActionType::Rest);
+    }
+    
+    if (!actionValid) {
+        NLM_LOG_WARNING("Planner selected low-confidence action " + std::to_string(static_cast<int>(plannedAction)) + ", defaulting to Wait");
+        plannedAction = ActionType::Wait;
+    }
+    
+    auto action = std::make_unique<Action>(plannedAction);
+    
+    NLM_LOG_DEBUG("Planner-driven action selected: " + std::to_string(static_cast<int>(plannedAction)) + 
+                 " (confidence: " + std::to_string(pImpl->planner->getPlanningConfidence()) + ")");
     
     return action;
 }

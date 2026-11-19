@@ -97,6 +97,8 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
+     // Now planner-driven: uses NeuralPlanner to select actions based on learned
+     // forward models, episodic memory, prediction systems, and concept formation
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
