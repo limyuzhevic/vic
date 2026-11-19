@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include "../environment/Observation.hpp"
+#include <cstring>
 
 namespace nlm {
 
@@ -24,7 +26,7 @@ public:
     
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    float computeReward(const Observation& observation) const;
     
     // Reward history
     const std::vector<float>& getHistory() const;

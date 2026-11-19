@@ -401,8 +401,24 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
+bool CheckpointWriter::writeHeader() {
+    // Write the checkpoint header to the stream
+    // The header is written at finalize() time, not at creation time
+    // So this method should return true to indicate successful header preparation
+    // In the actual implementation, the header is written during finalize()
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    // Write a section header to the stream
+    // This method is called during finalize() when writing sections
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) {
+        error_ = "Failed to write section header";
+        return false;
+    }
+    return true;
+}
 bool CheckpointWriter::padToAlignment(size_t) { return true; }
 
 // ---------------- CheckpointManager ----------------

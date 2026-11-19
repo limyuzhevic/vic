@@ -113,8 +113,52 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Save experiment results to a file
+    // This is a placeholder implementation - in a real system, this would
+    // serialize the experiment results in a structured format
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+            return false;
+        }
+        
+        // Write experiment summary to file
+        file << "NLM Experiment Results\n";
+        file << "======================\n\n";
+        
+        // Header
+        file << "Total Experiments: " << pImpl->experiments.size() << "\n";
+        file << "Global Seed: " << pImpl->globalSeed << "\n\n";
+        
+        // Details for each experiment
+        file << "Experiment Details:\n";
+        file << "------------------\n";
+        for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+            auto& exp = pImpl->experiments[i];
+            file << i + 1 << ". " << exp->getName() << "\n";
+            file << "   Seed: " << exp->getSeed() << "\n";
+            file << "   Start Step: " << exp->getStartStep() << "\n";
+            file << "   End Step: " << exp->getEndStep() << "\n";
+            file << "   Metrics: " << exp->getMetrics().size() << "\n";
+            
+            // Print key metrics if available
+            auto& metrics = exp->getMetrics();
+            for (const auto& metric : metrics) {
+                file << "     - " << metric.first << ": " << metric.second << "\n";
+            }
+            file << "\n";
+        }
+        
+        file.close();
+        
+        NLM_LOG_INFO("Experiment results saved to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving experiment results: ") + e.what());
+        return false;
+    }
 }
 
 } // namespace nlm

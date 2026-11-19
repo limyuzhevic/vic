@@ -6,6 +6,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # Create test executable
 add_executable(nlm_test
     test_main.cpp
+    test_demo_main.cpp
+    test_demo_phase2.cpp
+    test_demo_phase3.cpp
+    test_demo_phase4.cpp
+    test_demo_phase5.cpp
+    test_demo_phase6.cpp
+    test_demo_phase6_text.cpp
+    test_demo_phase6_benchmark.cpp
     test_types.cpp
     test_config.cpp
     test_random.cpp
