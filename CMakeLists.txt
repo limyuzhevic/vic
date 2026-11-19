@@ -164,6 +164,26 @@ add_executable(nlm_phase6_demo
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
+# Phase 5 demo executable (Phase 5, added here: pattern probe,
+# sandbox run, and checkpoint round-trip for the brain-personality
+# step — previously Phase 5 was library-only with no demo).
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Simple learning demo executable (new educational demo)
+add_executable(nlm_simple_learning_demo
+    src/experiments/SimpleLearningDemo.cpp
+)
+target_link_libraries(nlm_simple_learning_demo PUBLIC nlm_core nlm_agent nlm_world)
+
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
 # a teacher, planner overrides, and a checkpoint round-trip. The old
@@ -172,12 +192,6 @@ add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
-
-# Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
-)
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,

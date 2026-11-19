@@ -215,17 +215,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
 
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
+    // Configure with modern pybind11 patterns for better Python integration
+    py::class_<WorldObject>(m, "WorldObject", "World object representation in the NLM simulation")
+        .def(py::init<>(), "Default constructor")
         .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+             py::arg("x"), py::arg("y"), py::arg("type"),
+             py::arg("value") = 0.0f, py::arg("radius") = 0.5f,
+             "Constructor with position, type, value, and radius")
+        .def(py::init<py::iniciator<WorldObject>, float, float, WorldObjectType, float, float>())
+        .def_readwrite("x", &WorldObject::x, "X coordinate of the object")
+        .def_readwrite("y", &WorldObject::y, "Y coordinate of the object")
+        .def_readwrite("radius", &WorldObject::radius, "Radius of the object")
+        .def_readwrite("type", &WorldObject::type, "Type of the object (Empty, Resource, Hazard, Wall, Marker)")
+        .def_readwrite("value", &WorldObject::value, "Value associated with the object")
+        .def_readwrite("active", &WorldObject::active, "Whether the object is active")
+        .def("to_string", [](const WorldObject& obj) {
+            std::stringstream ss;
+            ss << "WorldObject(x=" << obj.x << ", y=" << obj.y 
+               << ", radius=" << obj.radius << ", type=" << static_cast<int>(obj.type)
+               << ", value=" << obj.value << ", active=" << (obj.active ? "true" : "false") << ")";
+            return ss.str();
+        }, "String representation of the object");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -243,31 +253,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
         .def("reset", &AgentBody::reset);
 
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+    // Add convenience methods for common operations
+    .def("addVector", [](AgentBody& body, float dx, float dy) {
+        body.x += dx;
+        body.y += dy;
+    }, py::arg("dx"), py::arg("dy"), "Add vector to position")
+    .def("moveTo", [](AgentBody& body, float x, float y) {
+        body.x = x;
+        body.y = y;
+        body.isMoving = true;
+        body.lastActionTime = 0.0f;
+    }, py::arg("x"), py::arg("y"), "Move agent to position");
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+    py::class_<ActionResult>(m, "ActionResult", "Result of an action applied to the world")
+        .def(py::init<>(), "Default constructor")
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "",
+             "Constructor with reward, success flag, and message")
+        .def_readwrite("reward", &ActionResult::reward, "Reward received from the action")
+        .def_readwrite("success", &ActionResult::success, "Whether the action was successful")
+        .def_readwrite("message", &ActionResult::message, "Detailed message about the action result");
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())

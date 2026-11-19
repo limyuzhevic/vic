@@ -286,12 +286,20 @@ print("Agent simulation complete!")
 - Some neurons need input to fire - make sure sensory input is connected
 
 ---
-
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**New!** There's now a simple learning demo that shows how NLM learns through experience:
+
+```bash
+./nlm_simple_learning_demo
+```
+
+This demo demonstrates the core learning principles in an easy-to-understand way.
+
+---
