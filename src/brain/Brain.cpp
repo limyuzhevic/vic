@@ -374,12 +374,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimized: Collect all neurons first to avoid nested loops O(n³) -> O(n²)
+    std::vector<Neuron*> allNeurons;
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
+            auto neurons = pop->getNeurons();
+            allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
         }
+    }
+    
+    // Process all neurons in a single pass
+    for (auto* neuron : allNeurons) {
+        neuron->stepLIF(currentTime, pImpl->timestep);
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
