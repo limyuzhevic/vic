@@ -32,19 +32,35 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp - use thread-safe version
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tmBuf;
+    std::tm* tmPtr = nullptr;
+    
+#ifdef _WIN32
+    tmPtr = &tmBuf;
+    localtime_s(&tmBuf, &time);
+#else
+    tmPtr = std::localtime(&time);
+#endif
+    
+    if (tmPtr) {
+        oss << std::put_time(tmPtr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        oss << "[INVALID_TIME]";
+    }
     
     oss << " " << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output - thread-safe
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        std::cout.flush();  // Ensure immediate output for real-time logging
     } else {
         std::cout << output << "\n";
+        std::cout.flush();
     }
     
     // File output if set

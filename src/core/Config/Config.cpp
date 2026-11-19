@@ -19,8 +19,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Currently: simple key=value format with basic error handling
+    
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,18 +33,25 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with validation
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty()) {
+                continue;  // Skip invalid lines
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -59,12 +71,23 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
+        // Validate argument format
+        if (arg.empty()) {
+            continue;
+        }
+        
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,6 +95,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty()) {
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -79,14 +108,49 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Save actual values instead of placeholders
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format different value types properly
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << \"\", \"\";
+                    file << val[i];
+                }
+                file << "\"]\n";
+            } else {
+                file << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

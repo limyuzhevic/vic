@@ -31,6 +31,37 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Factory function types
+using SpikeSystemFactory = std::function<std::unique_ptr<SpikeSystem>(std::shared_ptr<Config>)>;
+using PlasticityRuleFactory = std::function<std::unique_ptr<void>(std::shared_ptr<Config>)>;
+using MemorySystemFactory = std::function<std::unique_ptr<void>(std::shared_ptr<SpikeSystem>)>;
+using NeuromodulatorFactory = std::function<std::unique_ptr<void>(std::shared_ptr<Config>)>;
+
+// Component registry for plugin architecture
+class ComponentRegistry {
+public:
+    // Register factory functions for different component types
+    static void registerSpikeSystemFactory(const std::string& name, SpikeSystemFactory factory);
+    static void registerPlasticityRuleFactory(const std::string& name, PlasticityRuleFactory factory);
+    static void registerMemorySystemFactory(const std::string& name, MemorySystemFactory factory);
+    static void registerNeuromodulatorFactory(const std::string& name, NeuromodulatorFactory factory);
+    
+    // Create components using registered factories
+    static std::unique_ptr<SpikeSystem> createSpikeSystem(const std::string& type, std::shared_ptr<Config> config);
+    static std::unique_ptr<void> createPlasticityRule(const std::string& type, std::shared_ptr<Config> config);
+    static std::unique_ptr<void> createMemorySystem(const std::string& type, std::shared_ptr<SpikeSystem> spikeSystem);
+    static std::unique_ptr<void> createNeuromodulator(const std::string& type, std::shared_ptr<Config> config);
+    
+    // List available component types
+    static std::vector<std::string> getAvailableSpikeSystemTypes();
+    static std::vector<std::string> getAvailablePlasticityRuleTypes();
+    static std::vector<std::string> getAvailableMemorySystemTypes();
+    static std::vector<std::string> getAvailableNeuromodulatorTypes();
+};
+
+// Brain factory methods
+class Brain {
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -202,12 +233,20 @@ public:
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
     
-    // Logging
-    void logStatus() const;
+// Factory methods for component creation
+        static bool registerDefaultFactories();
+        static bool configureFromConfig(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+        
+        // Configuration-based component creation
+        static std::unique_ptr<SpikeSystem> createSpikeSystemFromConfig(std::shared_ptr<Config> config);
+        static std::unique_ptr<STDP> createSTDPFromConfig(std::shared_ptr<Config> config);
+        static std::unique_ptr<Hebbian> createHebbianFromConfig(std::shared_ptr<Config> config);
+        static std::unique_ptr<StructuralPlasticity> createStructuralPlasticityFromConfig(std::shared_ptr<Config> config);
+        static std::unique_ptr<RandomGenerator> createRandomGeneratorFromConfig(std::shared_ptr<Config> config);
+        
+    private:
+        struct Impl;
+        Impl* pImpl;
+    };
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
 } // namespace nlm

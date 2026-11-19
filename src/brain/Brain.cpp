@@ -92,7 +92,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -104,6 +103,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , spikeHandlersRegistered(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -305,7 +305,7 @@ bool Brain::initialize() {
     // again and double-count every spike.
     if (!pImpl->spikeHandlersRegistered) {
         pImpl->spikeHandlersRegistered = true;
-    // Register spike handlers for event-driven processing
+    }  // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
@@ -725,6 +725,7 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
         it->second->injectCurrent(current);
         return;
     }
+    // Fallback scan for safety - should rarely be used as neuronById is comprehensive
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
@@ -737,10 +738,13 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Optimized: iterate once through all neurons, checking type
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+                // Process all neurons in this population at once
+                auto& neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
                     neuron->injectCurrent(current);
                 }
             }
@@ -805,7 +809,8 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Calculate activity of motor neuron groups - thread-safe since this is called
+    // from single-threaded simulation loop
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
@@ -1588,4 +1593,143 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Factory function implementations
+namespace {
+    // SpikeSystem factory implementations
+    std::unique_ptr<SpikeSystem> createDefaultSpikeSystem(std::shared_ptr<Config> config) {
+        return std::make_unique<SpikeSystem>();
+    }
+    
+    // STDP plasticity rule factory
+    std::unique_ptr<STDP> createDefaultSTDP(std::shared_ptr<Config> config) {
+        auto stdp = std::make_unique<STDP>();
+        if (config) {
+            float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.02f);
+            float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.015f);
+            float tau = config->getOr<float>("stdp_tau", 20.0f);
+            stdp->configure(ltpWeight, ltdWeight, tau);
+        }
+        return stdp;
+    }
+    
+    // Hebbian plasticity rule factory
+    std::unique_ptr<Hebbian> createDefaultHebbian(std::shared_ptr<Config> config) {
+        return std::make_unique<Hebbian>();
+    }
+    
+    // Structural plasticity factory
+    std::unique_ptr<StructuralPlasticity> createDefaultStructuralPlasticity(std::shared_ptr<Config> config) {
+        auto sp = std::make_unique<StructuralPlasticity>();
+        if (config) {
+            float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+            float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+            sp->setSynaptogenesisRate(synaptogenesisRate);
+            sp->setPruningRate(pruningRate);
+        }
+        return sp;
+    }
+    
+    // Random generator factory
+    std::unique_ptr<RandomGenerator> createDefaultRandomGenerator(std::shared_ptr<Config> config) {
+        uint64_t seed = 42;  // Default seed
+        if (config && config->get<int64_t>("random_seed")) {
+            seed = *config->get<int64_t>("random_seed");
+        }
+        return std::make_unique<RandomGenerator>(seed);
+    }
+} // namespace
+
+// ComponentRegistry implementation
+namespace nlm {
+    struct ComponentRegistry::Impl {
+        std::unordered_map<std::string, SpikeSystemFactory> spikeSystemFactories;
+        std::unordered_map<std::string, PlasticityRuleFactory> plasticityRuleFactories;
+        std::unordered_map<std::string, MemorySystemFactory> memorySystemFactories;
+        std::unordered_map<std::string, NeuromodulatorFactory> neuromodulatorFactories;
+    };
+    
+    ComponentRegistry::Impl* getImpl() {
+        static Impl instance;
+        return &instance;
+    }
+    
+    void ComponentRegistry::registerSpikeSystemFactory(const std::string& name, SpikeSystemFactory factory) {
+        getImpl()->spikeSystemFactories[name] = std::move(factory);
+    }
+    
+    void ComponentRegistry::registerPlasticityRuleFactory(const std::string& name, PlasticityRuleFactory factory) {
+        getImpl()->plasticityRuleFactories[name] = std::move(factory);
+    }
+    
+    void ComponentRegistry::registerMemorySystemFactory(const std::string& name, MemorySystemFactory factory) {
+        getImpl()->memorySystemFactories[name] = std::move(factory);
+    }
+    
+    void ComponentRegistry::registerNeuromodulatorFactory(const std::string& name, NeuromodulatorFactory factory) {
+        getImpl()->neuromodulatorFactories[name] = std::move(factory);
+    }
+    
+    std::unique_ptr<SpikeSystem> ComponentRegistry::createSpikeSystem(const std::string& type, std::shared_ptr<Config> config) {
+        auto it = getImpl()->spikeSystemFactories.find(type);
+        if (it != getImpl()->spikeSystemFactories.end()) {
+            return it->second(config);
+        }
+        return nullptr; // Default factory not found
+    }
+    
+    std::unique_ptr<void> ComponentRegistry::createPlasticityRule(const std::string& type, std::shared_ptr<Config> config) {
+        auto it = getImpl()->plasticityRuleFactories.find(type);
+        if (it != getImpl()->plasticityRuleFactories.end()) {
+            return it->second(config);
+        }
+        return nullptr;
+    }
+    
+    std::unique_ptr<void> ComponentRegistry::createMemorySystem(const std::string& type, std::shared_ptr<SpikeSystem> spikeSystem) {
+        auto it = getImpl()->memorySystemFactories.find(type);
+        if (it != getImpl()->memorySystemFactories.end()) {
+            return it->second(spikeSystem);
+        }
+        return nullptr;
+    }
+    
+    std::unique_ptr<void> ComponentRegistry::createNeuromodulator(const std::string& type, std::shared_ptr<Config> config) {
+        auto it = getImpl()->neuromodulatorFactories.find(type);
+        if (it != getImpl()->neuromodulatorFactories.end()) {
+            return it->second(config);
+        }
+        return nullptr;
+    }
+    
+    std::vector<std::string> ComponentRegistry::getAvailableSpikeSystemTypes() {
+        std::vector<std::string> types;
+        for (const auto& pair : getImpl()->spikeSystemFactories) {
+            types.push_back(pair.first);
+        }
+        return types;
+    }
+    
+    std::vector<std::string> ComponentRegistry::getAvailablePlasticityRuleTypes() {
+        std::vector<std::string> types;
+        for (const auto& pair : getImpl()->plasticityRuleFactories) {
+            types.push_back(pair.first);
+        }
+        return types;
+    }
+    
+    std::vector<std::string> ComponentRegistry::getAvailableMemorySystemTypes() {
+        std::vector<std::string> types;
+        for (const auto& pair : getImpl()->memorySystemFactories) {
+            types.push_back(pair.first);
+        }
+        return types;
+    }
+    
+    std::vector<std::string> ComponentRegistry::getAvailableNeuromodulatorTypes() {
+        std::vector<std::string> types;
+        for (const auto& pair : getImpl()->neuromodulatorFactories) {
+            types.push_back(pair.first);
+        }
+        return types;
+    }
+}
