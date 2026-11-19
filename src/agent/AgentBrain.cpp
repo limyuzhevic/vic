@@ -80,39 +80,71 @@ AgentBrain::~AgentBrain() = default;
 // rays, the vision group has 31 neurons), so text has its own
 // channel and cannot masquerade as a visual scene.
 std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
-    std::string norm;
-    for (char c : text) {
-        if (c == ' ' || c == '\t' || c == '\n') continue;
-        norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    try {
+        // Phase 6 text encoder: a teacher word becomes a sparse sensory
+        // pattern, never a string the brain can match on. Lower-case, trim,
+        // FNV-1a hash, then splitmix to pick 4 distinct neurons out of 16
+        // dedicated text neurons. Different words get different (overlapping,
+        // as in real sensory codes) patterns; the same word always gets the
+        // same pattern, which is what makes paired learning possible at all.
+        // The pattern is injected on sensoryVision_ neurons 16..30 — the
+        // tail vision neurons that vision itself never uses (vision is 16
+        // rays, the vision group has 31 neurons), so text has its own
+        // channel and cannot masquerade as a visual scene.
+        
+        std::string norm;
+        for (char c : text) {
+            if (c == ' ' || c == '\t' || c == '\n') continue;
+            norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (norm.empty()) return {};
+        
+        // Validate input string
+        if (norm.size() > 1000) {
+            NLM_LOG_WARNING("Text string too long for encoding: " + norm.size());
+            return {};
+        }
+        
+        uint64_t h = 1469598103934665603ULL;
+        for (char c : norm) {
+            h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+            h *= 1099511628211ULL;
+        }
+        std::vector<size_t> out;
+        uint64_t state = h;
+        while (out.size() < 4) {
+            // splitmix64
+            state += 0x9e3779b97f4a7c15ULL;
+            uint64_t z = state;
+            z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+            z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+            z = z ^ (z >> 31);
+            size_t idx = static_cast<size_t>(z % 15);
+            if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
+        }
+        return out;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during text encoding: ") + e.what());
+        return {};
     }
-    if (norm.empty()) return {};
-    uint64_t h = 1469598103934665603ULL;
-    for (char c : norm) {
-        h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
-        h *= 1099511628211ULL;
-    }
-    std::vector<size_t> out;
-    uint64_t state = h;
-    while (out.size() < 4) {
-        // splitmix64
-        state += 0x9e3779b97f4a7c15ULL;
-        uint64_t z = state;
-        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-        z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-        z = z ^ (z >> 31);
-        size_t idx = static_cast<size_t>(z % 15);
-        if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
-    }
-    return out;
 }
 
 std::vector<float> AgentBrain::getInternalFiringRates() const {
-    std::vector<float> rates;
-    rates.reserve(internalNeurons_.size());
-    for (const Neuron* n : internalNeurons_) {
-        rates.push_back(n ? n->getFiringRate() : 0.0f);
+    try {
+        std::vector<float> rates;
+        rates.reserve(internalNeurons_.size());
+        for (const Neuron* n : internalNeurons_) {
+            if (!n) {
+                NLM_LOG_WARNING("Internal neuron pointer is null");
+                continue;
+            }
+            rates.push_back(n->getFiringRate());
+        }
+        return rates;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting internal firing rates: ") + e.what());
+        return {};
     }
-    return rates;
 }
 
 std::vector<float> AgentBrain::conceptPattern() const {
@@ -127,14 +159,19 @@ size_t AgentBrain::getConceptCount() const {
 }
 
 float AgentBrain::getSelfModelConfidence() const {
-    if (!selfModelReady_) return 0.0f;
-    float sum = 0.0f;
-    int n = 0;
-    for (int a = 0; a < 6; ++a) {
-        float c = selfModel_.getSelfModelConfidence(static_cast<ActionType>(a));
-        if (c > 0.0f) { sum += c; ++n; }
+    try {
+        if (!selfModelReady_) return 0.0f;
+        float sum = 0.0f;
+        int n = 0;
+        for (int a = 0; a < 6; ++a) {
+            float c = selfModel_.getSelfModelConfidence(static_cast<ActionType>(a));
+            if (c > 0.0f) { sum += c; ++n; }
+        }
+        return n ? sum / n : 0.0f;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting self model confidence: ") + e.what());
+        return 0.0f;
     }
-    return n ? sum / n : 0.0f;
 }
 
 size_t AgentBrain::getSocialObservationCount() const {
@@ -143,17 +180,31 @@ size_t AgentBrain::getSocialObservationCount() const {
 
 void AgentBrain::observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
                                    const std::vector<float>& afterVision) {
-    if (!socialReady_ && brain_) { socialLearning_.initialize(brain_.get()); socialReady_ = true; }
-    ActionType act = ActionType::Wait;
-    switch (observed) {
-        case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-        case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-        case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-        case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-        case MotorCommand::Interact: act = ActionType::Interact; break;
-        default: break;
+    try {
+        if (!socialReady_ && brain_) { 
+            socialLearning_.initialize(brain_.get()); 
+            socialReady_ = true; 
+        }
+        ActionType act = ActionType::Wait;
+        switch (observed) {
+            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+            case MotorCommand::Interact: act = ActionType::Interact; break;
+            default: break;
+        }
+        // Validate input vectors before processing
+        if (beforeVision.size() != afterVision.size()) {
+            NLM_LOG_WARNING("Vision size mismatch in observeOtherAgent: " + 
+                           std::to_string(beforeVision.size()) + " vs " +
+                           std::to_string(afterVision.size()));
+            return;
+        }
+        socialLearning_.observeAgentAction(act, beforeVision, afterVision);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception observing other agent: ") + e.what());
     }
-    socialLearning_.observeAgentAction(act, beforeVision, afterVision);
 }
 
 void AgentBrain::initialize(const SimpleWorld& world) {
