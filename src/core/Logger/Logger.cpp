@@ -4,17 +4,28 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
 
 namespace nlm {
 
+// ===============================================
+// ConsoleLogger Implementation
+// ===============================================
+
 struct ConsoleLogger::Impl {
+    // Logging configuration
     LogLevel level = LogLevel::Info;
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // Internal helper methods for formatting
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+// Constructor implementations
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    // Default initialization with Info level
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
@@ -23,6 +34,7 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    // Check if log level is enabled
     if (entry.level < pImpl->level) {
         return;
     }
@@ -32,7 +44,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with precise formatting
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
@@ -40,14 +52,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with optional color coding
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if logging to file
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
@@ -72,6 +84,9 @@ bool ConsoleLogger::getUseColors() const {
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        throw std::runtime_error("Failed to open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
@@ -80,6 +95,7 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
+// Global string conversion utilities
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
@@ -102,8 +118,12 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// ===============================================
+// Logger Class Implementation
+// ===============================================
+
 struct Logger::Impl {
+    // Collection of all registered loggers
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
 };
@@ -114,7 +134,9 @@ Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (logger) {
+        pImpl->loggers.push_back(logger);
+    }
 }
 
 void Logger::clearLoggers() {
@@ -191,7 +213,7 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     }
 }
 
-// LogStream implementation
+// LogStream Implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 
