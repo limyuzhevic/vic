@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/CommandLine/CommandLineParser.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -25,6 +26,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
 
@@ -46,6 +48,37 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printAdvancedHelp() {
+    std::cout << "\n=== Advanced NLM Options ===\n";
+    std::cout << "Debug and monitoring:\n";
+    std::cout << "  --debug=<level>           Enable debug output (0-3)\n";
+    std::cout << "  --verbose                 Enable verbose logging\n";
+    std::cout << "  --quiet                   Suppress output messages\n";
+    std::cout << "  --metrics-file=<file>     Save metrics to file\n";
+    std::cout << "  --perf-profile            Enable performance profiling\n";
+    
+    std::cout << "\nVisualization options:\n";
+    std::cout << "  --viz-mode=<mode>         Visualization mode (network, activity, spikes, weights, all)\n";
+    std::cout << "  --viz-update-rate=<hz>    Visualization update rate (default: 30.0)\n";
+    std::cout << "  --viz-export=<format>     Export visualization (svg, png, json, csv)\n";
+    
+    std::cout << "\nConfiguration options:\n";
+    std::cout << "  --config=<file>           Load configuration file\n";
+    std::cout << "  --config-set=<key>=<val>  Set configuration value\n";
+    std::cout << "  --config-dump             Dump current configuration\n";
+    
+    std::cout << "\nSystem information:\n";
+    std::cout << "  --info                   Display system information\n";
+    std::cout << "  --version                Display version information\n";
+    std::cout << "  --help                   Display help information\n";
+    
+    std::cout << "\nAdvanced options:\n";
+    std::cout << "  --force                  Force operation (override safety checks)\n";
+    std::cout << "  --experiment=<name>      Run specific experiment\n";
+    std::cout << "  --step-count=<n>         Override step count\n";
+    std::cout << "  --random-seed=<n>        Override random seed\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -279,22 +312,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -312,9 +345,48 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize command-line parser
+    CommandLineParser parser;
+    common_options::setupOptions(parser);
+    
+    // Parse command-line arguments
+    bool parsed = parser.parse(argc, argv);
+    if (!parsed) {
+        std::cerr << "Error parsing command-line arguments" << std::endl;
+        return 1;
+    }
+    
+    // Handle help and version flags
+    if (parser.getFlag("help")) {
+        printAdvancedHelp();
+        return 0;
+    }
+    
+    if (parser.getFlag("version")) {
+        std::cout << "NLM Phase 2 - Version 0.1.0" << std::endl;
+        return 0;
+    }
+    
+    if (parser.getFlag("info")) {
+        std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+        std::cout << "C++ neural simulation framework" << std::endl;
+        std::cout << "Phase 2: Real LIF neuron dynamics, STDP, Hebbian plasticity" << std::endl;
+        std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+        return 0;
+    }
+    
+    // Set up logging based on debug level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = LogLevel::Info;
+    if (parser.getFlag("quiet")) {
+        logLevel = LogLevel::Error;
+    } else if (parser.getDebugLevel() >= 2) {
+        logLevel = LogLevel::Debug;
+    } else if (parser.getFlag("verbose")) {
+        logLevel = LogLevel::Debug;
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -322,7 +394,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - STDP plasticity rule");
+    NLM_LOG_INFO("  - Hebbian plasticity rule");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
@@ -349,7 +422,7 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line args (simplified for main.cpp)
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
@@ -367,6 +440,25 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Handle additional command-line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--experiment" && i + 1 < argc) {
+            std::string experimentName = argv[++i];
+            // Handle specific experiments
+            if (experimentName == "connectivity") {
+                std::cout << "Running connectivity test only..." << std::endl;
+                // Skip plasticity and STDP tests
+            } else if (experimentName == "plasticity") {
+                std::cout << "Running plasticity test only..." << std::endl;
+                // Skip connectivity and STDP tests
+            } else if (experimentName == "stdp") {
+                std::cout << "Running STDP test only..." << std::endl;
+                // Skip connectivity and plasticity tests
+            }
+        }
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -395,20 +487,47 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run all tests unless specific experiments requested
+    bool runAllTests = true;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--experiment" && i + 1 < argc) {
+            std::string experimentName = argv[++i];
+            if (experimentName == "connectivity") {
+                runAllTests = false;
+                // Run only connectivity test
+                runBasicConnectivityTest(brain);
+                break;
+            } else if (experimentName == "plasticity") {
+                runAllTests = false;
+                // Run only plasticity test
+                runPlasticityExperiment(brain);
+                break;
+            } else if (experimentName == "stdp") {
+                runAllTests = false;
+                // Run only STDP test
+                runStdpVerification(brain);
+                break;
+            }
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runAllTests) {
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

@@ -14,9 +14,10 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_integration.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent)
+target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent nlm_command_line nlm_error_handling)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
