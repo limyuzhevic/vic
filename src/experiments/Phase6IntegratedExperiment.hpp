@@ -29,12 +29,13 @@ namespace nlm {
  * Phase 6 integration test result
  */
 struct Phase6IntegrationResult {
-    // System integration status
-    bool memoryWorkingMemoryIntegrated;
-    bool memoryEpisodicMemoryIntegrated;
+    // Neuromodulation integration status (including new neuromodulators)
     bool neuromodulationIntegrated;
-    bool predictionIntegrated;
-    bool developmentIntegrated;
+    bool acetylcholineIntegrated;
+    bool norepinephrineIntegrated;
+    bool serotoninIntegrated;
+    
+    // Checkpointing and replay
     bool checkpointingWorks;
     bool replayWorks;
     
@@ -46,6 +47,9 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float acetylcholineLevel;
+    float norepinephrineLevel;
+    float serotoninLevel;
     
     // Timestamps
     time_t startTime;
@@ -56,8 +60,9 @@ struct Phase6IntegrationResult {
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
         , neuromodulationIntegrated(false)
-        , predictionIntegrated(false)
-        , developmentIntegrated(false)
+        , acetylcholineIntegrated(false)
+        , norepinephrineIntegrated(false)
+        , serotoninIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)
@@ -67,6 +72,9 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , acetylcholineLevel(0.0f)
+        , norepinephrineLevel(0.0f)
+        , serotoninLevel(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -120,19 +128,21 @@ public:
     bool testMemoryIntegration();
     
     /**
-     * Test neuromodulation integration
+     * Test dopamine neuromodulator
      */
-    bool testNeuromodulationIntegration();
+    bool testDopamine();
     
     /**
-     * Test checkpoint save/load
+     * Test acetylcholine neuromodulator
      */
-    bool testCheckpointing();
+    bool testAcetylcholine();
     
     /**
-     * Test replay system
+     * Test norepinephrine neuromodulator
      */
-    bool testReplay();
-};
-
-} // namespace nlm
+    bool testNorepinephrine();
+    
+    /**
+     * Test serotonin neuromodulator
+     */
+    bool testSerotonin();

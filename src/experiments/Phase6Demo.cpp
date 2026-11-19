@@ -34,13 +34,17 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
     
-    // Test individual systems
-    std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    // Test neuromodulation integration including new neuromodulators
+    std::cout << "--- Neuromodulation Integration Test (including ACh, NE, 5-HT) ---" << std::endl;
+    experiment.testNeuromodulationIntegration();
     std::cout << std::endl;
     
-    std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    // Test individual neuromodulators
+    std::cout << "--- Individual Neuromodulator Tests ---" << std::endl;
+    experiment.testDopamine();
+    experiment.testAcetylcholine();
+    experiment.testNorepinephrine();
+    experiment.testSerotonin();
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
@@ -67,17 +71,25 @@ int main(int argc, char* argv[]) {
     std::cout << "Total reward: " << result.totalReward << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
-    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << std::endl;
+    
+    // Neuromodulator levels
+    std::cout << "=== NEUROMODULATOR LEVELS ===" << std::endl;
+    std::cout << "Dopamine (DA): " << result.dopamineLevel << std::endl;
+    std::cout << "Acetylcholine (ACh): " << result.acetylcholineLevel << std::endl;
+    std::cout << "Norepinephrine (NE): " << result.norepinephrineLevel << std::endl;
+    std::cout << "Serotonin (5-HT): " << result.serotoninLevel << std::endl;
+    std::cout << "Novelty: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity: " << result.curiosityLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
     std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
-    std::cout << std::endl;
+    std::cout << "Neuromodulation (DA): " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Acetylcholine (ACh): " << (result.acetylcholineIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Norepinephrine (NE): " << (result.norepinephrineIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Serotonin (5-HT): " << (result.serotoninIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
