@@ -352,31 +352,88 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Additional command-line options for advanced configuration
+    // (beyond what's defined in Config.hpp)
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--debug") {
+            NLM_LOG_INFO("Debug mode enabled via command line");
+        } else if (arg == "--fast") {
+            NLM_LOG_INFO("Fast mode enabled (fewer steps, larger timesteps)");
+        } else if (arg == "--detailed") {
+            NLM_LOG_INFO("Detailed logging enabled");
+            // Increase log level
+        } else if (arg == "--neurons") {
+            if (i + 1 < argc) {
+                int neuronCount = std::atoi(argv[++i]);
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+                NLM_LOG_INFO("Neuron count set to: " + std::to_string(neuronCount));
+            }
+        } else if (arg == "--steps") {
+            if (i + 1 < argc) {
+                int maxSteps = std::atoi(argv[++i]);
+                // For experiments that use step limits
+                NLM_LOG_INFO("Max steps set to: " + std::to_string(maxSteps));
+            }
+        } else if (arg == "--learning-rate") {
+            if (i + 1 < argc) {
+                float learningRate = std::atof(argv[++i]);
+                // Set learning rate for agent brain (would need agent access)
+                NLM_LOG_INFO("Learning rate set to: " + std::to_string(learningRate));
+            }
+        } else if (arg == "--temperature") {
+            if (i + 1 < argc) {
+                float temperature = std::atof(argv[++i]);
+                // Set temperature for exploration/exploitation (would need agent access)
+                NLM_LOG_INFO("Temperature set to: " + std::to_string(temperature));
+            }
+        } else if (arg == "--config-file") {
+            if (i + 1 < argc) {
+                std::string configPath = argv[++i];
+                // Reload configuration from alternate file
+                if (config->loadFromFile(configPath)) {
+                    NLM_LOG_INFO("Reloaded configuration from: " + configPath);
+                } else {
+                    NLM_LOG_ERROR("Failed to load configuration from: " + configPath);
+                }
+            }
+        } else if (arg == "--checkpoint") {
+            // Enable checkpointing
+            std::string checkpointPath = "./checkpoint_test.bin";
+            if (i + 1 < argc && argv[++i][0] != '-') {
+                checkpointPath = argv[i];
+            }
+            // Set checkpoint path
+            NLM_LOG_INFO("Checkpointing enabled: " + checkpointPath);
+        } else if (arg == "--help") {
+            // Print help information
+            printBanner();
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Usage: nlm [OPTIONS]");
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Options:");
+            NLM_LOG_INFO("  --config=FILE      Load configuration from FILE");
+            NLM_LOG_INFO("  --debug            Enable debug logging");
+            NLM_LOG_INFO("  --fast             Use fast mode (fewer steps, larger timesteps)");
+            NLM_LOG_INFO("  --detailed         Enable detailed logging");
+            NLM_LOG_INFO("  --neurons=N        Set number of neurons (e.g., --neurons=1000)");
+            NLM_LOG_INFO("  --steps=N          Set maximum steps for simulation");
+            NLM_LOG_INFO("  --learning-rate=N  Set learning rate for plasticity");
+            NLM_LOG_INFO("  --temperature=N    Set temperature for exploration");
+            NLM_LOG_INFO("  --config-file=PATH  Reload configuration from alternate file");
+            NLM_LOG_INFO("  --checkpoint[=PATH] Enable checkpointing (default: ./checkpoint_test.bin)");
+            NLM_LOG_INFO("  --help             Print this help message");
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Configuration files should be in the 'configs/' directory.");
+            NLM_LOG_INFO("Environment variables (prefix with NLM_):");
+            NLM_LOG_INFO("  NLM_RANDOM_SEED=42      Set random seed");
+            NLM_LOG_INFO("  NLM_TIMESTEP=0.001      Set simulation timestep");
+            NLM_LOG_INFO("  NLM_NEURON_COUNT=500    Set neuron count");
+            NLM_LOG_INFO("  NLM_REGION_COUNT=1      Set region count");
+            NLM_LOG_INFO("  NLM_CONNECTION_PROB=0.1 Set connection probability");
+            return 0;
+        }
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

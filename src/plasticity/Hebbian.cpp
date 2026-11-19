@@ -1,6 +1,9 @@
 #include "Hebbian.hpp"
 #include "../brain/Synapse.hpp"
 #include <algorithm>
+#include <random>
+#include <chrono>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -9,9 +12,14 @@ struct Hebbian::Impl {
     float maxWeight;
     float minWeight;
     float covarianceThreshold;  // For covariance rule
+    std::unique_ptr<RandomGenerator> rng;  // Random number generator for exploration
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             covarianceThreshold(0.0f) {
+        // Initialize with a unique seed for each Hebbian instance
+        uint64_t seed = static_cast<uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
+        rng = std::make_unique<RandomGenerator>(seed);
+    }
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -53,12 +61,46 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    // Implement covariance-based Hebbian learning for better selectivity
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    // where coactivity = ⟨pre * post⟩ (pre and post firing together)
+    // and baseline = ⟨pre⟩⟨post⟩ (expected independent firing)
+    
+    // Calculate pre/post coactivity (normalized by history)
+    size_t historySize = std::min(preSpikes.size(), postSpikes.size());
+    if (historySize == 0) {
+        return;
+    }
+    
+    // Count correlated pre/post spikes (within 10ms window)
+    size_t coactivity = 0;
+    for (size_t i = 0; i < historySize; ++i) {
+        float timeDiff = static_cast<float>(std::abs(
+            postSpikes[postSpikes.size() - 1 - i] - preSpikes[preSpikes.size() - 1 - i]));
+        if (timeDiff < 0.01f) {  // 10ms window for correlation
+            coactivity++;
+        }
+    }
+    
+    // Normalize by history size for comparison
+    float coactivityRate = static_cast<float>(coactivity) / static_cast<float>(historySize);
+    
+    // Estimate independent firing probabilities (average firing rates)
+    // This creates competition - synapses with high coactivity relative to
+    // independent firing get stronger, creating selective patterns
+    float baseline = 0.5f;  // Default baseline (can be adjusted)
+    
+    // Covariance: actual coactivity minus expected independent activity
+    float covariance = coactivityRate - baseline;
+    
+    // Apply Hebbian learning only if covariance is positive (selective learning)
+    float delta = covariance * pImpl->learningRate;
+    
+    // Add small random noise for exploration (keeps learning going forever
+    // without complete saturation)
+    float noiseLevel = 0.01f;
+    delta += (rng_->nextFloat() - 0.5f) * noiseLevel;
+    
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }

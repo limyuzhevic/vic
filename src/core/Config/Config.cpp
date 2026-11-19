@@ -10,7 +10,35 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with Phase 2 defaults for NLM
+    // This mirrors the defaults set in main.cpp
+    
+    // Basic simulation parameters
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Additional parameters for advanced features
+    // These are commonly used by the advanced agent interface
+    set("learning_rate", 0.01f, ConfigSource::Default);
+    set("temperature", 1.0f, ConfigSource::Default);
+    set("exploration_rate", 0.1f, ConfigSource::Default);
+    set("novelty_threshold", 0.3f, ConfigSource::Default);
+    set("curiosity_drive", 1.0f, ConfigSource::Default);
+    set("prediction_horizon", 5.0f, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 

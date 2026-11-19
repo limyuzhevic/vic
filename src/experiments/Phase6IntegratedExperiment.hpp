@@ -40,6 +40,7 @@ struct Phase6IntegrationResult {
     
     // Metrics
     float totalReward;
+    float totalRewardAverage;  // NEW: Added to store both total and average reward
     float avgFiringRate;
     float avgSynapticWeight;
     float memoryEpisodesStored;
@@ -61,6 +62,7 @@ struct Phase6IntegrationResult {
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)
+        , totalRewardAverage(0.0f)  // NEW: Initialize the average reward field
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
         , memoryEpisodesStored(0.0f)

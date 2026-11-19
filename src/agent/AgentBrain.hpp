@@ -131,10 +131,61 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Advanced configuration for expert users
+    void setLearningRate(float rate);
+    void setTemperature(float temp); // For exploration vs exploitation control
+    void setExplorationRate(float rate);
+    void setInhibitionStrength(float strength);
+    void setExcitability(float exc);
+    void setSpikingThreshold(float threshold);
+    void setRefractoryPeriod(size_t period);
+    void setNeuronCount(size_t count);
+    void setConnectionDensity(float density);
+    void setSensoryGain(float gain);
+    void setMotorNoise(float noise);
+    void setNoveltyThreshold(float threshold);
+    void setCuriosityDrive(float drive);
+    void setPredictionHorizon(float horizon);
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Get current configuration
+    float getLearningRate() const;
+    float getTemperature() const;
+    float getExplorationRate() const;
+    float getInhibitionStrength() const;
+    float getExcitability() const;
+    float getSpikingThreshold() const;
+    size_t getRefractoryPeriod() const;
+    size_t getNeuronCount() const;
+    float getConnectionDensity() const;
+    float getSensoryGain() const;
+    float getMotorNoise() const;
+    float getNoveltyThreshold() const;
+    float getCuriosityDrive() const;
+    float getPredictionHorizon() const;
+    
+    // Advanced control functions
+    void setGoal(const std::string& goal);
+    void setPersonality(const std::string& personality);
+    void setBehaviorStyle(const std::string& style);
+    void setMemoryCapacity(size_t capacity);
+    void setReplayInterval(size_t interval);
+    void setConsolidationInterval(size_t interval);
+    void setDevelopmentSpeed(float speed);
+    
+    // Debug and monitoring
+    void enableDebugLogging(bool enable);
+    void setDebugLevel(int level);
+    bool isDebugLoggingEnabled() const;
+    int getDebugLevel() const;
+    
+    std::string getConfigurationSummary() const;
+    std::string getPerformanceStats() const;
+    std::string getMemoryStats() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -180,88 +231,36 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Slowly adapting prediction of the visual scene, for novelty
-    // detection (see processSensoryInput). Not the previous frame:
-    // per-frame differencing cannot work here, because the world
-    // changes vision by only ~0-0.004 per action step while moving.
-    std::vector<float> predictedVision_;
-    float sensoryNoveltyDecay_;
-    // Strongest touch/proximity signal in the most recent percept
-    // (0 = nothing within touch range, 1 = touching). Used only for the
-    // innate proximity reflex in decodeFromMotorNeurons().
-    float maxTouch_ = 0.0f;
-    // Phase 5 vision-guided reflex features, derived from the same
-    // percept the brain already receives (no world label is leaked):
-    // forwardTouch_ is the strongest touch in the forward cone (touch
-    // sensors 0, 1, 7 of 8, i.e. -45..+45 degrees); forwardObjectVision_
-    // is the closest forward-cone vision value (centre rays 5..10 of
-    // 16) below the empty value 1.0. The world's vision encoding makes
-    // a close bright object ~0.65-0.8 (resource), a close dark object
-    // ~0.24-0.3 (hazard) and a close wall ~0.1-0.2 — so a value above
-    // 0.5 with forward touch is a resource cue, and a value below 0.35
-    // is a hazard/wall cue. Touch alone cannot tell them apart; vision
-    // in the same percept can, and only that is used here.
-    float forwardTouch_ = 0.0f;
-    float forwardObjectVision_ = 1.0f;
-    // Phase 5 winner-take-all state: the motor group that won the last
-    // decode, and by how much. On the next presentation its competitors
-    // receive a lateral-inhibition pulse (see processSensoryInput), so
-    // a decisive winner suppresses its rivals instead of every group
-    // saturating together at 70-90 Hz.
-    int lastWinnerGroup_ = -1;
-    float lastWinnerMargin_ = 0.0f;
-    int consecutiveWinnerCount_ = 0;
-    // Phase 5 action-diversity state, updated from final decoded
-    // actions: steps since the last turn, and how many times the same
-    // movement has repeated in a row. Used for a turn-diversity bias
-    // and a repetition-fatigue penalty in decode, not a pathfinder.
-    int stepsSinceTurn_ = 0;
-    int repeatCount_ = 0;
-    // Phase 5 diagnostic counters (not used for decisions): how often
-    // the vision-gated reflex bonus / hazard suppression / WTA pulse
-    // actually fired, so demo reports can tell a live mechanism from
-    // a dead one.
-    int reflexBonusCount_ = 0;
-    int reflexSuppressCount_ = 0;
-    int wtaPulseCount_ = 0;
-    // Last decoded command, for the interact no-repeat rule below.
-    MotorCommand lastDecoded_ = MotorCommand::Wait;
-    bool hasLastDecoded_ = false;
-    // Phase 6 wired cognition: the brain owns the planner and concept
-    // formation, but AgentBrain owns the self-model and social
-    // learning (Brain never owned them) and calls them from the loop,
-    // so they are no longer library-only classes. The self-model is
-    // fed every loop turn (previous percept -> current percept for
-    // the action just taken); social learning is fed only when a
-    // teacher/other agent is observed, via observeOtherAgent().
-    SelfModel selfModel_;
-    SocialLearning socialLearning_;
-    bool selfModelReady_ = false;
-    bool socialReady_ = false;
-    // Last percept's touch vector, kept so applyRewardModulation can
-    // present the pattern that actually led to a reward to concept
-    // formation (pattern -> action -> reward, in that order).
-    std::vector<float> lastTouch_;
-    std::string lastText_;
-    // Phase 6 counters for planner/concept/self/social influence.
-    int plannerOverrideCount_ = 0;
-    int plannerAgreementCount_ = 0;
-    int plannerDecisionCount_ = 0;
-    int conceptBiasCount_ = 0;
-    int selfBiasCount_ = 0;
-    int socialBiasCount_ = 0;
-    // Concept pattern for the current percept, in closeness form
-    // (1 - vision, 0 = empty) plus touch, for concept bias lookup.
-    std::vector<float> conceptPattern() const;
-    // Phase 5 thought trace: last perceived scene summary, last
-    // planner suggestion (from learned action quality), last decoded
-    // action, and its outcome reward. Filled across one loop turn.
-    std::vector<float> lastVision_;
-    std::string thoughtPercept_ = "none";
-    MotorCommand thoughtPlanned_ = MotorCommand::Wait;
-    bool hasThoughtPlanned_ = false;
-    float thoughtReward_ = 0.0f;
-    bool hasThoughtOutcome_ = false;
-};
+    // Debug and monitoring state
+    bool debugLoggingEnabled_;
+    int debugLevel_;
+    
+    // Advanced configuration state
+    float learningRate_;
+    float temperature_;
+    float explorationRate_;
+    float inhibitionStrength_;
+    float excitability_;
+    float spikingThreshold_;
+    size_t refractoryPeriod_;
+    size_t neuronCount_;
+    float connectionDensity_;
+    float sensoryGain_;
+    float motorNoise_;
+    float noveltyThreshold_;
+    float curiosityDrive_;
+    float predictionHorizon_;
+    
+    // Behavioral control state
+    std::string goal_;
+    std::string personality_;
+    std::string behaviorStyle_;
+    size_t memoryCapacity_;
+    size_t replayInterval_;
+    size_t consolidationInterval_;
+    float developmentSpeed_;
+    
+    // Behavior rules for policy management
+    std::vector<std::string> behaviorRules_;
 
 } // namespace nlm

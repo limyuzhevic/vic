@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -22,6 +23,10 @@ public:
     
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    
+    // Access to random number generator for exploration
+    RandomGenerator& getRandomGenerator() { return *pImpl->rng; }
+    const RandomGenerator& getRandomGenerator() const { return *pImpl->rng; }
     
 private:
     struct Impl;

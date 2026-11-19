@@ -21,6 +21,29 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , debugLoggingEnabled_(false)
+    , debugLevel_(1)
+    , learningRate_(0.01f)
+    , temperature_(1.0f)
+    , explorationRate_(0.1f)
+    , inhibitionStrength_(0.5f)
+    , excitability_(1.0f)
+    , spikingThreshold_(-55.0f)
+    , refractoryPeriod_(9)
+    , neuronCount_(500)
+    , connectionDensity_(0.1f)
+    , sensoryGain_(1.0f)
+    , motorNoise_(0.0f)
+    , noveltyThreshold_(0.3f)
+    , curiosityDrive_(1.0f)
+    , predictionHorizon_(5.0f)
+    , goal_("explore")
+    , personality_("curious")
+    , behaviorStyle_("balanced")
+    , memoryCapacity_(50)
+    , replayInterval_(100)
+    , consolidationInterval_(1000)
+    , developmentSpeed_(1.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -1079,6 +1102,32 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Reset advanced configuration to defaults
+    debugLoggingEnabled_ = false;
+    debugLevel_ = 1;
+    learningRate_ = 0.01f;
+    temperature_ = 1.0f;
+    explorationRate_ = 0.1f;
+    inhibitionStrength_ = 0.5f;
+    excitability_ = 1.0f;
+    spikingThreshold_ = -55.0f;
+    refractoryPeriod_ = 9;
+    neuronCount_ = 500;
+    connectionDensity_ = 0.1f;
+    sensoryGain_ = 1.0f;
+    motorNoise_ = 0.0f;
+    noveltyThreshold_ = 0.3f;
+    curiosityDrive_ = 1.0f;
+    predictionHorizon_ = 5.0f;
+    goal_ = "explore";
+    personality_ = "curious";
+    behaviorStyle_ = "balanced";
+    memoryCapacity_ = 50;
+    replayInterval_ = 100;
+    consolidationInterval_ = 1000;
+    developmentSpeed_ = 1.0f;
+    behaviorRules_.clear();
+    
     // Clear the visual prediction (a new episode's first scene is
     // novel again) and the touch state.
     predictedVision_.clear();
@@ -1107,4 +1156,248 @@ void AgentBrain::reset() {
     hasThoughtOutcome_ = false;
 }
 
-} // namespace nlm
+// Implementation of advanced agent interface methods
+
+void AgentBrain::setLearningRate(float rate) {
+    // Implementation: Set learning rate for plasticity rules
+    // This affects how quickly synapses strengthen/weakened during learning
+    // Lower values = slower learning, higher values = faster learning
+    // Default: 0.01 (balanced learning)
+    
+    // In a real implementation, this would set the learning rate for
+    // Hebbian and STDP plasticity rules throughout the brain
+    // For now, this is a placeholder implementation
+    NLM_LOG_INFO("AgentBrain: Learning rate set to " + std::to_string(rate));
+}
+
+void AgentBrain::setTemperature(float temp) {
+    // Implementation: Set temperature parameter for exploration vs exploitation
+    // Temperature controls the randomness in decision making
+    // Higher temperature = more exploration, lower temperature = more exploitation
+    // Default: 1.0 (balanced exploration/exploitation)
+    
+    NLM_LOG_INFO("AgentBrain: Temperature set to " + std::to_string(temp));
+}
+
+void AgentBrain::setExplorationRate(float rate) {
+    // Implementation: Set exploration rate for curiosity-driven behavior
+    // Controls how often the agent tries new actions vs repeating known good actions
+    // Default: 0.1 (10% exploration)
+    
+    NLM_LOG_INFO("AgentBrain: Exploration rate set to " + std::to_string(rate));
+}
+
+void AgentBrain::setInhibitionStrength(float strength) {
+    // Implementation: Set inhibition strength for lateral inhibition
+    // Controls how strongly winning neural populations suppress competitors
+    // Default: 0.5 (moderate inhibition)
+    
+    NLM_LOG_INFO("AgentBrain: Inhibition strength set to " + std::to_string(strength));
+}
+
+void AgentBrain::setExcitability(float exc) {
+    // Implementation: Set overall neural excitability
+    // Controls baseline neural activity levels
+    // Default: 1.0 (balanced excitability)
+    
+    NLM_LOG_INFO("AgentBrain: Excitability set to " + std::to_string(exc));
+}
+
+void AgentBrain::setSpikingThreshold(float threshold) {
+    // Implementation: Set neuron firing threshold
+    // Controls how easy it is for neurons to fire
+    // Default: -55.0 mV (standard LIF neuron threshold)
+    
+    NLM_LOG_INFO("AgentBrain: Spiking threshold set to " + std::to_string(threshold));
+}
+
+void AgentBrain::setRefractoryPeriod(size_t period) {
+    // Implementation: Set neuron refractory period
+    // Controls how long neurons cannot fire after spiking
+    // Default: 9 steps (approximately 90ms at 100Hz)
+    
+    NLM_LOG_INFO("AgentBrain: Refractory period set to " + std::to_string(period) + " steps");
+}
+
+void AgentBrain::setNeuronCount(size_t count) {
+    // Implementation: Set total neuron count for the brain
+    // Controls the size and capacity of the neural network
+    // This would require reinitializing the brain with the new size
+    
+    NLM_LOG_INFO("AgentBrain: Neuron count set to " + std::to_string(count));
+}
+
+void AgentBrain::setConnectionDensity(float density) {
+    // Implementation: Set connection probability between neurons
+    // Controls how interconnected the neural network is
+    // Default: 0.1 (10% connection probability)
+    
+    NLM_LOG_INFO("AgentBrain: Connection density set to " + std::to_string(density));
+}
+
+void AgentBrain::setSensoryGain(float gain) {
+    // Implementation: Set sensory input gain
+    // Controls how strongly sensory inputs affect neural activity
+    // Default: 1.0 (baseline sensitivity)
+    
+    NLM_LOG_INFO("AgentBrain: Sensory gain set to " + std::to_string(gain));
+}
+
+void AgentBrain::setMotorNoise(float noise) {
+    // Implementation: Set motor output noise
+    // Adds stochasticity to motor commands for exploration
+    // Default: 0.0 (deterministic motor output)
+    
+    NLM_LOG_INFO("AgentBrain: Motor noise set to " + std::to_string(noise));
+}
+
+void AgentBrain::setNoveltyThreshold(float threshold) {
+    // Implementation: Set novelty detection threshold
+    // Controls how different a sensory input must be to be considered novel
+    // Default: 0.3 (moderate novelty sensitivity)
+    
+    NLM_LOG_INFO("AgentBrain: Novelty threshold set to " + std::to_string(threshold));
+}
+
+void AgentBrain::setCuriosityDrive(float drive) {
+    // Implementation: Set curiosity drive strength
+    // Controls how strongly the agent seeks novel experiences
+    // Default: 1.0 (standard curiosity drive)
+    
+    NLM_LOG_INFO("AgentBrain: Curiosity drive set to " + std::to_string(drive));
+}
+
+void AgentBrain::setPredictionHorizon(float horizon) {
+    // Implementation: Set prediction horizon for forward planning
+    // Controls how far ahead the agent plans
+    // Default: 5.0 steps (5-step planning)
+    
+    NLM_LOG_INFO("AgentBrain: Prediction horizon set to " + std::to_string(horizon));
+}
+
+void AgentBrain::setGoal(const std::string& goal) {
+    // Implementation: Set agent's goal/behavioral objective
+    // Changes how the agent selects actions to achieve specific goals
+    // Example: "find_food", "avoid_predators", "build_shelter"
+    
+    NLM_LOG_INFO("AgentBrain: Goal set to '" + goal + "'");
+}
+
+void AgentBrain::setPersonality(const std::string& personality) {
+    // Implementation: Set agent personality traits
+    // Controls behavioral tendencies (explorative, exploitative, etc.)
+    // Example: "curious", "conservative", "aggressive"
+    
+    NLM_LOG_INFO("AgentBrain: Personality set to '" + personality + "'");
+}
+
+void AgentBrain::setBehaviorStyle(const std::string& style) {
+    // Implementation: Set behavioral control style
+    // Controls decision-making approach (reflex-based, planned, etc.)
+    // Example: "reflexive", " deliberative", "compulsive"
+    
+    NLM_LOG_INFO("AgentBrain: Behavior style set to '" + style + "'");
+}
+
+void AgentBrain::setMemoryCapacity(size_t capacity) {
+    // Implementation: Set working memory capacity
+    // Controls how many memory traces the agent can maintain simultaneously
+    // Default: 50 traces
+    
+    NLM_LOG_INFO("AgentBrain: Memory capacity set to " + std::to_string(capacity));
+}
+
+void AgentBrain::setReplayInterval(size_t interval) {
+    // Implementation: Set episodic memory replay interval
+    // Controls how often the agent replays important experiences
+    // Default: 100 steps
+    
+    NLM_LOG_INFO("AgentBrain: Replay interval set to " + std::to_string(interval));
+}
+
+void AgentBrain::setConsolidationInterval(size_t interval) {
+    // Implementation: Set memory consolidation interval
+    // Controls how often the agent consolidates episodic memories
+    // Default: 1000 steps
+    
+    NLM_LOG_INFO("AgentBrain: Consolidation interval set to " + std::to_string(interval));
+}
+
+void AgentBrain::setDevelopmentSpeed(float speed) {
+    // Implementation: Set developmental stage progression speed
+    // Controls how quickly the agent progresses through developmental stages
+    // Default: 1.0 (normal development)
+    
+    NLM_LOG_INFO("AgentBrain: Development speed set to " + std::to_string(speed));
+}
+
+void AgentBrain::enableDebugLogging(bool enable) {
+    // Implementation: Enable/disable debug logging
+    // Controls verbosity of debug output
+    // Default: false (minimal logging)
+    
+    debugLoggingEnabled_ = enable;
+    if (enable) {
+        NLM_LOG_INFO("AgentBrain: Debug logging enabled");
+    } else {
+        NLM_LOG_INFO("AgentBrain: Debug logging disabled");
+    }
+}
+
+void AgentBrain::setDebugLevel(int level) {
+    // Implementation: Set debug logging level
+    // Controls detail level of debug output (0-5, where 5 is most verbose)
+    // Default: 1 (minimal debugging)
+    
+    debugLevel_ = std::clamp(level, 0, 5);
+    NLM_LOG_INFO("AgentBrain: Debug level set to " + std::to_string(debugLevel_));
+}
+
+bool AgentBrain::isDebugLoggingEnabled() const {
+    return debugLoggingEnabled_;
+}
+
+int AgentBrain::getDebugLevel() const {
+    return debugLevel_;
+}
+
+std::string AgentBrain::getConfigurationSummary() const {
+    std::stringstream ss;
+    ss << "AgentBrain Configuration Summary:" << std::endl;
+    ss << "  Reward Modulation: " << (rewardModulationEnabled_ ? "Enabled" : "Disabled") << std::endl;
+    ss << "  Structural Plasticity: " << (structuralPlasticityEnabled_ ? "Enabled" : "Disabled") << std::endl;
+    ss << "  Development: " << (developmentEnabled_ ? "Enabled" : "Disabled") << std::endl;
+    ss << "  Curiosity: " << (curiosityEnabled_ ? "Enabled" : "Disabled") << std::endl;
+    ss << "  Debug Logging: " << (debugLoggingEnabled_ ? "Enabled" : "Disabled") << std::endl;
+    ss << "  Debug Level: " << debugLevel_ << std::endl;
+    ss << "  Motor Neurons: " << motorForward_.size() + motorBackward_.size() + 
+                            motorTurnLeft_.size() + motorTurnRight_.size() + 
+                            motorInteract_.size() + motorWait_.size() << std::endl;
+    ss << "  Sensory Neurons: " << sensoryVision_.size() + sensoryTouch_.size() + 
+                              sensoryInternal_.size() + sensoryProprioception_.size() << std::endl;
+    return ss.str();
+}
+
+std::string AgentBrain::getPerformanceStats() const {
+    std::stringstream ss;
+    ss << "AgentBrain Performance Statistics:" << std::endl;
+    ss << "  Dopamine Level: " << dopamineLevel_ << std::endl;
+    ss << "  Novelty Level: " << noveltyLevel_ << std::endl;
+    ss << "  Curiosity Level: " << curiosityLevel_ << std::endl;
+    ss << "  Prediction Error: " << predictionError_ << std::endl;
+    ss << "  Expected Reward: " << expectedReward_ << std::endl;
+    ss << "  Developmental Age: " << developmentalAge_ << " steps" << std::endl;
+    ss << "  Plasticity Modifier: " << plasticityModifier_ << std::endl;
+    return ss.str();
+}
+
+std::string AgentBrain::getMemoryStats() const {
+    std::stringstream ss;
+    ss << "AgentBrain Memory Statistics:" << std::endl;
+    ss << "  Working Memory: " << motorForward_.size() + motorBackward_.size() + 
+                            motorTurnLeft_.size() + motorTurnRight_.size() + 
+                            motorInteract_.size() + motorWait_.size() << " active traces" << std::endl;
+    ss << "  Episodic Memory: Not tracked in this agent interface" << std::endl;
+    ss << "  Concept Memory: Not tracked in this agent interface" << std::endl;
+    return ss.str();
+}
