@@ -95,6 +95,24 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+// Get configuration summary
+    std::string summary() const;
+    
+    // Configuration validation
+    bool validate(const std::vector<ConfigEntry>& schema) const;
+    bool validate(const std::string& schema) const;
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Schema management
+    void addSchema(const std::string& key, const std::string& type, 
+                  const std::string& description = "",
+                  const std::string& validation = "");
+    void clearSchema();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

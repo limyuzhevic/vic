@@ -54,6 +54,9 @@ public:
     // Get observation space
     virtual size_t getObservationSpaceSize() const = 0;
     
+    // Clone environment for batch experiments
+    virtual std::unique_ptr<Environment> clone() const = 0;
+    
 protected:
     EnvironmentState* state_;
     float lastReward_;
@@ -75,6 +78,9 @@ public:
     const char* getName() const override;
     size_t getActionSpaceSize() const override;
     size_t getObservationSpaceSize() const override;
+    
+    // Clone environment for batch experiments
+    std::unique_ptr<Environment> clone() const override;
     
 private:
     struct Impl;

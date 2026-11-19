@@ -21,7 +21,8 @@ public:
     bool runExperiment(std::shared_ptr<Experiment> experiment,
                       std::shared_ptr<Brain> brain,
                       std::shared_ptr<Environment> environment,
-                      SimulationStep maxSteps);
+                      SimulationStep maxSteps,
+                      std::function<void(float)> progressCallback = nullptr);
     
     // Run batch of experiments
     std::vector<std::shared_ptr<Experiment>> runBatch(

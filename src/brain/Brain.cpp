@@ -843,6 +843,46 @@ void Brain::develop() {
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
+std::unique_ptr<Brain> Brain::clone() const {
+    // Create a new brain with the same configuration
+    auto config = pImpl->config;
+    auto newBrain = std::make_unique<Brain>(config);
+    
+    if (!newBrain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize cloned brain");
+        return nullptr;
+    }
+    
+    // Copy inter-region connections
+    for (const auto& conn : pImpl->interRegionConnections) {
+        newBrain->addInterRegionConnection(conn.sourceRegion, conn.targetRegion, 
+                                         conn.weight, conn.delay);
+    }
+    
+    // Copy simulation state
+    newBrain->reset();
+    newBrain->pImpl->currentStep = pImpl->currentStep;
+    newBrain->pImpl->currentTime = pImpl->currentTime;
+    newBrain->pImpl->totalSpikesTotal = pImpl->totalSpikesTotal;
+    newBrain->pImpl->totalSpikesThisStep = pImpl->totalSpikesThisStep;
+    newBrain->pImpl->learnedPreference = pImpl->learnedPreference;
+    newBrain->pImpl->stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+    newBrain->pImpl->isResting = pImpl->isResting;
+    
+    // Note: A complete clone would also need to copy:
+    // - Working memory state
+    // - Episodic memory episodes
+    // - Associative memory patterns
+    // - Prediction system state
+    // - Cognition system states (planner, concept formation, attention)
+    // - Neuromodulation system states (dopamine, curiosity, novelty, prediction error)
+    // - Plasticity system states (STDP, Hebbian, structural plasticity)
+    // - Checkpoint system state
+    
+    NLM_LOG_INFO("Brain clone: Created cloned brain (partial implementation - complete cloning requires more work)");
+    return newBrain;
+}
+
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     

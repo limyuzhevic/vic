@@ -135,4 +135,24 @@ size_t GridWorldEnvironment::getObservationSpaceSize() const {
     return 4;  // agent_x, agent_y, goal_x, goal_y
 }
 
+std::unique_ptr<Environment> GridWorldEnvironment::clone() const {
+    auto cloned = std::make_unique<GridWorldEnvironment>(pImpl->width, pImpl->height);
+    
+    // Copy current state (agent position, goal, etc.)
+    cloned->pImpl->agentX = pImpl->agentX;
+    cloned->pImpl->agentY = pImpl->agentY;
+    cloned->pImpl->goalX = pImpl->goalX;
+    cloned->pImpl->goalY = pImpl->goalY;
+    cloned->pImpl->steps = pImpl->steps;
+    cloned->pImpl->maxSteps = pImpl->maxSteps;
+    cloned->pImpl->done = pImpl->done;
+    cloned->pImpl->state = pImpl->state;
+    
+    // Copy reward and done state
+    cloned->lastReward_ = lastReward_;
+    cloned->done_ = done_;
+    
+    return cloned;
+}
+
 } // namespace nlm

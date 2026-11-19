@@ -63,6 +63,9 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Clone brain - creates an independent copy for batch experiments
+    std::unique_ptr<Brain> clone() const;
+    
     // Initialize brain with configuration
     bool initialize();
     
