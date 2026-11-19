@@ -725,6 +725,9 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
         it->second->injectCurrent(current);
         return;
     }
+    
+    // Fallback: linear search (should rarely be needed if neuronById is properly populated)
+    NLM_LOG_WARNING("Neuron " + std::to_string(neuron.index()) + " not found in lookup table, performing linear search");
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
@@ -734,6 +737,8 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
             }
         }
     }
+    
+    NLM_LOG_ERROR("Neuron " + std::to_string(neuron.index()) + " not found in brain");
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {

@@ -39,13 +39,40 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage(const std::string& programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Neural Learning Machine (NLM) - Phase 2 Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=<file>    Load configuration from JSON file (recommended)" << std::endl;
+    std::cout << "  --help, -h         Show this help message" << std::endl;
+    std::cout << "  --version          Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration file format:" << std::endl;
+    std::cout << "  • JSON format (recommended): configs/default.json" << std::endl;
+    std::cout << "  • Legacy key=value format (for backward compatibility)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Command-line argument format:" << std::endl;
+    std::cout << "  • --key=value     Override configuration values" << std::endl;
+    std::cout << "  • --key value     Alternative format" << std::endl;
+    std::cout << "  • --help, -h      Show usage information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << "                    # Run with default config" << std::endl;
+    std::cout << "  " << programName << " --config=custom.json" << std::endl;
+    std::cout << "  " << programName << " --neuron_count=2000 --simulation_timestep=0.0005" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more details, see: https://github.com/your-org/nlm" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -333,7 +360,15 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Neural Learning Machine Version 2.0.0 (Phase 2)" << std::endl;
+            std::cout << "Build date: " << __DATE__ << " " << __TIME__ << std::endl;
+            std::cout << "Author: Your Organization" << std::endl;
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -342,14 +377,15 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (supports JSON and legacy format)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
+        NLM_LOG_WARNING("Failed to load configuration from: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line args (supports JSON-style and key=value)
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2

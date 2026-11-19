@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp> // JSON parsing
 
 namespace nlm {
 
@@ -19,14 +20,105 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser with nlohmann/json
+    // Use JSON format for better configuration management
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
+    try {
+        // Parse JSON configuration file
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Process JSON entries
+        if (jsonConfig.contains("config")) {
+            // Handle nested config section
+            const auto& configSection = jsonConfig["config"];
+            processJSONSection(configSection);
+        } else {
+            // Handle flat config (legacy support)
+            processJSONSection(jsonConfig);
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON: " + filepath);
+        return true;
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        NLM_LOG_ERROR("JSON parse error in config file " + filepath + ": " + std::string(e.what()));
+        // Fall back to legacy key=value format
+        file.clear();
+        file.seekg(0);
+        return loadLegacyFormat(file, filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+void Config::processJSONSection(const nlohmann::json& jsonConfig) {
+    for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+        std::string key = it.key();
+        
+        // Convert JSON value to ConfigValue
+        ConfigValue value;
+        ConfigSource source = ConfigSource::File;
+        
+        if (it->is_string()) {
+            value = it->get<std::string>();
+        } else if (it->is_number_integer()) {
+            value = it->get<int64_t>();
+        } else if (it->is_number_unsigned()) {
+            value = static_cast<int64_t>(it->get<uint64_t>());
+        } else if (it->is_number_float()) {
+            value = it->get<double>();
+        } else if (it->is_boolean()) {
+            value = it->get<bool>();
+        } else if (it->is_array()) {
+            // Handle array values (e.g., lists of integers)
+            const auto& array = *it;
+            if (!array.empty()) {
+                if (array[0].is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : array) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    value = intArray;
+                } else if (array[0].is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : array) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    value = doubleArray;
+                } else if (array[0].is_string()) {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : array) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    value = stringArray;
+                }
+            }
+        }
+        
+        // Add entry if we successfully parsed it
+        if (std::holds_alternative<std::monostate>(value)) {
+            // Failed to parse, skip this entry
+            NLM_LOG_WARNING("Could not parse config value for key: " + key);
+            continue;
+        }
+        
+        set(key, value, source);
+    }
+}
+
+bool Config::loadLegacyFormat(std::ifstream& file, const std::string& filepath) {
+    // Fall back to legacy key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -52,6 +144,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO("Loaded legacy format from config file: " + filepath);
     return true;
 }
 
@@ -81,14 +174,46 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot write to config file: " + filepath);
         return false;
     }
     
+    // Create JSON structure
+    nlohmann::json jsonConfig;
+    nlohmann::json configSection;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to JSON
+        std::string description = "Configuration parameter: " + entry.key;
+        
+        if (std::holds_alternative<int>(entry.value)) {
+            configSection[entry.key] = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            configSection[entry.key] = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            configSection[entry.key] = std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            configSection[entry.key] = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            configSection[entry.key] = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            configSection[entry.key] = std::get<std::vector<int>>(entry.value);
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            configSection[entry.key] = std::get<std::vector<double>>(entry.value);
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            configSection[entry.key] = std::get<std::vector<std::string>>(entry.value);
+        }
     }
     
+    // Add config metadata
+    jsonConfig["config"] = configSection;
+    jsonConfig["version"] = "2.0";
+    jsonConfig["description"] = "NLM Neural Learning Machine Configuration";
+    
+    // Write JSON to file with pretty formatting
+    file << std::setw(2) << jsonConfig;
+    
+    NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
     return true;
 }
 
