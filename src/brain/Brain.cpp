@@ -614,8 +614,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // This implements predictive coding for better processing
+        if (!pImpl->sensoryNeurons.empty() && !pImpl->predictedVision_.empty()) {
+            // Create sensory input for prediction system
+            SensoryInput currentSensory;
+            currentSensory.vision.resize(pImpl->sensoryNeurons.size());
+            currentSensory.touch.resize(8);
+            currentSensory.internal.resize(4);
+            currentSensory.proprioception.resize(6);
+            
+            // Extract sensory neuron activities
+            for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < currentSensory.vision.size(); ++i) {
+                currentSensory.vision[i] = pImpl->sensoryNeurons[i]->getMembranePotential();
+            }
+            
+            // Make prediction
+            auto prediction = pImpl->predictionSystem->predictNextState(currentSensory);
+            
+            // Update predictions with actual sensory input
+            pImpl->predictionSystem->updatePredictions(*prediction, currentSensory);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +650,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural state to form and update concepts
+        // Convert neural activity to concept patterns
+        std::vector<float> currentState;
+        
+        // Extract neural activity patterns from working memory
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Update concept formation with current state
+        pImpl->conceptFormation->updateConcept(currentTime);
+        
+        // If concept formation has discovered concepts, use them to influence processing
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            // Get current sensory state for concept matching
+            std::vector<float> sensoryState;
+            if (!pImpl->sensoryNeurons.empty()) {
+                sensoryState.resize(pImpl->sensoryNeurons.size());
+                for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < sensoryState.size(); ++i) {
+                    sensoryState[i] = pImpl->sensoryNeurons[i]->getMembranePotential();
+                }
+            }
+            
+            if (!sensoryState.empty()) {
+                auto matchingConceptId = pImpl->conceptFormation->getMatchingConcept(sensoryState);
+                if (matchingConceptId > 0) {
+                    const auto* concept = pImpl->conceptFormation->getConcept(matchingConceptId);
+                    if (concept) {
+                        // Apply concept-based biases to neural processing
+                        applyConceptBasedModulation(*concept);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1541,6 +1592,86 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// Concept formation integration
+void Brain::applyConceptBasedModulation(const DiscoveredConcept& concept) {
+    // Apply concept-based modulation to brain processing
+    // This allows learned concepts to influence perception, action, and learning
+    
+    float conceptStrength = concept.stability;
+    
+    // Modulate neural excitability based on concept stability
+    if (conceptStrength > 0.5f) {
+        // Strong concept: increase attention to concept-relevant areas
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Add concept-based excitation
+                neuron->injectCurrent(conceptStrength * 0.5f);
+            }
+        }
+    } else {
+        // Weak concept: mild influence on processing
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Subtractive concept-based inhibition
+                neuron->injectCurrent(-conceptStrength * 0.2f);
+            }
+        }
+    }
+}
+
+// Neural planner integration for action selection
+void Brain::applyNeuralPlannerToActionSelection() {
+    auto* planner = getPlanner();
+    if (!planner) return;
+    
+    // Get current sensory state for planning
+    std::vector<float> currentState;
+    if (pImpl->workingMemory) {
+        currentState = pImpl->workingMemory->retrieve();
+    }
+    
+    // Get planned actions from neural planner
+    auto plannedActions = planner->planAction(currentState);
+    
+    // Integrate planner suggestions with motor neuron activity
+    if (!plannedActions.empty()) {
+        for (const auto& action : plannedActions) {
+            // Apply planner bias to motor neuron groups
+            applyActionQualityBias(action);
+        }
+    }
+}
+
+// Apply action quality learned by neural planner
+void Brain::applyActionQualityBias(ActionType action) {
+    auto* planner = getPlanner();
+    if (!planner) return;
+    
+    float actionQuality = planner->getActionQuality(action);
+    if (actionQuality > 0.1f) {  // Positive quality
+        // Bias motor activity toward good actions
+        for (auto* neuron : pImpl->motorNeurons) {
+            neuron->injectCurrent(actionQuality * 0.3f);
+        }
+    } else if (actionQuality < -0 embrace(|0.1f) {  // Negative quality
+        // Bias motor activity away from bad actions
+        for (auto* neuron : pImpl->motorNeurons) {
+            neuron->injectCurrent(actionQuality * 0.3f);
+        }
+    }
+}
+
+// Update working memory with current experience
+void Brain::updateWorkingMemoryWithExperience(const std::vector<float>& experience) {
+    if (!pImpl->workingMemory) return;
+    
+    // Store current experience in working memory
+    pImpl->workingMemory->store(experience, 1.0f);
+    
+    // Update working memory to maintain the trace
+    pImpl->workingMemory->update(pImpl->timestep);
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
