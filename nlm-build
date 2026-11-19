@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""
+NLM Build and Deployment Script
+
+This script helps automate common tasks for the NLM project.
+
+Usage:
+    nlm-build            Build the project
+    nlm-run             Run the demo application
+    nlm-status          Show project status
+    nlm-help            Show help information
+
+Available commands:
+    build               Build the NLM project
+    run                 Run the Phase 6 demo
+    status              Show project build and version status
+    help                Show this help message
+    test                Run unit tests
+    benchmark           Run performance benchmarks
+    docs                Build documentation
+"""
+
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+def run_command(cmd, description=None):
+    """Run a shell command and return success status."""
+    if description:
+        print(f"Running: {description}")
+    print(f"  > {cmd}")
+    
+    try:
+        result = subprocess.run(cmd, shell=True, check=True, 
+                              capture_output=True, text=True)
+        if result.stdout:
+            print(f"  Output: {result.stdout.strip()}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"  Error: {e}")
+        if e.stderr:
+            print(f"  Stderr: {e.stderr.strip()}")
+        return False
+
+def build_project():
+    """Build the NLM project using CMake."""
+    print("Building NLM Project")
+    print("=" * 50)
+    
+    # Create build directory
+    build_dir = Path("build")
+    if not build_dir.exists():
+        print("Creating build directory...")
+        build_dir.mkdir(exist_ok=True)
+    
+    # Configure CMake
+    cmake_cmd = "cmake .. -DCMAKE_BUILD_TYPE=Release"
+    if not run_command(cmake_cmd, "Configure CMake"):
+        return False
+    
+    # Build the project
+    build_cmd = "make -j4"
+    if not run_command(build_cmd, "Build NLM"):
+        return False
+    
+    # Build Python bindings if enabled
+    python_bindings_cmd = "cmake --build . --target pynlm"
+    print("Building Python bindings...")
+    if run_command(python_bindings_cmd, "Build Python bindings"):
+        print("  ✓ Python bindings built successfully")
+    else:
+        print("  ⚠ Python bindings build failed (may be expected)")
+    
+    print("\n✓ Project built successfully!")
+    return True
+
+def run_demo():
+    """Run the Phase 6 integration demo."""
+    print("Running Phase 6 Integration Demo")
+    print("=" * 50)
+    
+    # Check if built demo exists
+    demo_path = Path("build/nlm_phase6_demo")
+    if not demo_path.exists():
+        print(f"Demo executable not found: {demo_path}")
+        print("Please run 'nlm-build' first to build the project.")
+        return False
+    
+    # Run the demo
+    return run_command(str(demo_path), "Run Phase 6 demo")
+
+def show_status():
+    """Show project build and version status."""
+    print("NLM Project Status")
+    print("=" * 50)
+    
+    # Check for build directory
+    build_dir = Path("build")
+    if not build_dir.exists():
+        print("❌ Build directory not found")
+        print("   Please run 'nlm-build' to build the project.")
+        return
+    
+    # Check for key build artifacts
+    artifacts = [
+        ("nlm_phase6_demo", "Phase 6 integration demo"),
+        ("nlm_phase5_demo", "Phase 5 demonstration"),
+        ("nlm_benchmark", "Performance benchmark"),
+        ("nlm_phase6_text_demo", "Phase 6 text demo"),
+    ]
+    
+    print("Build artifacts:")
+    for artifact, description in artifacts:
+        path = build_dir / artifact
+        if path.exists():
+            print(f"  ✓ {artifact:25} - {description}")
+            try:
+                stat = path.stat()
+                size_mb = stat.st_size / (1024 * 1024)
+                print(f"    Size: {size_mb:.2f} MB")
+            except:
+                pass
+        else:
+            print(f"  ❌ {artifact:25} - {description} (not built)")
+    
+    # Check Python bindings
+    python_bindings = Path("build/pynlm.so")
+    if python_bindings.exists():
+        print(f"  ✓ pynlm.so - Python bindings")
+    else:
+        print(f"  ❌ pynlm.so - Python bindings (not built)")
+    
+    # Show project information
+    print("\nProject Information:")
+    print("  Name: NLM (熙然) - Neural Learning Machine")
+    print("  Version: 0.1.0")
+    print("  Phase: 6 - Final Integration")
+    print("  Language: C++20")
+    print("  Build Type: Release")
+    print("  Compiler: GNU C++")
+
+def show_help():
+    """Show help information."""
+    help_text = __doc__
+    print(help_text)
+    
+    print("\nAdditional Commands:")
+    print("  clean              Clean build directory")
+    print("  tests              Run unit tests")
+    print("  benchmarks         Run performance benchmarks")
+    print("  docs               Build documentation")
+    print("  examples           Show example usage")
+
+def clean_build():
+    """Clean the build directory."""
+    print("Cleaning build directory...")
+    build_dir = Path("build")
+    if build_dir.exists():
+        import shutil
+        shutil.rmtree(build_dir)
+        print("✓ Build directory cleaned")
+    else:
+        print("⚠ Build directory does not exist")
+
+def main():
+    if len(sys.argv) < 2:
+        show_help()
+        return 1
+    
+    command = sys.argv[1].lower()
+    
+    if command == "build":
+        return 0 if build_project() else 1
+    
+    elif command == "run":
+        return 0 if run_demo() else 1
+    
+    elif command == "status":
+        show_status()
+        return 0
+    
+    elif command == "help":
+        show_help()
+        return 0
+    
+    elif command == "clean":
+        clean_build()
+        return 0
+    
+    elif command == "tests":
+        print("Running tests...")
+        # In a real implementation, this would run the test suite
+        print("⚠ Tests command not fully implemented")
+        return 0
+    
+    elif command == "benchmarks":
+        print("Running benchmarks...")
+        # In a real implementation, this would run benchmarks
+        print("⚠ Benchmarks command not fully implemented")
+        return 0
+    
+    elif command == "docs":
+        print("Building documentation...")
+        # In a real implementation, this would build documentation
+        print("⚠ Docs command not fully implemented")
+        return 0
+    
+    elif command == "examples":
+        print("Example Usage:")
+        print("  nlm-build                    # Build the project")
+        print("  nlm-run                      # Run the demo")
+        print("  nlm-status                   # Show project status")
+        print("  ./build/nlm_phase6_demo     # Run demo directly")
+        print("  nlmctl status                # Advanced brain control")
+        return 0
+    
+    else:
+        print(f"❌ Unknown command: {command}")
+        show_help()
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
