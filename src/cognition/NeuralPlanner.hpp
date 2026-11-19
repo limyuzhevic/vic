@@ -48,40 +48,49 @@ public:
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
 
-    // Get number of steps to look ahead
-    size_t getPlanningDepth() const { return planningDepth_; }
-    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
-
+// Set current goal
+    std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+    
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
-
+    
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
-
+    
     // Clear planning cache
     void clearCache();
-
+    
     // Set action quality function (from experience)
     void setActionQuality(ActionType action, float quality) {
         size_t idx = static_cast<size_t>(action);
         if (idx >= actionQuality_.size()) actionQuality_.resize(idx + 1, 0.0f);
         actionQuality_[idx] = quality;
     }
-
+    
     // Get action quality learned from experience (0 if never tried).
     float getActionQuality(ActionType action) const {
         size_t idx = static_cast<size_t>(action);
         return idx < actionQuality_.size() ? actionQuality_[idx] : 0.0f;
     }
-
-    // Get current goal
-    std::vector<float> getCurrentGoal() const { return currentGoal_; }
-    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
-
+    
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+    
+    // Concept formation integration
+    // Update planner with current concepts from concept formation system
+    void updateWithConcepts(const std::vector<DiscoveredConcept>& concepts);
+    
+    // Get concepts that influence current planning
+    std::vector<size_t> getInfluentialConcepts() const { return influentialConcepts_; }
+    
+    // Add concept influence to planning (concepts boost relevant actions)
+    void addConceptBoost(size_t conceptId, ActionType action, float strength);
+    
+    // Clear concept boosts
+    void clearConceptBoosts();
 
 private:
     // Generate possible action sequences
@@ -93,9 +102,9 @@ private:
     // Predict next state after an action (simple forward model)
     std::vector<float> predictNextState(ActionType action, const std::vector<float>& currentState);
 
-    struct Impl;
+struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
@@ -108,6 +117,16 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Concept formation integration
+    // Concepts that influence current planning
+    std::vector<size_t> influentialConcepts_;
+    
+    // Concept-to-action boosts (how much each concept promotes each action)
+    std::vector<std::vector<float>> conceptActionBoosts_;  // conceptId -> actionId -> strength
+    
+    // Concept stability weights (more stable concepts have more influence)
+    std::vector<float> conceptStabilityWeights_;  // conceptId -> weight
 };
 
 // SelfModel: Represents the agent's internal model of itself

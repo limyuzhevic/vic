@@ -7,6 +7,10 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
@@ -49,9 +53,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -138,6 +142,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -484,26 +491,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
+    // Update acetylcholine (attention)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+    }
+    
+    // Update norepinephrine (arousal)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+    }
+    
+    // Update serotonin (mood)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+    }
+    
+    // Apply acetylcholine attention effects
+    if (pImpl->acetylcholine && pImpl->workingMemory) {
+        // Store active sensory neurons in working memory with ACh modulation
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring()) {
+                float activation = neuron->getState().membranePotential;
+                pImpl->acetylcholine->consolidateMemory(this, neuron->getId(), activation);
             }
         }
+    }
+    
+    // Apply norepinephrine arousal effects on attention
+    if (pImpl->norepinephrine && pImpl->attention) {
+        float arousal = pImpl->norepinephrine->getArousalLevel();
+        float vigilance = pImpl->norepinephrine->getVigilanceFactor();
+        
+        // Arousal modulates attention selection threshold
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // Apply serotonin behavioral effects
+    if (pImpl->serotonin) {
+        pImpl->serotonin->applyToBrain(this);
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -626,6 +654,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Working memory → attention feedback: attention modulates memory storage
+            if (pImpl->acetylcholine) {
+                // ACh levels influence which working memory traces are consolidated
+                float attentionLevel = pImpl->acetylcholine->getLevel();
+                float topDownBias = attentionLevel * 2.0f - 1.0f;  // Range: -1 to 1
+                
+                // Apply top-down attention bias to working memory
+                for (size_t i = 0; i < competitors.size() && i < pImpl->workingMemory->getMemoryActivations().size(); ++i) {
+                    NeuronId neuron = competitors[i];
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                    
+                    // Apply attention bias: attended neurons get boosted storage
+                    if (topDownBias > 0.0f && activation > 0.3f) {
+                        pImpl->workingMemory->strengthenMemory(activation * (1.0f + topDownBias * 0.5f));
+                    }
+                }
+            }
+        }
+        
+        // NE arousal modulates attention competition
+        if (pImpl->norepinephrine) {
+            float arousal = pImpl->norepinephrine->getArousalLevel();
+            // Higher arousal increases competition intensity
+            pImpl->attention->setInhibitionStrength(0.5f * arousal);
+            pImpl->attention->setExcitationStrength(1.5f + arousal);
+        }
+        
+        // 5-HT mood modulates attention threshold
+        if (pImpl->serotonin) {
+            float mood = pImpl->serotonin->getMoodLevel();
+            // High mood lowers attention threshold (more inclusive), low mood raises it
+            float threshold = 0.3f + mood * 0.4f;
+            pImpl->attention->setCompetitionThreshold(threshold);
         }
     }
     
@@ -712,9 +774,27 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory - this is the sensory → working memory connection
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
+            // Store sensory input in working memory with attention modulation
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Apply neuromodulatory effects based on input type
+        // ACh enhances memory consolidation for salient sensory input
+        if (pImpl->acetylcholine && normalizedValue > 1.0f) {
+            pImpl->acetylcholine->signalAttention(0.5f, normalizedValue);
+        }
+        
+        // NE increases arousal for novel sensory input
+        if (pImpl->norepinephrine && normalizedValue > 2.0f) {
+            pImpl->norepinephrine->signalNovelty(normalizedValue);
+        }
+        
+        // 5-HT modulates emotional response to input
+        if (pImpl->serotonin && normalizedValue > 1.5f) {
+            // Positive input increases mood, negative would decrease (if input could be negative)
+            pImpl->serotonin->signalReward(std::abs(normalizedValue) * 0.1f);
         }
     }
 }

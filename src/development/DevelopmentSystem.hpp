@@ -43,8 +43,8 @@ public:
     // Get developmental age (in simulation time)
     double getDevelopmentalAge() const { return age_; }
     
-    // Set developmental age
-    void setDevelopmentalAge(double age) { age_ = age; }
+    // Apply development effects to the brain
+    void applyToBrain(Brain* brain);
     
 private:
     struct Impl;

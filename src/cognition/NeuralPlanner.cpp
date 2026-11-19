@@ -260,10 +260,7 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
         if (success) ++successCount;
     }
     
-    return successCount > recentPlanSuccess_.size() / 2;
-}
-
-// SelfModel Implementation
+    // SelfModel Implementation
 struct SelfModel::Impl {
     Brain* brain;
     
