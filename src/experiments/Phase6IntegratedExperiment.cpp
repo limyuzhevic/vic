@@ -21,9 +21,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
-    NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
-    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Features: Checkpointing=" << (config.enableCheckpointing ? "ON" : "OFF") << 
+                 ", Replay=" << (config.enableReplay ? "ON" : "OFF") << 
+                 ", Development=" << (config.enableDevelopment ? "ON" : "OFF"));
+    
+    // Validate configuration
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(config.neuronCount));
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    if (config.maxSteps == 0) {
+        NLM_LOG_ERROR("Invalid max steps: " + std::to_string(config.maxSteps));
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
@@ -48,22 +61,26 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     world.configure(16, 16, 16, 16);
     world.reset();
     
-    // Create agent
+    // Create agent with error handling
     AgentBrain agent(brain);
-    agent.initialize(world);
+    if (!agent.initialize(world)) {
+        NLM_LOG_ERROR("Failed to initialize agent");
+        result.endTime = time(nullptr);
+        return result;
+    }
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     
-    NLM_LOG_INFO("Brain and agent initialized successfully");
+    NLM_LOG_INFO("Agent initialized successfully");
     
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
+    NLM_LOG_INFO("Starting integration simulation...");
         // Get observation
         world.update(0.001);
         SensoryPercept percept = world.getSensoryPercept();
