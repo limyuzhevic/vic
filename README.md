@@ -107,6 +107,67 @@ currently separate demos per phase, not a single unified binary:
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
 
+## Enhanced Features
+
+This version includes several major enhancements:
+
+### 1. Enhanced Command Line Interface
+
+The new command line parser provides advanced argument parsing with extensive options:
+
+- **Short and Long Options**: Support for both `-h` and `--help` format
+- **Optional Arguments**: Options that require arguments (`--count=10` or `--count 10`)
+- **Boolean Options**: Toggle-style options (`--verbose`, `--quiet`)
+- **Required Options**: Mandatory options that must be provided
+- **Help System**: Built-in help with automatic option descriptions
+- **Error Handling**: Comprehensive error messages for invalid options
+
+**Common Options:**
+- `--help`, `-h`: Show help message
+- `--version`: Show version information  
+- `--verbose`, `-v`: Enable verbose logging
+- `--quiet`, `-q`: Suppress non-error output
+- `--config`, `-c`: Configuration file path
+- `--neuron-count`, `-n`: Number of neurons
+- `--steps`, `-s`: Number of simulation steps
+- `--log-level`: Log level (debug, info, warning, error, critical)
+
+### 2. Configuration Management
+
+Robust configuration system with file and command line support:
+
+- **Multiple Sources**: Command line arguments, configuration files, and defaults
+- **Type Conversion**: Automatic conversion to appropriate types
+- **File I/O**: Save and load configuration to/from files
+- **Default Values**: Built-in defaults for all configuration options
+
+**Configuration File Example:**
+```ini
+neuron_count=1000
+region_count=2
+connection_probability=0.15
+verbose_logging=true
+log_level=debug
+checkpoint_path=./checkpoints/brain.bin
+```
+
+### 3. Enhanced Testing
+
+Comprehensive test suite with performance benchmarks:
+
+- All existing tests preserved and enhanced
+- New `test_enhanced.cpp` tests command line parser, configuration manager, and utilities
+- Performance benchmarks for new features
+- Detailed test output with performance metrics
+
+### 4. String Utilities
+
+Utility functions for common string operations:
+
+- **Trim**: Remove leading and trailing whitespace
+- **Type Conversion**: String to number conversion with error handling
+- **Performance**: Optimized for minimal overhead
+
 ## Project Structure
 
 ```
@@ -119,27 +180,31 @@ NLM/
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── ENHANCED_FEATURES.md    # New documentation
 ├── src/
-│   ├── core/           # Core utilities
+│   ├── core/           # Core utilities (including CommandLine, Configuration)
+│   │   ├── CommandLine/
+│   │   ├── Configuration/
+│   │   └── Utilities/
 │   ├── agent/          # Agent-brain interface
 │   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
+│   ├── performance/    # Checkpoints, pools, queues
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
+│   ├── cognition/     # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
+│   └── visualization/ # Visualization
+├── tests/             # Enhanced test suite
 └── configs/
+```
 ```
 
 ## Phase Summary
