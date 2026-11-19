@@ -325,6 +325,11 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
+    // Use configurable checkpoint path for better testing and portability
+    std::string checkpointPath = cfg->getOr<std::string>("checkpoint_path", "./checkpoint_test.bin");
+    if (checkpointPath.empty()) {
+        checkpointPath = "./checkpoint_test.bin";
+    }
     
     // Create and initialize brain
     auto brain1 = std::make_shared<Brain>(cfg);
@@ -342,9 +347,8 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
-        NLM_LOG_ERROR("Failed to save checkpoint");
+    if (!brain1->save(checkpointPath)) {
+        NLM_LOG_ERROR("Failed to save checkpoint to " + checkpointPath);
         return false;
     }
     
@@ -352,8 +356,8 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     auto brain2 = std::make_shared<Brain>(cfg);
     brain2->initialize();
     
-    if (!brain2->load(path)) {
-        NLM_LOG_ERROR("Failed to load checkpoint");
+    if (!brain2->load(checkpointPath)) {
+        NLM_LOG_ERROR("Failed to load checkpoint from " + checkpointPath);
         return false;
     }
     
