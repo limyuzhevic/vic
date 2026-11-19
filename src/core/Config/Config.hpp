@@ -6,11 +6,14 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigurationSchema;
+class ConfigurationValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -56,8 +59,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from configuration file format
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJson(const std::string& filepath);
+    bool loadFromYaml(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -94,6 +102,24 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation and schema
+    std::vector<std::string> getValidationErrors() const;
+    std::string getValidationErrorReport() const;
+    bool validate(const ConfigurationSchema& schema, bool allowUnknownParameters = false) const;
+    bool validateWithDefaultSchema() const;
+    
+    // Schema evolution and backward compatibility
+    void setSchema(std::shared_ptr<ConfigurationSchema> schema);
+    std::shared_ptr<ConfigurationSchema> getSchema() const;
+    std::vector<std::string> getDeprecatedParameters() const;
+    
+    // Environment variable substitution and CLI validation
+    std::string substituteEnvironmentVariables(const std::string& value) const;
+    bool validateCLIArguments(const std::vector<std::string>& args);
+    
+    // Configuration templates
+    static std::unordered_map<std::string, ConfigValue> applyTemplate(const std::string& templateName);
     
 private:
     struct Impl;

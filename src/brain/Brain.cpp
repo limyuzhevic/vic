@@ -174,13 +174,19 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 Brain::~Brain() = default;
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+    // Move ownership - other's resources are now ours
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Cleanup current resources
         delete pImpl;
+        
+        // Move ownership
         pImpl = other.pImpl;
+        
+        // other's resources are now ours - set to nullptr to avoid double deletion
         other.pImpl = nullptr;
     }
     return *this;
@@ -389,7 +395,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
                 if (justFired) {

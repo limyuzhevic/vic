@@ -30,7 +30,7 @@ using namespace nlm;
 
 void printBanner() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
@@ -39,12 +39,12 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                       ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -279,22 +279,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -304,6 +304,163 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    }
+}
+
+void printUsage(const std::string& programName) {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                               NLM - Usage                                 ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                             ║
+║ NLM (熙然) - Neural Learning Machine                                       ║
+║ An experimental artificial developmental brain                              ║
+║                                                                             ║
+║ Usage:                                                                      ║
+║   " << programName << " [options]                                          ║
+║                                                                             ║
+║ Options:                                                                    ║
+║   --help, -h          Show this help message                                  ║
+║   --version           Show version information                                ║
+║   --validate-config    Validate configuration file                           ║
+║   --benchmark         Run performance benchmark                               ║
+║   --config-help       Show configuration options and descriptions              ║
+║   --config=FILE       Load configuration from file (default: configs/default.cfg) ║
+║   --neuron-count=N    Override neuron count                                     ║
+║   --region-count=N    Override region count                                     ║
+║   --connection-prob=N Override connection probability                            ║
+║   --random-seed=N     Set random seed for reproducibility                      ║
+║   --log-level=L       Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) ║
+║   --checkpoint-dir=D  Set checkpoint directory                                 ║
+║                                                                             ║
+║ Advanced Options:                                                           ║
+║   --enable-plasticity    Enable synaptic plasticity (default: enabled)        ║
+║   --disable-plasticity   Disable synaptic plasticity                          ║
+║   --enable-curiosity     Enable curiosity-driven exploration                  ║
+║   --enable-development   Enable developmental stages                         ║
+║   --enable-reward        Enable reward modulation                              ║
+║   --enable-stdp          Enable spike-timing dependent plasticity             ║
+║                                                                             ║
+║ Examples:                                                                   ║
+║   " << programName << " --help                                             ║
+║   " << programName << " --neuron-count=500 --region-count=2                   ║
+║   " << programName << " --config=myconfig.cfg --log-level=INFO                ║
+║   " << programName << " --enable-curiosity --enable-development               ║
+║                                                                             ║
+║ For more information about configuration options, use --config-help           ║
+║                                                                             ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine v1.0.0" << std::endl;
+    std::cout << "Phase 6: Final Integration" << std::endl;
+    std::cout << "Compiled with C++20" << std::endl;
+    std::cout << "Build date: " << __DATE__ << std::endl;
+}
+
+void printConfigHelp() {
+    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                            NLM Configuration Options                           ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║  Core Parameters:                                                               ║" << std::endl;
+    std::cout << "║    random_seed           Integer seed for random number generator             ║" << std::endl;
+    std::cout << "║    simulation_timestep    Time step for simulation (seconds)                   ║" << std::endl;
+    std::cout << "║    neuron_count          Total number of neurons in brain                        ║" << std::endl;
+    std::cout << "║    region_count          Number of brain regions                                 ║" << std::endl;
+    std::cout << "║    connection_probability Probability of synaptic connection between neurons ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "║  Plasticity Settings:                                                            ║" << std::endl;
+    std::cout << "║    stdp_ltp_weight       STDP Long-Term Potentiation weight                     ║" << std::endl;
+    std::cout << "║    stdp_ltd_weight       STDP Long-Term Depression weight                       ║" << std::endl;
+    std::cout << "║    stdp_tau              STDP time constant (ms)                                ║" << std::endl;
+    std::cout << "║    synaptogenesis_rate   Structural plasticity synapse creation rate           ║" << std::endl;
+    std::cout << "║    pruning_rate          Structural plasticity synapse removal rate            ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "║  Neuromodulation:                                                                ║" << std::endl;
+    std::cout << "║    dopamine_baseline     Dopamine baseline level                                 ║" << std::endl;
+    std::cout << "║    curiosity_enable      Enable curiosity-driven exploration (true/false)       ║" << std::endl;
+    std::cout << "║    novelty_enable        Enable novelty detection (true/false)                 ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "║  Development:                                                                   ║" << std::endl;
+    std::cout << "║    development_synaptogenesis_rate Development synapse creation rate           ║" << std::endl;
+    std::cout << "║    development_pruning_rate Development synapse removal rate                   ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "║  Logging:                                                                        ║" << std::endl;
+    std::cout << "║    log_level            Logging level (DEBUG/INFO/WARNING/ERROR/CRITICAL)        ║" << std::endl;
+    std::cout << "║    log_to_file          Enable/disable file logging (true/false)               ║" << std::endl;
+    std::cout << "║    log_filename         Log file name                                           ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "║  Performance:                                                                   ║" << std::endl;
+    std::cout << "║    max_simulation_steps Maximum number of simulation steps                      ║" << std::endl;
+    std::cout << "║    simulation_time_limit Simulation time limit (seconds, 0 = no limit)          ║" << std::endl;
+    std::cout << "║                                                                                   ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║ Configuration File Format:                                                        ║" << std::endl;
+    std::cout << "║   key = value   (values can be quoted for strings)                              ║" << std::endl;
+    std::cout << "║   # or // comments                                                            ║" << std::endl;
+    std::cout << "╚═══════════════════════════════════════════════════════════════════════════════════╝" << std::endl;
+}
+
+void validateConfig(const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("Validating configuration...");
+    
+    // Core validation
+    bool isValid = true;
+    
+    // Check required parameters
+    if (!config->has("random_seed")) {
+        NLM_LOG_WARNING("Missing random_seed (will use default 42)");
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    
+    if (!config->has("simulation_timestep")) {
+        NLM_LOG_WARNING("Missing simulation_timestep (will use default 0.001)");
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    
+    if (!config->has("neuron_count")) {
+        NLM_LOG_WARNING("Missing neuron_count (will use default 1000)");
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    }
+    
+    if (!config->has("region_count")) {
+        NLM_LOG_WARNING("Missing region_count (will use default 1)");
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    
+    // Validate parameter ranges
+    auto neuronCount = config->get<int64_t>("neuron_count");
+    if (neuronCount.has_value() && neuronCount.value() < 10) {
+        NLM_LOG_ERROR("neuron_count must be at least 10");
+        isValid = false;
+    }
+    
+    auto regionCount = config->get<int64_t>("region_count");
+    if (regionCount.has_value() && (regionCount.value() < 1 || regionCount.value() > 100)) {
+        NLM_LOG_ERROR("region_count must be between 1 and 100");
+        isValid = false;
+    }
+    
+    auto connectionProb = config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("connection_probability must be between 0.0 and 1.0");
+        isValid = false;
+    }
+    
+    // Validate plasticity parameters
+    auto stdpLtp = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    auto stdpLtd = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    if (stdpLtp <= 0.0f || stdpLtd <= 0.0f) {
+        NLM_LOG_ERROR("STDP weights must be positive");
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+    } else {
+        NLM_LOG_INFO("Configuration validation passed!");
     }
 }
 
@@ -342,17 +499,17 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load from file
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Load from command line
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase  menstruace2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -370,7 +527,7 @@ int main(int argc, char** argv) {
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
