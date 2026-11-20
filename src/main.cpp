@@ -307,10 +307,93 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+// Enhanced command-line argument parsing
+    bool printHelp = false;
+    bool verboseMode = false;
+    bool benchmarkMode = false;
+    bool saveOutput = false;
+    std::string outputFile = "nlm_output.txt";
+    size_t stepsOverride = 0;
+    std::string configOverride = "";
+    std::string logLevel = "info";
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            benchmarkMode = true;
+        } else if (arg == "--save" || arg == "-s") {
+            saveOutput = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                outputFile = argv[++i];
+            }
+        } else if (arg == "--steps" || arg == "-n") {
+            if (i + 1 < argc) {
+                stepsOverride = std::stoul(argv[++i]);
+            }
+        } else if (arg == "--config" || arg == "-c") {
+            if (i + 1 < argc) {
+                configOverride = argv[++i];
+            }
+        } else if (arg == "--log-level" || arg == "-l") {
+            if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg == "--quiet" || arg == "-q") {
+            // Just suppress some output
+            verboseMode = false;
+        }
+    }
+    
+    // Print help if requested
+    if (printHelp) {
+        printBanner();
+        std::cout << "\n=== NLM Command Line Interface ===\n" << std::endl;
+        std::cout << "Usage: ./nlm [OPTIONS]\n" << std::endl;
+        std::cout << "NLM (Neural Learning Machine) - Phase 2 Neural Computation Demo\n\n" << std::endl;
+        std::cout << "Options:\n" << std::endl;
+        std::cout << "  -h, --help              Show this help message\n" << std::endl;
+        std::cout << "  -v, --verbose           Enable verbose output\n" << std::endl;
+        std::cout << "  -b, --benchmark         Run in benchmark mode\n" << std::endl;
+        std::cout << "  -s, --save [file]       Save output to file (default: nlm_output.txt)\n" << std::endl;
+        std::cout << "  -n, --steps N           Override number of steps (default: 1000)\n" << std::endl;
+        std::cout << "  -c, --config FILE       Use custom configuration file (default: configs/default.cfg)\n" << std::endl;
+        std::cout << "  -l, --log-level LEVEL   Set log level (debug, info, warning, error, critical)\n" << std::endl;
+        std::cout << "  -q, --quiet             Suppress verbose output\n\n" << std::endl;
+        std::cout << "Examples:\n" << std::endl;
+        std::cout << "  ./nlm                          # Run standard demo\n" << std::endl;
+        std::cout << "  ./nlm --benchmark              # Run benchmark test\n" << std::endl;
+        std::cout << "  ./nlm --steps 5000 -v          # Run with 5000 steps and verbose output\n" << std::endl;
+        std::cout << "  ./nlm --config custom.cfg -s results.txt\n" << std::endl;
+        return 0;
+    }
+    
+    // Set log level based on command line argument
+    if (logLevel == "debug") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (logLevel == "warning") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (logLevel == "error") {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else if (logLevel == "critical") {
+        consoleLogger->setLevel(LogLevel::Critical);
+    }
+    // Default is info level
+    
+    // Use benchmark mode for standard demo
+    if (benchmarkMode) {
+        NLM_LOG_INFO("Running in BENCHMARK mode - optimized for performance testing");
+    }
+    
+    // Use verbose mode for detailed output
+    if (verboseMode) {
+        NLM_LOG_INFO("Running in VERBOSE mode - detailed output enabled");
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -326,33 +409,23 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    // Override configuration file if specified
+    if (!configOverride.empty()) {
+        configFile = configOverride;
+        NLM_LOG_INFO("Using custom configuration file: " + configFile);
     }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (with overrides from command line)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -370,12 +443,15 @@ int main(int argc, char** argv) {
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  Configuration file: " + configFile);
+    NLM_LOG_INFO("  Random seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  Simulation timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  Neuron count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  Region count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  Connection probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  Verbose mode: " + std::string(verboseMode ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Benchmark mode: " + std::string(benchmarkMode ? "enabled" : "disabled"));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

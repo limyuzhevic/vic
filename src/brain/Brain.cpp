@@ -92,7 +92,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(std::make_unique<RandomGenerator>(42))  // Initialize directly
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -105,12 +105,12 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
+        // Update random generator seed from config if available
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
             seed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
+        rng->setSeed(seed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -301,30 +301,30 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers once; re-initialising used to register them
+// Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
     if (!pImpl->spikeHandlersRegistered) {
         pImpl->spikeHandlersRegistered = true;
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        auto it = pImpl->neuronById.find(event.destination_neuron.index());
-        if (it != pImpl->neuronById.end()) {
-            Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-            if (event.is_excitatory) {
-                neuron->receiveExcitatoryInput(synapticCurrent);
-            } else {
-                neuron->receiveInhibitoryInput(-synapticCurrent);
+        // Register spike handlers for event-driven processing
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            auto it = pImpl->neuronById.find(event.destination_neuron.index());
+            if (it != pImpl->neuronById.end()) {
+                Neuron* neuron = it->second;
+                MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                if (event.is_excitatory) {
+                    neuron->receiveExcitatoryInput(synapticCurrent);
+                } else {
+                    neuron->receiveInhibitoryInput(-synapticCurrent);
+                }
             }
-        }
-    });
+        });
     }  // spikeHandlersRegistered
     
     // Configure checkpoint manager
