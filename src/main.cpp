@@ -7,10 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Constants.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -19,33 +16,109 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+void displayHelp();
+void displayAvailableConfigurations();
 
-using namespace nlm;
+void displayHelp() {
+    std::cout << "\n=== NLM (熙然) - Neural Learning Machine ===\n" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation\n" << std::endl;
+    
+    std::cout << "USAGE:\n";
+    std::cout << "  nlm [--config=<file>] [--option=value]...\n" << std::endl;
+    std::cout << "  nlm --help, -h, -? (for help)\n" << std::endl;
+    
+    std::cout << "\nCOMMANDS:\n";
+    std::cout << "  --help, -h           Display this help message\n" << std::endl;
+    std::cout << "  --config=<file>      Load configuration from file\n" << std::endl;
+    std::cout << "  --mode=<mode>        Simulation mode (basic, plasticity, stdp)\n" << std::endl;
+    std::cout << "  --neurons=<count>    Number of neurons (default: 1000)\n" << std::endl;
+    std::cout << "  --steps=<count>      Number of simulation steps (default: 5000)\n" << std::endl;
+    std::cout << "  --seed=<number>      Random seed for reproducible results\n" << std::endl;
+    std::cout << "  --verbose, -v         Enable verbose logging\n" << std::endl;
+    std::cout << "  --benchmark           Run benchmark instead of standard tests\n" << std::endl;
+    std::cout << "  --save=<file>         Save final brain state to file\n" << std::endl;
+    std::cout << "  --load=<file>         Load initial brain state from file\n" << std::endl;
+    std::cout << "  --list-configs        List all available configuration options\n" << std::endl;
+    
+    std::cout << "\nADVANCED OPTIONS:\n";
+    std::cout << "  --region-count=<n>    Number of brain regions\n" << std::endl;
+    std::cout << "  --connection-prob=<f> Synapse connection probability (0.0-1.0)\n" << std::endl;
+    std::cout << "  --stdp-ltp=<f>        STDP LTP weight (default: 0.01)\n" << std::endl;
+    std::cout << "  --stdp-ltd=<f>        STDP LTD weight (default: 0.012)\n" << std::endl;
+    std::cout << "  --stdp-tau=<f>        STDP time constant (default: 20.0)\n" << std::endl;
+    std::cout << "  --synaptogenesis=<f>  Synaptogenesis rate (default: 0.0001)\n" << std::endl;
+    std::cout << "  --pruning=<f>         Pruning rate (default: 0.00001)\n" << std::endl;
+    std::cout << "  --checkpoint-dir=<d>  Directory for checkpoints\n" << std::endl;
+    std::cout << "  --checkpoint-interval=<n> Checkpoint interval (default: 100)\n" << std::endl;
+    
+    std::cout << "\nCONFIGURATION FILES:\n";
+    std::cout << "  configs/default.cfg     Default configuration\n" << std::endl;
+    std::cout << "  configs/user.cfg        User customizations\n" << std::endl;
+    
+    std::cout << "\nSIMULATION MODES:\n";
+    std::cout << "  basic                  Basic connectivity test\n" << std::endl;
+    std::cout << "  plasticity             Plasticity learning experiment\n" << std::endl;
+    std::cout << "  stdp                   STDP verification test\n" << std::endl;
+    std::cout << "  benchmark              Performance benchmark\n" << std::endl;
+    
+    std::cout << "\nEXAMPLES:\n";
+    std::cout << "  nlm --mode=plasticity --steps=2000 --seed=42\n" << std::endl;
+    std::cout << "  nlm --neurons=2000 --connection-prob=0.15 --save=final_brain.bin\n" << std::endl;
+    std::cout << "  nlm --benchmark --verbose --checkpoint-dir=./checkpoints\n" << std::endl;
+    std::cout << "  nlm --list-configs\n" << std::endl;
+    
+    std::cout << "\nFor more information, visit: https://github.com/nlm/neural-learning-machine\n" << std::endl;
+    std::cout << "Phase 2 Documentation: https://github.com/nlm/documentation/tree/phase2\n" << std::endl;
+}
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void displayAvailableConfigurations() {
+    std::cout << "\n=== Available Configuration Options ===\n" << std::endl;
+    
+    // Configuration categories
+    std::cout << "GENERAL SETTINGS:\n";
+    std::cout << "  brain.neuron_count              Number of neurons (default: 1000)\n" << std::endl;
+    std::cout << "  brain.region_count              Number of regions (default: 1)\n" << std::endl;
+    std::cout << "  simulation.timestep             Simulation timestep (default: 0.001)\n" << std::endl;
+    
+    std::cout << "\nNEURAL DYNAMICS:\n";
+    std::cout << "  brain.connection_probability    Synapse connection probability (default: 0.1)\n" << std::endl;
+    std::cout << "  brain.initial_weight_mean       Mean initial weight (default: 0.2)\n" << std::endl;
+    std::cout << "  brain.initial_weight_std        Weight standard deviation (default: 0.1)\n" << std::endl;
+    
+    std::cout << "\nPLASTICITY RULES:\n";
+    std::cout << "  plasticity.stdp.enable         STDP enabled (default: true)\n" << std::endl;
+    std::cout << "  plasticity.stdp.ltp_weight      LTP weight (default: 0.01)\n" << std::endl;
+    std::cout << "  plasticity.stdp.ltd_weight      LTD weight (default: 0.012)\n" << std::endl;
+    std::cout << "  plasticity.stdp.time_constant   STDP time constant (default: 20.0)\n" << std::endl;
+    std::cout << "  plasticity.hebbian.enable      Hebbian enabled (default: true)\n" << std::endl;
+    std::cout << "  plasticity.hebbian.learning_rate Hebbian learning rate (default: 0.01)\n" << std::endl;
+    
+    std::cout << "\nSTRUCTURAL PLASTICITY:\n";
+    std::cout << "  plasticity.structural.synaptogenesis_rate Synaptogenesis rate (default: 0.0001)\n" << std::endl;
+    std::cout << "  plasticity.structural.pruning_rate         Pruning rate (default: 0.00001)\n" << std::endl;
+    
+    std::cout << "\nNEUROMODULATION:\n";
+    std::cout << "  neuromod.dopamine.baseline    Dopamine baseline (default: 0.0)\n" << std::endl;
+    std::cout << "  neuromod.curiosity.scale      Curiosity scale (default: 1.0)\n" << std::endl;
+    
+    std::cout << "\nDEVELOPMENT:\n";
+    std::cout << "  development.stage             Developmental stage (Initial|CriticalPeriod|Maturation|Adult|Aging)\n" << std::endl;
+    
+    std::cout << "\nMEMORY SYSTEMS:\n";
+    std::cout << "  memory.working.capacity        Working memory capacity (default: 100)\n" << std::endl;
+    std::cout << "  memory.episodic.max_episodes    Max episodic episodes (default: 1000)\n" << std::endl;
+    
+    std::cout << "\nCHECKPOINTING:\n";
+    std::cout << "  checkpoint.directory           Checkpoint directory (default: ./checkpoints)\n" << std::endl;
+    std::cout << "  checkpoint.save_interval       Save interval (default: 100)\n" << std::endl;
+    std::cout << "  checkpoint.load_interval       Load interval (default: 100)\n" << std::endl;
+    
+    std::cout << "\nLOGGING:\n";
+    std::cout << "  logging.level                 Log level (Debug|Info|Warning|Error|Critical)\n" << std::endl;
+    std::cout << "  logging.to_file               Log to file (default: false)\n" << std::endl;
+    std::cout << "  logging.filename              Log filename (default: nlm.log)\n" << std::endl;
+    
+    std::cout << "\nUse: nlm --list-configs to display all configuration options\n" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -310,6 +383,21 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Display comprehensive help if no arguments or help requested
+    if (argc == 1) {
+        displayHelp();
+        return 0;
+    }
+    
+    // Check for help flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h" || arg == "-?" || arg == "/?") {
+            displayHelp();
+            return 0;
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -352,30 +440,30 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 using constants
+    config->set("random_seed", Constants::DEFAULT_RANDOM_SEED, ConfigSource::Default);
+    config->set("simulation_timestep", Constants::DEFAULT_SIMULATION_TIMESTEP, ConfigSource::Default);
+    config->set("neuron_count", Constants::DEFAULT_NEURON_COUNT, ConfigSource::Default);
+    config->set("region_count", Constants::DEFAULT_REGION_COUNT, ConfigSource::Default);
+    config->set("connection_probability", Constants::DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters using constants
+    config->set("stdp_ltp_weight", Constants::DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", Constants::DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", Constants::DEFAULT_STDP_TIME_CONSTANT, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters using constants
+    config->set("synaptogenesis_rate", Constants::DEFAULT_SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    config->set("pruning_rate", Constants::DEFAULT_PRUNING_RATE, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary using constants
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", Constants::DEFAULT_RANDOM_SEED)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", Constants::DEFAULT_SIMULATION_TIMESTEP)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", Constants::DEFAULT_NEURON_COUNT)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", Constants::DEFAULT_REGION_COUNT)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", Constants::DEFAULT_CONNECTION_PROBABILITY)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
